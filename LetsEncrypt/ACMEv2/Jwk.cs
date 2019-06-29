@@ -2,6 +2,7 @@
  * JSON Web Key (JWK)
  * https://tools.ietf.org/html/rfc7517
  * https://www.gnupg.org/documentation/manuals/gcrypt-devel/RSA-key-parameters.html
+ * https://static.javadoc.io/com.nimbusds/nimbus-jose-jwt/2.15.2/com/nimbusds/jose/jwk/RSAKey.html
  *
 */
 
@@ -46,43 +47,58 @@ namespace ACMEv2
         public string Use { get; set; }
 
         /// <summary>
-        /// RSA public modulus n.
+        /// The the modulus value for the public RSA key. It is represented as the Base64URL encoding of value's big endian representation.
         /// </summary>
         [JsonProperty("n")]
         public string Modulus { get; set; }
 
         /// <summary>
-        /// RSA public exponent e. 
+        /// The exponent value for the public RSA key. It is represented as the Base64URL encoding of value's big endian representation.
         /// </summary>
         [JsonProperty("e")]
         public string Exponent { get; set; }
 
         /// <summary>
-        /// RSA secret exponent d = e^-1 \bmod (p-1)(q-1).
+        /// The private exponent. It is represented as the Base64URL encoding of the value's big endian representation.
         /// </summary>
         [JsonProperty("d")]
         public string D { get; set; }
 
         /// <summary>
-        /// RSA secret prime p. 
+        /// The first prime factor. It is represented as the Base64URL encoding of the value's big endian representation.
         /// </summary>
         [JsonProperty("p")]
         public string P { get; set; }
 
         /// <summary>
-        /// RSA secret prime q with p < q. 
+        /// The second prime factor. It is represented as the Base64URL encoding of the value's big endian representation.
         /// </summary>
         [JsonProperty("q")]
         public string Q { get; set; }
 
+        /// <summary>
+        /// The first factor Chinese Remainder Theorem exponent. It is represented as the Base64URL encoding of the value's big endian representation.
+        /// </summary>
         [JsonProperty("dp")]
         public string DP { get; set; }
 
+        /// <summary>
+        /// The second factor Chinese Remainder Theorem exponent. It is represented as the Base64URL encoding of the value's big endian representation.
+        /// </summary>
         [JsonProperty("dq")]
         public string DQ { get; set; }
 
+        /// <summary>
+        /// The first Chinese Remainder Theorem coefficient. It is represented as the Base64URL encoding of the value's big endian representation.
+        /// </summary>
         [JsonProperty("qi")]
         public string InverseQ { get; set; }
+
+        /// <summary>
+        /// The other primes information, should they exist, null or an empty list if not specified.
+        /// </summary>
+        [JsonProperty("oth")]
+        public string OthInf { get; set; }
 
         /// <summary>
         /// "alg" (Algorithm) Parameter
