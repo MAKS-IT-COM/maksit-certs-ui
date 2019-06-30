@@ -510,7 +510,7 @@ namespace ACMEv2
                 return false;
             }
 
-            var cert = new X509Certificate2(cache.Cert);
+            var cert = new X509Certificate2(Encoding.ASCII.GetBytes(cache.Cert));
 
             // if it is about to expire, we need to refresh
             if ((cert.NotAfter - DateTime.UtcNow).TotalDays < 14)
@@ -519,6 +519,7 @@ namespace ACMEv2
             var rsa = new RSACryptoServiceProvider(4096);
             rsa.ImportCspBlob(cache.Private);
 
+
             value = new CachedCertificateResult
             {
                 Certificate = cache.Cert,
@@ -526,6 +527,7 @@ namespace ACMEv2
             };
             return true;
         }
+
 
         /// <summary>
         /// 

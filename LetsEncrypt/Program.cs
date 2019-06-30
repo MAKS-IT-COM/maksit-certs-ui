@@ -47,47 +47,72 @@ namespace LetsEncrypt
 
             try
             {
-                LetsEncryptClient client = new LetsEncryptClient(LetsEncryptClient.StagingV2, AppDomain.CurrentDomain.BaseDirectory);
+                LetsEncryptClient client = new LetsEncryptClient(LetsEncryptClient.ProductionV2, AppDomain.CurrentDomain.BaseDirectory);
                 Console.WriteLine("1. Client Initialization...");
 
                 // 1
                 client.Init(contacts.ToArray()).Wait();
                 Console.WriteLine(string.Format("Terms of service: {0}",client.GetTermsOfServiceUri()));
-                client.NewNonce().Wait();
 
 
-                // 2
-                try
+                // get cached certificate and chech if it's valid
+                CachedCertificateResult certRes = new CachedCertificateResult();
+                if (client.TryGetCachedCertificate(hosts, out certRes))
                 {
-                    Console.WriteLine("2. Client New Order...");
-                    Task<Dictionary<string, string>> orders = client.NewOrder(hosts.ToArray(), "http-01");
-                    orders.Wait();
+                    File.WriteAllText(Path.Combine(certsPath, "maks-it.com.crt"), certRes.Certificate);
 
-                    foreach (var result in orders.Result)
+                    using (StreamWriter writer = File.CreateText(Path.Combine(certsPath, "maks-it.com.key")))
+                        Library.ExportPrivateKey(certRes.PrivateKey, writer);
+                }
+                else {
+
+                    client.NewNonce().Wait();
+
+                    // 2
+                    try
                     {
-                        Console.WriteLine("Key: " + result.Key + Environment.NewLine + "Value: " + result.Value);
-                        string[] splitToken = result.Value.Split('~');
-                        File.WriteAllText(FS.Path.Combine(tokensPath, splitToken[0]), splitToken[1]);
+                        Console.WriteLine("2. Client New Order...");
+                        Task<Dictionary<string, string>> orders = client.NewOrder(hosts.ToArray(), "http-01");
+                        orders.Wait();
+
+                        foreach (var result in orders.Result)
+                        {
+                            Console.WriteLine("Key: " + result.Key + Environment.NewLine + "Value: " + result.Value);
+                            string[] splitToken = result.Value.Split('~');
+                            File.WriteAllText(FS.Path.Combine(tokensPath, splitToken[0]), splitToken[1]);
+                        }
+
+                        // 3
+                        Console.WriteLine("3. Client Complete Challange...");
+                        client.CompleteChallenges().Wait();
+                        Console.WriteLine("Challanges comleted.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.Message.ToString());
+                        client.GetOrder(hosts.ToArray()).Wait();
                     }
 
-                    // 3
-                    Console.WriteLine("3. Client Complete Challange...");
-                    client.CompleteChallenges().Wait();
-                    Console.WriteLine("Challanges comleted.");
-                }
-                catch (Exception ex) {
-                    Console.WriteLine(ex.Message.ToString());
-                    client.GetOrder(hosts.ToArray()).Wait();
-                }
-               
 
-                // 4 Download certificate
-                Console.WriteLine("4. Download certificate...");
-                Task<(X509Certificate2 Cert, RSA PrivateKey)> certificate = client.GetCertificate();
-                certificate.Wait();
+                    // 4 Download certificate
+                    Console.WriteLine("4. Download certificate...");
+                    client.GetCertificate().Wait();
 
-                File.WriteAllText(Path.Combine(certsPath, "maks-it.com.crt"), Library.ExportToPEM(certificate.Result.Cert));
-                Console.WriteLine("Certificate saved.");
+
+                    // 5 Write to filesystem
+                    //CachedCertificateResult certRes = new CachedCertificateResult();
+                    //if (client.TryGetCachedCertificate(hosts, out certRes)) {
+                    //    File.WriteAllText(Path.Combine(certsPath, "maks-it.com.crt"), certRes.Certificate);
+
+                    //    using (StreamWriter writer = File.CreateText(Path.Combine(certsPath, "maks-it.com.key")))
+                    //        Library.ExportPrivateKey(certRes.PrivateKey, writer);
+                    //}
+
+                    Console.WriteLine("Certificate saved.");
+                }
+
+
+                
             }
             catch (Exception ex) {
                 Console.WriteLine(ex.Message.ToString());

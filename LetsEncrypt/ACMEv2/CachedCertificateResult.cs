@@ -4,7 +4,7 @@ namespace ACMEv2
 {
     public class CachedCertificateResult
     {
-        public RSA PrivateKey;
+        public RSACryptoServiceProvider PrivateKey;
         public string Certificate;
     }
 
