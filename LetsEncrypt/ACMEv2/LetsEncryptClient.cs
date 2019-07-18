@@ -76,7 +76,7 @@ namespace ACMEv2
         private RSACryptoServiceProvider _accountKey;
         private RegistrationCache _cache;
         private HttpClient _client;
-        private Directory _directory;
+        private AcmeDirectory _directory;
         private List<AuthorizationChallenge> _challenges = new List<AuthorizationChallenge>();
         private Order _currentOrder;
 
@@ -84,6 +84,7 @@ namespace ACMEv2
         /// Let's encrypt client object
         /// </summary>
         /// <param name="url"></param>
+        /// <param name="home"></param>
         public LetsEncryptClient(string url, string home)
         {
             _url = url ?? throw new ArgumentNullException(nameof(url));
@@ -108,7 +109,7 @@ namespace ACMEv2
             _client = GetCachedClient(_url);
 
             // 1 - Get directory
-            (_directory, _) = await SendAsync<Directory>(HttpMethod.Get, new Uri("directory", UriKind.Relative), null, token);
+            (_directory, _) = await SendAsync<AcmeDirectory>(HttpMethod.Get, new Uri("directory", UriKind.Relative), null, token);
 
 
             if (File.Exists(_path))
@@ -502,7 +503,7 @@ namespace ACMEv2
         /// <param name="hosts"></param>
         /// <param name="value"></param>
         /// <returns></returns>
-        public bool TryGetCachedCertificate(List<string> hosts, out CachedCertificateResult value)
+        public bool TryGetCachedCertificate(string [] hosts, out CachedCertificateResult value)
         {
             value = null;
             if (_cache.CachedCerts.TryGetValue(hosts[0], out var cache) == false)

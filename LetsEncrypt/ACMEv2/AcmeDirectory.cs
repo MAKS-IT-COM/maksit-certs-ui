@@ -3,7 +3,7 @@ using Newtonsoft.Json;
 
 namespace ACMEv2
 {
-    public class Directory
+    public class AcmeDirectory
     {
         //New nonce 
         [JsonProperty("newNonce")]
@@ -32,6 +32,12 @@ namespace ACMEv2
 
         //Metadata object
         [JsonProperty("meta")]
-        public DirectoryMeta Meta { get; set; }
+        public AcmeDirectoryMeta Meta { get; set; }
+    }
+
+    public class AcmeDirectoryMeta
+    {
+        [JsonProperty("termsOfService")]
+        public string TermsOfService { get; set; }
     }
 }

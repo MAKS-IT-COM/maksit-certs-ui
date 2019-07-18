@@ -1,132 +1,179 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
-
 using System.Threading.Tasks;
-
-
-
 using ACMEv2;
-
-
-using FS = System.IO;
-
-
 
 namespace LetsEncrypt
 {
     class Program
     {
+        private static readonly string AppPath = AppDomain.CurrentDomain.BaseDirectory;
+
+
+
         static void Main(string[] args)
         {
-            // save to http://<YOUR_DOMAIN>/.well-known/acme-challenge/<TOKEN>
-            var tokensPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".well-known/acme-challenge");
-            if (!FS.Directory.Exists(tokensPath))
-                FS.Directory.CreateDirectory(tokensPath);
-
-            foreach (FileInfo file in new DirectoryInfo(tokensPath).GetFiles())
-                file.Delete();
-
-
-            var certsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "certs");
-            if (!FS.Directory.Exists(certsPath))
-                FS.Directory.CreateDirectory(certsPath);
-
-
-            List<string> contacts = new List<string>();
-            contacts.Add("maksym.sadovnychyy@gmail.com");
-
-            List<string> hosts = new List<string>();
-            hosts.Add("maks-it.com");
-            hosts.Add("www.maks-it.com");
-
-            Console.WriteLine("Let's Encrypt C# .Net Core Client");
-
             try
             {
-                LetsEncryptClient client = new LetsEncryptClient(LetsEncryptClient.ProductionV2, AppDomain.CurrentDomain.BaseDirectory);
-                Console.WriteLine("1. Client Initialization...");
+                Console.WriteLine("Let's Encrypt C# .Net Core Client");
 
-                // 1
-                client.Init(contacts.ToArray()).Wait();
-                Console.WriteLine(string.Format("Terms of service: {0}",client.GetTermsOfServiceUri()));
+                Settings settings  = (new SettingsProvider(null)).settings;
+        
+                //loop all customers
+                foreach(Customer customer in settings.customers) {
+                    try {
+                        Console.WriteLine(string.Format("Managing customer: {0} - {1} {2}", customer.id, customer.name, customer.lastname));
+
+                        //loop each customer website
+                        foreach(Site site in customer.sites) {
+                            Console.WriteLine(string.Format("Managing site: {0}", site.name));
+
+                            try {
+                                //define cache folder
+                                string cache = Path.Combine(AppPath, "cache", customer.id, site.name);
+                                if(!Directory.Exists(cache)) {
+                                    Directory.CreateDirectory(cache);
+                                }
+
+                                LetsEncryptClient client = new LetsEncryptClient(settings.url, cache);
+
+                                //1. Client initialization
+                                Console.WriteLine("1. Client Initialization...");
+                                client.Init(customer.contacts).Wait();
+                                Console.WriteLine(string.Format("Terms of service: {0}", client.GetTermsOfServiceUri()));
+
+                                //create folder for ssl
+                                string ssl = Path.Combine(settings.ssl, site.name);
+                                if(!Directory.Exists(ssl)) {
+                                    Directory.CreateDirectory(ssl);
+                                }
+
+                                // get cached certificate and check if it's valid
+                                // if valid check if cert and key exists otherwise recreate
+                                // else continue with new certificate request
+                                CachedCertificateResult certRes = new CachedCertificateResult();
+                                if (client.TryGetCachedCertificate(site.hosts, out certRes))
+                                {
+                                    string cert = Path.Combine(ssl, site.name + ".crt");
+                                    if(!File.Exists(cert))
+                                        File.WriteAllText(cert, certRes.Certificate);
+                                    
+                                    string key = Path.Combine(ssl, site.name + ".key");
+                                    if(!File.Exists(key)) {
+                                        using (StreamWriter writer = File.CreateText(key))
+                                            Library.ExportPrivateKey(certRes.PrivateKey, writer);
+                                    }
+
+                                    Console.WriteLine("Certificate and Key exists and valid.");
+                                }
+                                else {
+                                    if(!Directory.Exists(Path.Combine(settings.www, site.name))) {
+                                        throw new DirectoryNotFoundException(string.Format("Site {0} wasn't initialized", site.name));
+                                    }
+
+                                    //new nonce
+                                    client.NewNonce().Wait();
+
+                                    //try to make new order
+                                    try
+                                    {
+                                        //create new orders
+                                        Console.WriteLine("2. Client New Order...");
+                                        Task<Dictionary<string, string>> orders = client.NewOrder(site.hosts, site.challenge);
+                                        orders.Wait();
+
+                                        switch(site.challenge) {
+                                            case "http-01": {
+                                                //ensure to enable static file discovery on server in .well-known/acme-challenge
+                                                //and listen on 80 port
+
+                                                //create acme directory for web site
+                                                string acme = Path.Combine(settings.www, site.name, settings.acme);
+                                                if(!Directory.Exists(acme)) {
+                                                    Directory.CreateDirectory(acme);
+                                                }
+
+                                                foreach (FileInfo file in new DirectoryInfo(acme).GetFiles())
+                                                    file.Delete();
+
+                                                foreach (var result in orders.Result)
+                                                {
+                                                    Console.WriteLine("Key: " + result.Key + Environment.NewLine + "Value: " + result.Value);
+                                                    string[] splitToken = result.Value.Split('~');
+
+                                                    string token = Path.Combine(acme, splitToken[0]);
+                                                    File.WriteAllText(token, splitToken[1]);
+
+                                                    //for Selinux on centos7
+                                                    Console.WriteLine(Library.RestoreCon(token));
+                                                }
+
+                                                
+
+                                                break;
+                                            }
+
+                                            case "dns-01": {
+                                                //Manage DNS server MX record, depends from provider
+
+                                                break;
+                                            }
+
+                                            default: {
+
+                                                break;
+                                            }
+                                        }
+                        
+                                        //complete challanges
+                                        Console.WriteLine("3. Client Complete Challange...");
+                                        client.CompleteChallenges().Wait();
+                                        Console.WriteLine("Challanges comleted.");
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Console.WriteLine(ex.Message.ToString());
+                                        client.GetOrder(site.hosts).Wait();
+                                    }
 
 
-                // get cached certificate and chech if it's valid
-                CachedCertificateResult certRes = new CachedCertificateResult();
-                if (client.TryGetCachedCertificate(hosts, out certRes))
-                {
-                    File.WriteAllText(Path.Combine(certsPath, "maks-it.com.crt"), certRes.Certificate);
+                                    // Download new certificate
+                                    Console.WriteLine("4. Download certificate...");
+                                    client.GetCertificate().Wait();
 
-                    using (StreamWriter writer = File.CreateText(Path.Combine(certsPath, "maks-it.com.key")))
-                        Library.ExportPrivateKey(certRes.PrivateKey, writer);
-                }
-                else {
+                                    // Write to filesystem
+                                    certRes = new CachedCertificateResult();
+                                    if (client.TryGetCachedCertificate(site.hosts, out certRes)) {
+                                        string cert = Path.Combine(ssl, site.name + ".crt");
+                                        File.WriteAllText(cert, certRes.Certificate);
+                                        
+                                        string key = Path.Combine(ssl, site.name + ".key");
+                                        using (StreamWriter writer = File.CreateText(key))
+                                            Library.ExportPrivateKey(certRes.PrivateKey, writer);
 
-                    client.NewNonce().Wait();
+                                        Console.WriteLine("Certificate saved.");
+                                    }
+                                    else {
+                                        Console.WriteLine("Unable to get new cached certificate.");
+                                    }
 
-                    // 2
-                    try
-                    {
-                        Console.WriteLine("2. Client New Order...");
-                        Task<Dictionary<string, string>> orders = client.NewOrder(hosts.ToArray(), "http-01");
-                        orders.Wait();
-
-                        foreach (var result in orders.Result)
-                        {
-                            Console.WriteLine("Key: " + result.Key + Environment.NewLine + "Value: " + result.Value);
-                            string[] splitToken = result.Value.Split('~');
-                            File.WriteAllText(FS.Path.Combine(tokensPath, splitToken[0]), splitToken[1]);
+                                    
+                                }
+                            }
+                            catch (Exception ex) {
+                                Console.WriteLine(ex.Message.ToString());
+                            }
                         }
-
-                        // 3
-                        Console.WriteLine("3. Client Complete Challange...");
-                        client.CompleteChallenges().Wait();
-                        Console.WriteLine("Challanges comleted.");
                     }
-                    catch (Exception ex)
-                    {
+                    catch (Exception ex) {
                         Console.WriteLine(ex.Message.ToString());
-                        client.GetOrder(hosts.ToArray()).Wait();
                     }
-
-
-                    // 4 Download certificate
-                    Console.WriteLine("4. Download certificate...");
-                    client.GetCertificate().Wait();
-
-
-                    // 5 Write to filesystem
-                    //CachedCertificateResult certRes = new CachedCertificateResult();
-                    //if (client.TryGetCachedCertificate(hosts, out certRes)) {
-                    //    File.WriteAllText(Path.Combine(certsPath, "maks-it.com.crt"), certRes.Certificate);
-
-                    //    using (StreamWriter writer = File.CreateText(Path.Combine(certsPath, "maks-it.com.key")))
-                    //        Library.ExportPrivateKey(certRes.PrivateKey, writer);
-                    //}
-
-                    Console.WriteLine("Certificate saved.");
                 }
-
-
-                
             }
             catch (Exception ex) {
                 Console.WriteLine(ex.Message.ToString());
             }
-
-
-
-
-            Console.Read();
         }
-
-
-
     }
-
-
 }
