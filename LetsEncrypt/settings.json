@@ -2,7 +2,7 @@
     "_StagingV2": "https://acme-staging-v02.api.letsencrypt.org/directory",
     "_ProductionV2": "https://acme-v02.api.letsencrypt.org/directory",
 
-    "url": "https://acme-staging-v02.api.letsencrypt.org/directory",
+    "url": "https://acme-v02.api.letsencrypt.org/directory",
 
     "cache": "/home/maksym/Desktop/LetsEncrypt_Cache/cache",
 
@@ -27,7 +27,7 @@
                     "challenge": "http-01"
                 },
                 {
-                    "name": "maks-it.com",
+                    "name": "api.maks-it.com",
                     "hosts": [
                         "api.maks-it.com",
                         "www.api.maks-it.com"
