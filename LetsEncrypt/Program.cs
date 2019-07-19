@@ -68,6 +68,7 @@ namespace LetsEncrypt
                                     Console.WriteLine("Certificate and Key exists and valid.");
                                 }
                                 else {
+                                    //check if folder for the site exists
                                     if(!Directory.Exists(Path.Combine(settings.www, site.name))) {
                                         throw new DirectoryNotFoundException(string.Format("Site {0} wasn't initialized", site.name));
                                     }
@@ -88,10 +89,10 @@ namespace LetsEncrypt
                                                 //ensure to enable static file discovery on server in .well-known/acme-challenge
                                                 //and listen on 80 port
 
-                                                //create acme directory for web site
+                                                //check acme directory of the web site
                                                 string acme = Path.Combine(settings.www, site.name, settings.acme);
                                                 if(!Directory.Exists(acme)) {
-                                                    Directory.CreateDirectory(acme);
+                                                    throw new DirectoryNotFoundException(string.Format("Directory {0} wasn't created", acme));
                                                 }
 
                                                 foreach (FileInfo file in new DirectoryInfo(acme).GetFiles())
@@ -104,12 +105,7 @@ namespace LetsEncrypt
 
                                                     string token = Path.Combine(acme, splitToken[0]);
                                                     File.WriteAllText(token, splitToken[1]);
-
-                                                    //for Selinux on centos7
-                                                    Console.WriteLine(Library.RestoreCon(token));
                                                 }
-
-                                                
 
                                                 break;
                                             }

@@ -173,40 +173,5 @@ namespace LetsEncrypt
                 }
             }
         }
-    
-    
-    
-    
-        public static string RestoreCon(string cmd)
-        {
-            var escapedArgs = cmd.Replace("\"", "\\\"");
-            
-            var process = new Process()
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "restorecon",
-                    Arguments = $"-v \"{escapedArgs}\"",
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                }
-            };
-            process.Start();
-            string result = process.StandardOutput.ReadToEnd();
-            process.WaitForExit();
-            return result;
-        }
-    
-    
-    
     }
-
-
-
-
-
-
-
-
 }
