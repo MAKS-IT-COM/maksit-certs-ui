@@ -31,12 +31,12 @@ namespace LetsEncrypt
 
                             try {
                                 //define cache folder
-                                string cache = Path.Combine(AppPath, "cache", customer.id, site.name);
+                                string cache = Path.Combine(AppPath, "cache", customer.id);
                                 if(!Directory.Exists(cache)) {
                                     Directory.CreateDirectory(cache);
                                 }
 
-                                LetsEncryptClient client = new LetsEncryptClient(settings.url, cache);
+                                LetsEncryptClient client = new LetsEncryptClient(settings.url, cache, site.name);
 
                                 //1. Client initialization
                                 Console.WriteLine("1. Client Initialization...");
@@ -53,7 +53,7 @@ namespace LetsEncrypt
                                 // if valid check if cert and key exists otherwise recreate
                                 // else continue with new certificate request
                                 CachedCertificateResult certRes = new CachedCertificateResult();
-                                if (client.TryGetCachedCertificate(site.hosts, out certRes))
+                                if (client.TryGetCachedCertificate(site.name, out certRes))
                                 {
                                     string cert = Path.Combine(ssl, site.name + ".crt");
                                     if(!File.Exists(cert))
@@ -68,11 +68,6 @@ namespace LetsEncrypt
                                     Console.WriteLine("Certificate and Key exists and valid.");
                                 }
                                 else {
-                                    //check if folder for the site exists
-                                    if(!Directory.Exists(Path.Combine(settings.www, site.name))) {
-                                        throw new DirectoryNotFoundException(string.Format("Site {0} wasn't initialized", site.name));
-                                    }
-
                                     //new nonce
                                     client.NewNonce().Wait();
 
@@ -89,8 +84,8 @@ namespace LetsEncrypt
                                                 //ensure to enable static file discovery on server in .well-known/acme-challenge
                                                 //and listen on 80 port
 
-                                                //check acme directory of the web site
-                                                string acme = Path.Combine(settings.www, site.name, settings.acme);
+                                                //check acme directory
+                                                string acme = Path.Combine(settings.www, settings.acme);
                                                 if(!Directory.Exists(acme)) {
                                                     throw new DirectoryNotFoundException(string.Format("Directory {0} wasn't created", acme));
                                                 }
@@ -136,11 +131,11 @@ namespace LetsEncrypt
 
                                     // Download new certificate
                                     Console.WriteLine("4. Download certificate...");
-                                    client.GetCertificate().Wait();
+                                    client.GetCertificate(site.name).Wait();
 
                                     // Write to filesystem
                                     certRes = new CachedCertificateResult();
-                                    if (client.TryGetCachedCertificate(site.hosts, out certRes)) {
+                                    if (client.TryGetCachedCertificate(site.name, out certRes)) {
                                         string cert = Path.Combine(ssl, site.name + ".crt");
                                         File.WriteAllText(cert, certRes.Certificate);
                                         

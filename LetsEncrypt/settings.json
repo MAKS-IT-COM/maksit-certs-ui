@@ -22,15 +22,9 @@
                     "name": "maks-it.com",
                     "hosts": [
                         "maks-it.com",
-                        "www.maks-it.com"
-                    ],
-                    "challenge": "http-01"
-                },
-                {
-                    "name": "api.maks-it.com",
-                    "hosts": [
+                        "www.maks-it.com",
                         "api.maks-it.com",
-                        "www.api.maks-it.com"
+                        "www.api.maks-it.com",
                     ],
                     "challenge": "http-01"
                 }
@@ -45,14 +39,19 @@
             
             "sites": [
                 {
+                   
                     "name": "nastyarey.com",
                     "hosts": [
                         "nastyarey.com",
-                        "www.nastyarey.com"
+                        "www.nastyarey.com",
+                        "it.nastyarey.com",
+                        "www.it.nastyarey.com",
+                        "ru.nastyarey.com",
+                        "www.ru.nastyarey.com"
                     ],
                     "challenge": "http-01"
                 }
             ]
         }
     ]
-} 
+}

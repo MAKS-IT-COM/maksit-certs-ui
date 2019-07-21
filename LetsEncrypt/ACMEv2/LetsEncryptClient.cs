@@ -85,10 +85,10 @@ namespace ACMEv2
         /// </summary>
         /// <param name="url"></param>
         /// <param name="home"></param>
-        public LetsEncryptClient(string url, string home)
+        public LetsEncryptClient(string url, string home, string siteName)
         {
             _url = url ?? throw new ArgumentNullException(nameof(url));
-            var hash = SHA256.Create().ComputeHash(Encoding.UTF8.GetBytes(url));
+            var hash = SHA256.Create().ComputeHash(Encoding.UTF8.GetBytes(siteName));
 
             _home = home ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData,
                 Environment.SpecialFolderOption.Create);
@@ -349,10 +349,10 @@ namespace ACMEv2
         /// </summary>
         /// <param name="token"></param>
         /// <returns></returns>
-        public async Task<(X509Certificate2 Cert, RSA PrivateKey)> GetCertificate(CancellationToken token = default(CancellationToken))
+        public async Task<(X509Certificate2 Cert, RSA PrivateKey)> GetCertificate(string subject, CancellationToken token = default(CancellationToken))
         {
             var key = new RSACryptoServiceProvider(4096);
-            var csr = new CertificateRequest("CN=" + _currentOrder.Identifiers[0].Value,
+            var csr = new CertificateRequest("CN=" + subject,
                 key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
 
             var san = new SubjectAlternativeNameBuilder();
@@ -382,7 +382,7 @@ namespace ACMEv2
 
             var cert = new X509Certificate2(Encoding.UTF8.GetBytes(pem));
 
-            _cache.CachedCerts[_currentOrder.Identifiers[0].Value] = new CertificateCache
+            _cache.CachedCerts[subject] = new CertificateCache
             {
                 Cert = pem,
                 Private = key.ExportCspBlob(true)
@@ -503,10 +503,10 @@ namespace ACMEv2
         /// <param name="hosts"></param>
         /// <param name="value"></param>
         /// <returns></returns>
-        public bool TryGetCachedCertificate(string [] hosts, out CachedCertificateResult value)
+        public bool TryGetCachedCertificate(string subject, out CachedCertificateResult value)
         {
             value = null;
-            if (_cache.CachedCerts.TryGetValue(hosts[0], out var cache) == false)
+            if (_cache.CachedCerts.TryGetValue(subject, out var cache) == false)
             {
                 return false;
             }
