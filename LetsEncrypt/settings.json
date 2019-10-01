@@ -12,7 +12,7 @@
 
     "customers": [
         {
-            "id": "{9b4c8584-dc83-4388-b45f-2942e34dca9d}",
+            "id": "9b4c8584-dc83-4388-b45f-2942e34dca9d",
             "contacts": [ "maksym.sadovnychyy@gmail.com" ],
             "name": "Maksym",
             "lastname": "Sadovnychyy",
@@ -31,7 +31,7 @@
             ]
         },
         {
-            "id": "{d6be989c-3b68-480d-9f4f-b7317674847a}",
+            "id": "d6be989c-3b68-480d-9f4f-b7317674847a",
             "contacts": [ "anastasiia.pavlovskaia@gmail.com" ],
 
             "name": "Anastasiia",
