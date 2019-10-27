@@ -23,8 +23,12 @@
                     "hosts": [
                         "maks-it.com",
                         "www.maks-it.com",
+                        "it.maks-it.com",
+                        "www.it.maks-it.com",
+                        "ru.maks-it.com",
+                        "www.ru.maks-it.com",
                         "api.maks-it.com",
-                        "www.api.maks-it.com",
+                        "www.api.maks-it.com"
                     ],
                     "challenge": "http-01"
                 }

@@ -514,7 +514,7 @@ namespace ACMEv2
             var cert = new X509Certificate2(Encoding.ASCII.GetBytes(cache.Cert));
 
             // if it is about to expire, we need to refresh
-            if ((cert.NotAfter - DateTime.UtcNow).TotalDays < 14)
+            if ((cert.NotAfter - DateTime.UtcNow).TotalDays < 30)
                 return false;
 
             var rsa = new RSACryptoServiceProvider(4096);
