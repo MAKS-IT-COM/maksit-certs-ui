@@ -4,5 +4,5 @@ Simple client to obtain Let's Encrypt HTTPS certificates developed with .net cor
 
 ## Vesrions History
 
-*29 Jun, 2019 - V1.0
-*01 Nov, 2019 - V2.0 (Dependency Injection pattern impelemtation)
+* 29 Jun, 2019 - V1.0
+* 01 Nov, 2019 - V2.0 (Dependency Injection pattern impelemtation)
