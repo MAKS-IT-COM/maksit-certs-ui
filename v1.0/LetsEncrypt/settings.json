@@ -2,9 +2,7 @@
     "_StagingV2": "https://acme-staging-v02.api.letsencrypt.org/directory",
     "_ProductionV2": "https://acme-v02.api.letsencrypt.org/directory",
 
-    "url": "https://acme-v02.api.letsencrypt.org/directory",
-
-    "cache": "/home/maksym/Desktop/LetsEncrypt_Cache/cache",
+    "url": "https://acme-staging-v02.api.letsencrypt.org/directory",
 
     "www": "/var/www",
     "acme": ".well-known/acme-challenge",
