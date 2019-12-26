@@ -9,6 +9,7 @@ namespace LetsEncrypt.Helpers
     public class Environment {
         public string name { get; set; }
         public string url { get; set; }
+        public string cache { get; set; }
         public string www { get; set; }
         public string acme { get; set; }
         public string ssl { get; set; }

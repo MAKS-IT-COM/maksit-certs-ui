@@ -7,6 +7,8 @@ using System.Linq;
 
 using Microsoft.Extensions.Options;
 
+using Mono.Unix;
+
 using LetsEncrypt.Services;
 using LetsEncrypt.Helpers;
 using LetsEncrypt.Entities;
@@ -20,11 +22,13 @@ namespace LetsEncrypt
         private readonly AppSettings _appSettings;
         private readonly ILetsEncryptService _letsEncryptService;
         private readonly IKeyService _keyService;
+        private readonly ITerminalService _terminalService;
 
-        public App(IOptions<AppSettings> appSettings, ILetsEncryptService letsEncryptService, IKeyService keyService) {
+        public App(IOptions<AppSettings> appSettings, ILetsEncryptService letsEncryptService, IKeyService keyService, ITerminalService terminalService) {
             _appSettings = appSettings.Value;
             _letsEncryptService = letsEncryptService;
             _keyService = keyService;
+            _terminalService = terminalService;
         }
 
         public void Run() {
@@ -46,7 +50,7 @@ namespace LetsEncrypt
 
                             try {
                                 //define cache folder
-                                string cache = Path.Combine(AppPath, "cache", customer.id);
+                                string cache = Path.Combine(AppPath, env.cache, customer.id);
                                 if(!Directory.Exists(cache)) {
                                     Directory.CreateDirectory(cache);
                                 }
@@ -70,16 +74,16 @@ namespace LetsEncrypt
                                 CachedCertificateResult certRes = new CachedCertificateResult();
                                 if (_letsEncryptService.TryGetCachedCertificate(site.name, out certRes)) {
                                     string cert = Path.Combine(ssl, site.name + ".crt");
-                                    if(!File.Exists(cert))
+                                    //if(!File.Exists(cert))
                                         File.WriteAllText(cert, certRes.Certificate);
                                     
                                     string key = Path.Combine(ssl, site.name + ".key");
-                                    if(!File.Exists(key)) {
+                                    //if(!File.Exists(key)) {
                                         using (StreamWriter writer = File.CreateText(key))
                                             _keyService.ExportPrivateKey(certRes.PrivateKey, writer);
-                                    }
+                                    //}
 
-                                    Console.WriteLine("Certificate and Key exists and valid.");
+                                    Console.WriteLine("Certificate and Key exists and valid. Restored from cache.");
                                 }
                                 else {
                                     //new nonce
@@ -103,8 +107,8 @@ namespace LetsEncrypt
                                                     throw new DirectoryNotFoundException(string.Format("Directory {0} wasn't created", acme));
                                                 }
 
-                                                foreach (FileInfo file in new DirectoryInfo(acme).GetFiles())
-                                                    file.Delete();
+                                                //foreach (FileInfo file in new DirectoryInfo(acme).GetFiles())
+                                                    //file.Delete();
 
                                                 foreach (var result in orders.Result)
                                                 {
@@ -114,6 +118,9 @@ namespace LetsEncrypt
                                                     string token = Path.Combine(acme, splitToken[0]);
                                                     File.WriteAllText(token, splitToken[1]);
                                                 }
+
+                                                _terminalService.Exec("chgrp -R nginx /var/www");
+                                                _terminalService.Exec("chmod -R g+rwx /var/www");
 
                                                 break;
                                             }
@@ -175,6 +182,10 @@ namespace LetsEncrypt
                         Console.WriteLine(ex.Message.ToString());
                     }
                 }
+            
+            
+                _terminalService.Exec("systemctl restart nginx");
+            
             }
             catch (Exception ex) {
                 Console.WriteLine(ex.Message.ToString());

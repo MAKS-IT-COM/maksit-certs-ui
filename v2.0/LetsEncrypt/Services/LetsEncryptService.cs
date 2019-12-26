@@ -1,3 +1,10 @@
+/**
+* tools.itef.org/html/draft-itef-acme-acme-18
+* https://community.letsencrypt.org/t/trying-to-do-post-as-get-but-getting-post-jws-not-signed/108371
+* https://tools.ietf.org/html/rfc8555#section-6.2
+* 
+*/
+
 using System;
 
 using System.Threading;
@@ -125,15 +132,17 @@ namespace LetsEncrypt.Services {
 
             //New Account request
             _jwsService.Init(_accountKey, null);
-            var (account, response) = await SendAsync<Account>(HttpMethod.Post, _directory.NewAccount, new Account
+
+            var letsEncryptOrder = new Account
             {
                 // we validate this in the UI before we get here, so that is fine
                 TermsOfServiceAgreed = true,
                 Contacts = contacts.Select(contact =>
                     string.Format("mailto:{0}", contact)
                 ).ToArray()
+            };
 
-            }, token);
+            var (account, response) = await SendAsync<Account>(HttpMethod.Post, _directory.NewAccount, letsEncryptOrder, token);
             _jwsService.SetKeyId(account);
 
             if (account.Status != "valid")
@@ -195,7 +204,7 @@ namespace LetsEncrypt.Services {
             //update jws with account url
             _jwsService.Init(_accountKey, _cache.Location.ToString());
 
-            var (order, response) = await SendAsync<Order>(HttpMethod.Post, _directory.NewOrder, new Order
+            var letsEncryptOrder = new Order
             {
                 Expires = DateTime.UtcNow.AddDays(2),
                 Identifiers = hostnames.Select(hostname => new OrderIdentifier
@@ -203,7 +212,9 @@ namespace LetsEncrypt.Services {
                     Type = "dns",
                     Value = hostname
                 }).ToArray()
-            }, token);
+            };
+
+            var (order, response) = await SendAsync<Order>(HttpMethod.Post, _directory.NewOrder, letsEncryptOrder, token);
 
             if (order.Status != "pending")
                 throw new InvalidOperationException("Created new order and expected status 'pending', but got: " + order.Status + Environment.NewLine + 
@@ -213,7 +224,8 @@ namespace LetsEncrypt.Services {
             var results = new Dictionary<string, string>();
             foreach (var item in order.Authorizations)
             {
-                var (challengeResponse, responseText) = await SendAsync<AuthorizationChallengeResponse>(HttpMethod.Get, item, null, token);
+                var (challengeResponse, responseText) = await SendAsync<AuthorizationChallengeResponse>(HttpMethod.Post, item, "POST-as-GET", token);
+                
                 if (challengeResponse.Status == "valid")
                     continue;
 
@@ -277,17 +289,22 @@ namespace LetsEncrypt.Services {
         {
             _jwsService.Init(_accountKey, _cache.Location.ToString());
 
-            for (var index = 0; index < _challenges.Count; index++)
-            {
-                var challenge = _challenges[index];
 
-                while (true)
+
+
+                for (var index = 0; index < _challenges.Count; index++)
                 {
+                    
+                    var challenge = _challenges[index];
+
+                    while (true)
+                    {
                     AuthorizeChallenge authorizeChallenge = new AuthorizeChallenge();
 
                     switch (challenge.Type) {
                         case "dns-01": {
                                 authorizeChallenge.KeyAuthorization = _jwsService.GetKeyAuthorization(challenge.Token);
+                                //var (result, responseText) = await SendAsync<AuthorizationChallengeResponse>(HttpMethod.Post, challenge.Url, authorizeChallenge, token);
                                 break;
                             }
 
@@ -296,16 +313,18 @@ namespace LetsEncrypt.Services {
                             }
                     }
 
-                    var (result, responseText) = await SendAsync<AuthorizationChallengeResponse>(HttpMethod.Post, challenge.Url, authorizeChallenge, token);
+                    var (result, responseText) = await SendAsync<AuthorizationChallengeResponse>(HttpMethod.Post, challenge.Url, "{}", token);
 
                     if (result.Status == "valid")
                         break;
                     if (result.Status != "pending")
                         throw new InvalidOperationException("Failed autorization of " + _currentOrder.Identifiers[index].Value + Environment.NewLine + responseText);
 
+               
 
-                    await Task.Delay(500);
+                    await Task.Delay(1000);
                 }
+
             }
         }
 
@@ -317,7 +336,7 @@ namespace LetsEncrypt.Services {
             //update jws
             _jwsService.Init(_accountKey, _cache.Location.ToString());
 
-            var (order, response) = await SendAsync<Order>(HttpMethod.Post, _directory.NewOrder, new Order
+            var letsEncryptOrder = new Order
             {
                 Expires = DateTime.UtcNow.AddDays(2),
                 Identifiers = hostnames.Select(hostname => new OrderIdentifier
@@ -325,7 +344,9 @@ namespace LetsEncrypt.Services {
                     Type = "dns",
                     Value = hostname
                 }).ToArray()
-            }, token);
+            };
+
+            var (order, response) = await SendAsync<Order>(HttpMethod.Post, _directory.NewOrder, letsEncryptOrder, token);
 
             _currentOrder = order;
         }
@@ -351,14 +372,16 @@ namespace LetsEncrypt.Services {
 
             csr.CertificateExtensions.Add(san.Build());
 
-            var (response, responseText) = await SendAsync<Order>(HttpMethod.Post, _currentOrder.Finalize, new FinalizeRequest
+            var letsEncryptOrder = new FinalizeRequest
             {
                 CSR = _jwsService.Base64UrlEncoded(csr.CreateSigningRequest())
-            }, token);
+            };
+
+            var (response, responseText) = await SendAsync<Order>(HttpMethod.Post, _currentOrder.Finalize, letsEncryptOrder, token);
 
             while (response.Status != "valid")
             {
-                (response, responseText) = await SendAsync<Order>(HttpMethod.Get, response.Location, null, token);
+                (response, responseText) = await SendAsync<Order>(HttpMethod.Post, response.Location, "POST-as-GET", token);
 
                 if(response.Status == "processing")
                 {
@@ -368,7 +391,7 @@ namespace LetsEncrypt.Services {
                 throw new InvalidOperationException("Invalid order status: " + response.Status + Environment.NewLine +
                     responseText);
             }
-            var (pem, _) = await SendAsync<string>(HttpMethod.Get, response.Certificate, null, token);
+            var (pem, _) = await SendAsync<string>(HttpMethod.Post, response.Certificate, "POST-as-GET", token);
 
             var cert = new X509Certificate2(Encoding.UTF8.GetBytes(pem));
 
@@ -449,6 +472,8 @@ namespace LetsEncrypt.Services {
                 request.Content.Headers.Remove("Content-Type");
                 request.Content.Headers.Add("Content-Type", requestType);
             }
+
+
 
             var response = await _client.SendAsync(request, token).ConfigureAwait(false);
 
