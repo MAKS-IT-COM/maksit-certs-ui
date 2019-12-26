@@ -107,8 +107,11 @@ namespace LetsEncrypt
                                                     throw new DirectoryNotFoundException(string.Format("Directory {0} wasn't created", acme));
                                                 }
 
-                                                //foreach (FileInfo file in new DirectoryInfo(acme).GetFiles())
-                                                    //file.Delete();
+                                                foreach (FileInfo file in new DirectoryInfo(acme).GetFiles()) {
+                                                    if(file.LastWriteTimeUtc < DateTime.UtcNow.AddMonths(-3))
+                                                        file.Delete();
+                                                }
+                                                    
 
                                                 foreach (var result in orders.Result)
                                                 {
