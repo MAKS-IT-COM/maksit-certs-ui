@@ -7,8 +7,8 @@ namespace LetsEncrypt.Entities
 
     public class JwsMessage
     {
-        [JsonProperty("header")]
-        public JwsHeader Header { get; set; }
+        //[JsonProperty("header")]
+        //public JwsHeader Header { get; set; }
 
         [JsonProperty("protected")]
         public string Protected { get; set; }

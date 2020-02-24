@@ -44,6 +44,7 @@ namespace LetsEncrypt
             services.AddScoped<IKeyService, KeyService>();
             services.AddScoped<IJwsService, JwsService>();
             services.AddScoped<ILetsEncryptService, LetsEncryptService>();
+            services.AddScoped<ITerminalService,TerminalService>();
 
             // add app
             services.AddTransient<App>();

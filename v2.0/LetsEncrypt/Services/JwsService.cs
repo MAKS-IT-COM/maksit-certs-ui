@@ -57,9 +57,30 @@ namespace LetsEncrypt.Services
 
             var message = new JwsMessage
             {
-                Payload = Base64UrlEncoded(JsonConvert.SerializeObject(payload)),
+                Payload = "",
                 Protected = Base64UrlEncoded(JsonConvert.SerializeObject(protectedHeader))
             };
+
+            if(payload != null) {
+                if(payload is String) {
+                    string value = payload.ToString();
+                    switch(value) {
+                        case "POST-as-GET":
+                            message.Payload = string.Empty;
+                        break;
+
+                        default:
+                            message.Payload = Base64UrlEncoded(value);
+                        break;
+                    }
+                    
+
+                } else {
+                    message.Payload = Base64UrlEncoded(JsonConvert.SerializeObject(payload));
+                }
+                    
+            }
+                
 
             message.Signature = Base64UrlEncoded(
                 _rsa.SignData(Encoding.ASCII.GetBytes(message.Protected + "." + message.Payload),
