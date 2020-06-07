@@ -1,12 +1,12 @@
 namespace LetsEncrypt.Helpers
 {
     public class AppSettings {
-        public string active { get; set; }
         public Environment [] environments { get; set; }
         public Customer [] customers { get; set;}
     }
 
     public class Environment {
+        public bool active { get; set; } 
         public string name { get; set; }
         public string url { get; set; }
         public string cache { get; set; }
