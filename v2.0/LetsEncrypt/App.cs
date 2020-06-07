@@ -35,7 +35,7 @@ namespace LetsEncrypt
 
             try
             {
-                LetsEncrypt.Helpers.Environment env = _appSettings.environments.First(x => (x.name == _appSettings.active));
+                LetsEncrypt.Helpers.Environment env = _appSettings.environments.Where(x => x.name == _appSettings.active).FirstOrDefault();
 
                 Console.WriteLine(string.Format("Let's Encrypt C# .Net Core Client, environment: {0}", env.name));
         
@@ -45,7 +45,7 @@ namespace LetsEncrypt
                         Console.WriteLine(string.Format("Managing customer: {0} - {1} {2}", customer.id, customer.name, customer.lastname));
 
                         //loop each customer website
-                        foreach(Site site in customer.sites) {
+                        foreach(Site site in customer.sites.Where(s => s.active)) {
                             Console.WriteLine(string.Format("Managing site: {0}", site.name));
 
                             try {
