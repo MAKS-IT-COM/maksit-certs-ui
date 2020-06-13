@@ -1,10 +1,12 @@
+// https://tools.ietf.org/html/rfc7517
+
 using System;
 using Newtonsoft.Json;
 
 
 namespace LetsEncrypt.Entities
 {
-      public class Jwk
+    public class Jwk
     {
         /// <summary>
         /// "kty" (Key Type) Parameter

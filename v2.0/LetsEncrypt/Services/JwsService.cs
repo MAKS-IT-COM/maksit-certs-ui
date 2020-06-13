@@ -1,4 +1,9 @@
-﻿using System;
+﻿/**
+* https://tools.ietf.org/html/rfc4648
+* https://tools.ietf.org/html/rfc4648#section-5
+*/
+
+using System;
 using System.Security.Cryptography;
 using System.Text;
 using Newtonsoft.Json;
@@ -31,8 +36,7 @@ namespace LetsEncrypt.Services
 
             var publicParameters = rsa.ExportParameters(false);
 
-            _jwk = new Jwk
-            {
+            _jwk = new Jwk () {
                 KeyType = "RSA",
                 Exponent = Base64UrlEncoded(publicParameters.Exponent),
                 Modulus = Base64UrlEncoded(publicParameters.Modulus),
@@ -112,6 +116,7 @@ namespace LetsEncrypt.Services
             return Base64UrlEncoded(Encoding.UTF8.GetBytes(s));
         }
 
+        // https://tools.ietf.org/html/rfc4648#section-5
         public string Base64UrlEncoded(byte[] arg)
         {
             var s = Convert.ToBase64String(arg); // Regular base64 encoder

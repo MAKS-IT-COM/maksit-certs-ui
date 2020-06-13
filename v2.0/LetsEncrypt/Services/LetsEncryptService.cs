@@ -1,5 +1,4 @@
 /**
-* tools.itef.org/html/draft-itef-acme-acme-18
 * https://community.letsencrypt.org/t/trying-to-do-post-as-get-but-getting-post-jws-not-signed/108371
 * https://tools.ietf.org/html/rfc8555#section-6.2
 * 
@@ -99,7 +98,6 @@ namespace LetsEncrypt.Services {
 
             // 1 - Get directory
             (_directory, _) = await SendAsync<AcmeDirectory>(HttpMethod.Get, new Uri("directory", UriKind.Relative), null, token);
-
 
             if (File.Exists(_path))
             {
@@ -420,8 +418,7 @@ namespace LetsEncrypt.Services {
         /// </summary>
         /// <param name="token"></param>
         /// <returns></returns>
-        public async Task KeyChange(CancellationToken token = default(CancellationToken))
-        {
+        public async Task KeyChange(CancellationToken token = default(CancellationToken)) {
 
         }
 
@@ -431,8 +428,7 @@ namespace LetsEncrypt.Services {
         /// </summary>
         /// <param name="token"></param>
         /// <returns></returns>
-        public async Task RevokeCertificate(CancellationToken token = default(CancellationToken))
-        {
+        public async Task RevokeCertificate(CancellationToken token = default(CancellationToken)) {
 
         }
 

@@ -1,13 +1,16 @@
 using System;
 using System.IO;
+using System.Linq;
+
+using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 
-using System.Linq;
+
 
 using Microsoft.Extensions.Options;
 
-using Mono.Unix;
+
 
 using LetsEncrypt.Services;
 using LetsEncrypt.Helpers;
@@ -32,7 +35,7 @@ namespace LetsEncrypt
         }
 
         public void Run() {
-            _appSettings.environments.Where(env => env.active).ToList().ForEach(env => {
+            foreach(var env in _appSettings.environments.Where(env => env.active)) {
                 try {
                     Console.WriteLine(string.Format("Let's Encrypt C# .Net Core Client, environment: {0}", env.name));
         
@@ -189,10 +192,9 @@ namespace LetsEncrypt
                 }
                 catch (Exception ex) {
                     Console.WriteLine(ex.Message.ToString());
+                    break;
                 }
-            });
-
-            
+            }
         }
     }
 }
