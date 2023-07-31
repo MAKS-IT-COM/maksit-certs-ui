@@ -5,12 +5,14 @@ using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using MaksIT.Core.Extensions;
+
 using MaksIT.LetsEncrypt.Services;
 using MaksIT.LetsEncrypt.Entities;
 using MaksIT.LetsEncryptConsole.Services;
-
-using MaksIT.Core.Extensions;
-using System.Text.Json;
+using SSHProvider;
+using Mono.Unix.Native;
+using Serilog.Core;
 
 namespace MaksIT.LetsEncryptConsole {
 
@@ -26,7 +28,6 @@ namespace MaksIT.LetsEncryptConsole {
     private readonly ILogger<App> _logger;
     private readonly Configuration _appSettings;
     private readonly ILetsEncryptService _letsEncryptService;
-    private readonly IJwsService _jwsService;
     private readonly IKeyService _keyService;
     private readonly ITerminalService _terminalService;
 
@@ -34,87 +35,90 @@ namespace MaksIT.LetsEncryptConsole {
       ILogger<App> logger,
       IOptions<Configuration> appSettings,
       ILetsEncryptService letsEncryptService,
-      IJwsService jwsService,
       IKeyService keyService,
       ITerminalService terminalService
     ) {
       _logger = logger;
       _appSettings = appSettings.Value;
       _letsEncryptService = letsEncryptService;
-      _jwsService = jwsService;
       _keyService = keyService;
       _terminalService = terminalService;
     }
 
     public async Task Run(string[] args) {
 
+      _logger.LogInformation("Letsencrypt client estarted...");
+
       foreach (var env in _appSettings.Environments?.Where(x => x.Active) ?? new List<LetsEncryptEnvironment>()) {
         try {
-          _logger.LogTrace($"Let's Encrypt C# .Net Core Client, environment: {env.Name}");
+          _logger.LogInformation($"Let's Encrypt C# .Net Core Client, environment: {env.Name}");
 
           //loop all customers
           foreach (Customer customer in _appSettings.Customers?.Where(x => x.Active) ?? new List<Customer>()) {
             try {
-              _logger.LogTrace($"Managing customer: {customer.Id} - {customer.Name} {customer.LastName}");
+              _logger.LogInformation($"Managing customer: {customer.Id} - {customer.Name} {customer.LastName}");
+
+              //define cache folder
+              string cachePath = Path.Combine(_appPath, customer.Id, env.Name, "cache");
+              if (!Directory.Exists(cachePath)) {
+                Directory.CreateDirectory(cachePath);
+              }
+
+              //check acme directory
+              var acmePath = Path.Combine(_appPath, customer.Id, env.Name, "acme");
+              if (!Directory.Exists(acmePath)) {
+                Directory.CreateDirectory(acmePath);
+              }
 
               //loop each customer website
               foreach (Site site in customer.Sites?.Where(s => s.Active) ?? new List<Site>()) {
-                _logger.LogTrace($"Managing site: {site.Name}");
+                _logger.LogInformation($"Managing site: {site.Name}");
 
                 try {
-                  //define cache folder
-                  string cacheFolder = Path.Combine(_appPath, env.Cache, customer.Id);
-                  if (!Directory.Exists(cacheFolder)) {
-                    Directory.CreateDirectory(cacheFolder);
+                  //create folder for ssl
+                  string sslPath = Path.Combine(_appPath, customer.Id, env.Name, "ssl", site.Name);
+                  if (!Directory.Exists(sslPath)) {
+                    Directory.CreateDirectory(sslPath);
                   }
 
+                  var cacheFile = Path.Combine(cachePath, $"{site.Name}.lets-encrypt.cache.json");
+
                   //1. Client initialization
-                  _logger.LogTrace("1. Client Initialization...");
+                  _logger.LogInformation("1. Client Initialization...");
 
                   #region LetsEncrypt client configuration
-                  await _letsEncryptService.ConfigureClient(env.Url, customer.Contacts);
+                  await _letsEncryptService.ConfigureClient(env.Url);
                   #endregion
 
                   #region LetsEncrypt local registration cache initialization
-                  var hash = SHA256.HashData(Encoding.UTF8.GetBytes(site.Name));
-                  var cacheFileName = _jwsService.Base64UrlEncoded(hash) + ".lets-encrypt.cache.json";
-                  var cachePath = Path.Combine(cacheFolder, cacheFileName);
+                  var registrationCache = (File.Exists(cacheFile)
+                    ? File.ReadAllText(cacheFile)
+                    : null)
+                    .ToObject<RegistrationCache>();
 
-                  var cacheFile = File.Exists(cachePath)
-                    ? File.ReadAllText(cachePath)
-                    : null;
-
-                  var registrationCache = cacheFile.ToObject<RegistrationCache>();
-                  await _letsEncryptService.Init(registrationCache);
-                  registrationCache = _letsEncryptService.GetRegistrationCache();
+                  await _letsEncryptService.Init(customer.Contacts, registrationCache);
                   #endregion
 
                   #region LetsEncrypt terms of service
-                  _logger.LogTrace($"Terms of service: {_letsEncryptService.GetTermsOfServiceUri()}");
+                  _logger.LogInformation($"Terms of service: {_letsEncryptService.GetTermsOfServiceUri()}");
                   #endregion
-
-                  //create folder for ssl
-                  string ssl = Path.Combine(env.GetSSL(), site.Name);
-                  if (!Directory.Exists(ssl)) {
-                    Directory.CreateDirectory(ssl);
-                  }
 
                   // get cached certificate and check if it's valid
                   // if valid check if cert and key exists otherwise recreate
                   // else continue with new certificate request
                   var certRes = new CachedCertificateResult();
                   if (TryGetCachedCertificate(registrationCache, site.Name, out certRes)) {
-                    string cert = Path.Combine(ssl, $"{site.Name}.crt");
+                    string cert = Path.Combine(sslPath, $"{site.Name}.crt");
                     //if(!File.Exists(cert))
                     File.WriteAllText(cert, certRes.Certificate);
 
-                    string key = Path.Combine(ssl, $"{site.Name}.key");
+                    string key = Path.Combine(sslPath, $"{site.Name}.key");
                     //if(!File.Exists(key)) {
                     using (StreamWriter writer = File.CreateText(key))
                       _keyService.ExportPrivateKey(certRes.PrivateKey, writer);
                     //}
 
-                    _logger.LogTrace("Certificate and Key exists and valid. Restored from cache.");
+                    _logger.LogInformation("Certificate and Key exists and valid. Restored from cache.");
                   }
                   else {
 
@@ -127,77 +131,89 @@ namespace MaksIT.LetsEncryptConsole {
                       var orders = await _letsEncryptService.NewOrder(site.Hosts, site.Challenge);
                       #endregion
 
-                      switch (site.Challenge) {
-                        case "http-01": {
-                            //ensure to enable static file discovery on server in .well-known/acme-challenge
-                            //and listen on 80 port
+                      if (orders.Count > 0) {
+                        switch (site.Challenge) {
+                          case "http-01": {
+                              //ensure to enable static file discovery on server in .well-known/acme-challenge
+                              //and listen on 80 port
 
-                            //check acme directory
-                            var acme = env.GetACME();
-
-                            if (!Directory.Exists(acme)) {
-                              Directory.CreateDirectory(acme);
-                            }
-
-                            foreach (FileInfo file in new DirectoryInfo(acme).GetFiles()) {
-                              if (file.LastWriteTimeUtc < DateTime.UtcNow.AddMonths(-3))
+                              foreach (FileInfo file in new DirectoryInfo(acmePath).GetFiles())
                                 file.Delete();
+
+                              foreach (var result in orders) {
+                                Console.WriteLine($"Key: {result.Key}, Value: {result.Value}");
+                                string[] splitToken = result.Value.Split('.');
+
+                                File.WriteAllText(Path.Combine(acmePath, splitToken[0]), result.Value);
+                              }
+
+                              foreach (FileInfo file in new DirectoryInfo(acmePath).GetFiles()) {
+                                if (env?.SSH?.Active ?? false) {
+                                  UploadFiles(_logger, env.SSH, env.ACME.Linux.Path, file.Name, File.ReadAllBytes(file.FullName), env.ACME.Linux.Owner, env.ACME.Linux.ChangeMode);
+                                }
+                                else {
+                                  throw new NotImplementedException();
+                                }
+                              }
+
+
+
+
+
+                              break;
                             }
 
-
-                            foreach (var result in orders) {
-                              Console.WriteLine($"Key: {result.Key}, Value: {result.Value}");
-                              string[] splitToken = result.Value.Split('.');
-
-                              File.WriteAllText(Path.Combine(env.GetACME(), splitToken[0]), result.Value);
+                          case "dns-01": {
+                              //Manage DNS server MX record, depends from provider
+                              throw new NotImplementedException();
                             }
 
-                            if (OperatingSystem.IsLinux()) {
-                              _terminalService.Exec($"chgrp -R nginx {env.GetACME()}");
-                              _terminalService.Exec($"chmod -R g+rwx {env.GetACME()}");
+                          default: {
+                              throw new NotImplementedException();
                             }
+                        }
 
-                            break;
-                          }
 
-                        case "dns-01": {
-                            //Manage DNS server MX record, depends from provider
-                            throw new NotImplementedException();
-                          }
+                        #region LetsEncrypt complete challenges
+                        _logger.LogInformation("3. Client Complete Challange...");
+                        await _letsEncryptService.CompleteChallenges();
+                        _logger.LogInformation("Challanges comleted.");
+                        #endregion
 
-                        default: {
-                            throw new NotImplementedException();
-                          }
+                        await Task.Delay(1000);
+
+                        // Download new certificate
+                        _logger.LogInformation("4. Download certificate...");
+                        var (cert, key) = await _letsEncryptService.GetCertificate(site.Name);
+
+                        #region Persist cache
+                        registrationCache = _letsEncryptService.GetRegistrationCache();
+                        File.WriteAllText(cacheFile, registrationCache.ToJson());
+                        #endregion
                       }
-
-                      #region LetsEncrypt complete challenges
-                      _logger.LogTrace("3. Client Complete Challange...");
-                      await _letsEncryptService.CompleteChallenges();
-                      _logger.LogTrace("Challanges comleted.");
-                      #endregion
-
-                      await Task.Delay(1000);
-
-                      // Download new certificate
-                      _logger.LogTrace("4. Download certificate...");
-                      var (cert, key) = await _letsEncryptService.GetCertificate(site.Name);
-
-                      #region Persist cache
-                      registrationCache = _letsEncryptService.GetRegistrationCache();
-                      File.WriteAllText(cachePath, registrationCache.ToJson());
-                      #endregion
 
                       #region Save cert and key to filesystem
                       certRes = new CachedCertificateResult();
                       if (TryGetCachedCertificate(registrationCache, site.Name, out certRes)) {
-                        string certPath = Path.Combine(ssl, site.Name + ".crt");
-                        File.WriteAllText(certPath, certRes.Certificate);
 
-                        string keyPath = Path.Combine(ssl, site.Name + ".key");
-                        using (var writer = File.CreateText(keyPath))
+                        File.WriteAllText(Path.Combine(sslPath, site.Name + ".crt"), certRes.Certificate);
+
+                        using (var writer = File.CreateText(Path.Combine(sslPath, site.Name + ".key"))) {
                           _keyService.ExportPrivateKey(certRes.PrivateKey, writer);
+                        }
 
-                        _logger.LogTrace("Certificate saved.");
+                        _logger.LogInformation("Certificate saved.");
+
+                        foreach (FileInfo file in new DirectoryInfo(sslPath).GetFiles()) {
+
+                          if (env?.SSH?.Active ?? false) {
+                            UploadFiles(_logger, env.SSH, $"{env.SSL.Linux.Path}/{site.Name}", file.Name, File.ReadAllBytes(file.FullName), env.SSL.Linux.Owner, env.SSL.Linux.ChangeMode);
+                          }
+                          else {
+                            throw new NotImplementedException();
+                          }
+                        }
+
                       }
                       else {
                         _logger.LogError("Unable to get new cached certificate.");
@@ -212,7 +228,7 @@ namespace MaksIT.LetsEncryptConsole {
                   }
 
 
-                  
+
 
                 }
                 catch (Exception ex) {
@@ -236,9 +252,6 @@ namespace MaksIT.LetsEncryptConsole {
       }
     }
 
-
-
-
     /// <summary>
     /// 
     /// </summary>
@@ -254,7 +267,7 @@ namespace MaksIT.LetsEncryptConsole {
       if (!registrationCache.CachedCerts.TryGetValue(subject, out var cache)) {
         return false;
       }
-  
+
       var cert = new X509Certificate2(Encoding.ASCII.GetBytes(cache.Cert));
 
       // if it is about to expire, we need to refresh
@@ -277,11 +290,34 @@ namespace MaksIT.LetsEncryptConsole {
     /// </summary>
     /// <param name="hostsToRemove"></param>
     public RegistrationCache? ResetCachedCertificate(RegistrationCache? registrationCache, IEnumerable<string> hostsToRemove) {
-      if (registrationCache != null)
+      if (registrationCache?.CachedCerts != null)
         foreach (var host in hostsToRemove)
           registrationCache.CachedCerts.Remove(host);
 
       return registrationCache;
+    }
+    private void UploadFiles(
+      ILogger logger,
+      SSHClientSettings sshSettings,
+      string workDir,
+      string fileName,
+      byte [] bytes,
+      string owner,
+      string changeMode
+    ) {
+
+      using var sshService = new SSHService(logger, sshSettings.Host, sshSettings.Port, sshSettings.Username, sshSettings.Password);
+      sshService.Connect();
+
+      sshService.RunSudoCommand(sshSettings.Password, $"mkdir {workDir}");
+
+      sshService.RunSudoCommand(sshSettings.Password, $"chown {owner} {workDir} -R");
+      sshService.RunSudoCommand(sshSettings.Password, $"chmod 777 {workDir} -R");
+
+      sshService.Upload($"{workDir}", fileName, bytes);
+
+      sshService.RunSudoCommand(sshSettings.Password, $"chown {owner} {workDir} -R");
+      sshService.RunSudoCommand(sshSettings.Password, $"chmod {changeMode} {workDir} -R");
     }
   }
 }

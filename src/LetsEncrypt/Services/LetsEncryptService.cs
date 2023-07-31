@@ -25,9 +25,9 @@ namespace MaksIT.LetsEncrypt.Services {
 
   public interface ILetsEncryptService {
 
-    Task ConfigureClient(string url, string[] contacts);
+    Task ConfigureClient(string url);
 
-    Task Init(RegistrationCache? registrationCache);
+    Task Init(string[] contacts, RegistrationCache? registrationCache);
 
     string GetTermsOfServiceUri();
 
@@ -51,10 +51,10 @@ namespace MaksIT.LetsEncrypt.Services {
     //};
 
     private readonly ILogger<LetsEncryptService> _logger;
-    private readonly IJwsService _jwsService;
+    
     private HttpClient _httpClient;
-    private string[]? _contacts;
 
+    private IJwsService _jwsService;
     private AcmeDirectory? _directory;
     private RegistrationCache? _cache;
 
@@ -65,11 +65,9 @@ namespace MaksIT.LetsEncrypt.Services {
 
     public LetsEncryptService(
       ILogger<LetsEncryptService> logger,
-      IJwsService jwsService,
       HttpClient httpClient
     ) {
       _logger = logger;
-      _jwsService = jwsService;
       _httpClient = httpClient;
     }
 
@@ -80,11 +78,9 @@ namespace MaksIT.LetsEncrypt.Services {
     /// <param name="url"></param>
     /// <param name="contacts"></param>
     /// <returns></returns>
-    public async Task ConfigureClient(string url, string[] contacts) {
+    public async Task ConfigureClient(string url) {
 
       _httpClient.BaseAddress ??= new Uri(url);
-
-      _contacts = contacts;
 
       (_directory, _) = await SendAsync<AcmeDirectory>(HttpMethod.Get, new Uri("directory", UriKind.Relative), false, null);
     }
@@ -95,9 +91,9 @@ namespace MaksIT.LetsEncrypt.Services {
     /// <param name="contacts"></param>
     /// <param name="token"></param>
     /// <returns></returns>
-    public async Task Init(RegistrationCache? cache) {
+    public async Task Init(string? [] contacts, RegistrationCache? cache) {
 
-      if (_contacts == null || _contacts.Length == 0)
+      if (contacts == null || contacts.Length == 0)
         throw new ArgumentNullException();
 
       if (_directory == null)
@@ -105,18 +101,18 @@ namespace MaksIT.LetsEncrypt.Services {
 
       var accountKey = new RSACryptoServiceProvider(4096);
 
-      if (cache != null) {
+      if (cache != null && cache.AccountKey != null) {
         _cache = cache;
-        accountKey.ImportCspBlob(_cache.AccountKey);
+        accountKey.ImportCspBlob(cache.AccountKey);
       }
 
       // New Account request
-      _jwsService.Init(accountKey, null);
+      _jwsService = new JwsService(accountKey);
 
 
       var letsEncryptOrder = new Account {
         TermsOfServiceAgreed = true,
-        Contacts = _contacts.Select(contact => $"mailto:{contact}").ToArray()
+        Contacts = contacts.Select(contact => $"mailto:{contact}").ToArray()
       };
 
       var (account, response) = await SendAsync<Account>(HttpMethod.Post, _directory.NewAccount, false, letsEncryptOrder);
@@ -183,8 +179,11 @@ namespace MaksIT.LetsEncrypt.Services {
 
       var (order, response) = await SendAsync<Order>(HttpMethod.Post, _directory.NewOrder, false, letsEncryptOrder);
 
+      if (order.Status == "ready")
+        return new Dictionary<string, string>();
+
       if (order.Status != "pending")
-        throw new InvalidOperationException($"Created new order and expected status 'pending or ready', but got: {order.Status} \r\n {response}");
+        throw new InvalidOperationException($"Created new order and expected status 'pending', but got: {order.Status} \r\n {response}");
       
       _currentOrder = order;
 
@@ -311,7 +310,7 @@ namespace MaksIT.LetsEncrypt.Services {
     /// <exception cref="InvalidOperationException"></exception>
     public async Task<(X509Certificate2 Cert, RSA PrivateKey)> GetCertificate(string subject) {
 
-      _logger.LogTrace($"Invoked: {nameof(GetCertificate)}");
+      _logger.LogInformation($"Invoked: {nameof(GetCertificate)}");
 
 
       if (_currentOrder == null)

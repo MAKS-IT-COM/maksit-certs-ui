@@ -13,8 +13,7 @@ using MaksIT.Core.Extensions;
 
 namespace MaksIT.LetsEncrypt.Services {
   public interface IJwsService {
-
-    void Init(RSA rsa, string? keyId);
+    void SetKeyId(string location);
 
     JwsMessage Encode(JwsHeader protectedHeader);
 
@@ -22,34 +21,41 @@ namespace MaksIT.LetsEncrypt.Services {
 
     string GetKeyAuthorization(string token);
 
-    string Base64UrlEncoded(byte[] arg);
 
-    void SetKeyId(string location);
+    string Base64UrlEncoded(string s);
+
+    string Base64UrlEncoded(byte[] arg);
   }
 
 
   public class JwsService : IJwsService {
 
-    public Jwk? _jwk;
-    private RSA? _rsa;
+    public Jwk _jwk;
+    private RSA _rsa;
 
-    public void Init(RSA rsa, string? keyId) {
+    public JwsService(RSA rsa) {
       _rsa = rsa ?? throw new ArgumentNullException(nameof(rsa));
 
       var publicParameters = rsa.ExportParameters(false);
 
+      var exp = publicParameters.Exponent ?? throw new ArgumentNullException(nameof(publicParameters.Exponent));
+      var mod = publicParameters.Modulus ?? throw new ArgumentNullException(nameof(publicParameters.Modulus));
+
       _jwk = new Jwk() {
         KeyType = "RSA",
-        Exponent = Base64UrlEncoded(publicParameters.Exponent),
-        Modulus = Base64UrlEncoded(publicParameters.Modulus),
-        KeyId = keyId
+        Exponent = Base64UrlEncoded(exp),
+        Modulus = Base64UrlEncoded(mod),
       };
+    }
+
+    public void SetKeyId(string location) {
+      _jwk.KeyId = location;
     }
 
     public JwsMessage Encode(JwsHeader protectedHeader) =>
       Encode<string>(null, protectedHeader);
 
-    public JwsMessage Encode<TPayload>(TPayload? payload, JwsHeader protectedHeader) {
+    public JwsMessage Encode<T>(T? payload, JwsHeader protectedHeader) {
 
       protectedHeader.Algorithm = "RS256";
       if (_jwk.KeyId != null) {
@@ -65,13 +71,10 @@ namespace MaksIT.LetsEncrypt.Services {
       };
 
       if (payload != null) {
-        if (payload is string) {
-          string value = payload.ToString();
-          message.Payload = Base64UrlEncoded(value);
-        }
-        else {
+        if (payload is string stringPayload) 
+          message.Payload = Base64UrlEncoded(stringPayload);
+        else 
           message.Payload = Base64UrlEncoded(payload.ToJson());
-        }
       }
 
 
@@ -83,32 +86,27 @@ namespace MaksIT.LetsEncrypt.Services {
       return message;
     }
 
+    public string GetKeyAuthorization(string token) =>
+      $"{token}.{GetSha256Thumbprint()}";
+
     private string GetSha256Thumbprint() {
       var json = "{\"e\":\"" + _jwk.Exponent + "\",\"kty\":\"RSA\",\"n\":\"" + _jwk.Modulus + "\"}";
-
-      using (var sha256 = SHA256.Create()) {
-        return Base64UrlEncoded(sha256.ComputeHash(Encoding.UTF8.GetBytes(json)));
-      }
+      return Base64UrlEncoded(SHA256.HashData(Encoding.UTF8.GetBytes(json)));
     }
 
-    public string GetKeyAuthorization(string token) => $"{token}.{GetSha256Thumbprint()}";
 
 
-
-    public string Base64UrlEncoded(string s) => Base64UrlEncoded(Encoding.UTF8.GetBytes(s));
-
+    public string Base64UrlEncoded(string s) =>
+      Base64UrlEncoded(Encoding.UTF8.GetBytes(s));
 
     // https://tools.ietf.org/html/rfc4648#section-5
-    public string Base64UrlEncoded(byte[] arg) {
-      var s = Convert.ToBase64String(arg); // Regular base64 encoder
-      s = s.Split('=')[0]; // Remove any trailing '='s
-      s = s.Replace('+', '-'); // 62nd char of encoding
-      s = s.Replace('/', '_'); // 63rd char of encoding
-      return s;
-    }
+    public string Base64UrlEncoded(byte[] bytes) =>
+      Convert.ToBase64String(bytes) // Regular base64 encoder
+        .Split('=').First() // Remove any trailing '='s
+        .Replace('+', '-') // 62nd char of encoding
+        .Replace('/', '_'); // 63rd char of encoding
+    
 
-    public void SetKeyId(string location) {
-      _jwk.KeyId = location;
-    }
+
   }
 }

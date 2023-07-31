@@ -6,9 +6,34 @@ namespace MaksIT.LetsEncryptConsole {
     public Customer[]? Customers { get; set; }
   }
 
+  public class OsWindows {
+    public string? Path { get; set; }
+  }
+
+  public class OsLinux {
+    public string? Path { get; set; }
+
+    public string? Owner { get; set; }
+
+    public string? ChangeMode { get; set; }
+
+  }
+
   public class OsDependant {
-    public string? Windows { get; set; }
-    public string? Linux { get; set; }
+    public OsWindows? Windows { get; set; }
+    public OsLinux? Linux { get; set; }
+  }
+
+  public class SSHClientSettings {
+    public bool Active { get; set; }
+
+    public string? Host { get; set; }
+
+    public int Port { get; set; }
+
+    public string? Username { get; set; }
+
+    public string? Password { get; set; }
   }
 
 
@@ -18,37 +43,10 @@ namespace MaksIT.LetsEncryptConsole {
     public string? Name { get; set; }
     public string? Url { get; set; }
 
-    private string? _cache;
-    public string Cache {
-      get => _cache ?? "";
-      set => _cache = value;
-    }
-
     public OsDependant? ACME { get; set; }
     public OsDependant? SSL { get; set; }
 
-
-    public string? GetACME() {
-
-      if (OperatingSystem.IsWindows())
-        return ACME?.Windows;
-
-      if (OperatingSystem.IsLinux())
-        return ACME?.Linux;
-
-      return default;
-    }
-
-    public string? GetSSL() {
-
-      if (OperatingSystem.IsWindows())
-        return SSL?.Windows;
-
-      if (OperatingSystem.IsLinux())
-        return SSL?.Linux;
-
-      return default;
-    }
+    public SSHClientSettings? SSH { get; set; }
   }
 
   public class Customer {

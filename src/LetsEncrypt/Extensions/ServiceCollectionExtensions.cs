@@ -7,7 +7,6 @@ namespace MaksIT.LetsEncrypt.Extensions {
     public static void RegisterLetsEncrypt(this IServiceCollection services) {
 
       services.AddHttpClient<ILetsEncryptService, LetsEncryptService>();
-      services.AddSingleton<IJwsService, JwsService>();
     }
   }
 }
