@@ -1,40 +1,40 @@
-using System.Runtime.InteropServices;
 
-namespace MaksIT.LetsEncryptConsole {
-  public class Configuration {
-    public LetsEncryptEnvironment[]? Environments { get; set; }
-    public Customer[]? Customers { get; set; }
-  }
+namespace MaksIT.LetsEncryptConsole;
 
-  public class OsWindows {
-    public string? Path { get; set; }
-  }
+public class Configuration {
+  public LetsEncryptEnvironment[]? Environments { get; set; }
+  public Customer[]? Customers { get; set; }
+}
 
-  public class OsLinux {
-    public string? Path { get; set; }
+public class OsWindows {
+  public string? Path { get; set; }
+}
 
-    public string? Owner { get; set; }
+public class OsLinux {
+  public string? Path { get; set; }
 
-    public string? ChangeMode { get; set; }
+  public string? Owner { get; set; }
 
-  }
+  public string? ChangeMode { get; set; }
 
-  public class OsDependant {
-    public OsWindows? Windows { get; set; }
-    public OsLinux? Linux { get; set; }
-  }
+}
 
-  public class SSHClientSettings {
-    public bool Active { get; set; }
+public class OsDependant {
+  public OsWindows? Windows { get; set; }
+  public OsLinux? Linux { get; set; }
+}
 
-    public string? Host { get; set; }
+public class SSHClientSettings {
+  public bool Active { get; set; }
 
-    public int Port { get; set; }
+  public string? Host { get; set; }
 
-    public string? Username { get; set; }
+  public int Port { get; set; }
 
-    public string? Password { get; set; }
-  }
+  public string? Username { get; set; }
+
+  public string? Password { get; set; }
+}
 
 
 
@@ -69,4 +69,3 @@ namespace MaksIT.LetsEncryptConsole {
     public string[]? Hosts { get; set; }
     public string? Challenge { get; set; }
   }
-}

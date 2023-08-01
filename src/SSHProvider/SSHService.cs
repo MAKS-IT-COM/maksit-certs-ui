@@ -5,7 +5,7 @@ using Renci.SshNet;
 using Renci.SshNet.Common;
 using System.Text.RegularExpressions;
 
-namespace SSHProvider {
+namespace MaksIT.SSHProvider {
 
   public interface ISSHService : IDisposable {
     IDomainResult Upload(string workingdirectory, string fileName, byte[] bytes);
@@ -77,8 +77,8 @@ namespace SSHProvider {
         
         _logger.LogInformation($"Listing directory:");
 
-        foreach (var fi in listDirectory) {
-          _logger.LogInformation($" - " + fi.Name);
+        foreach (var file in listDirectory) {
+          _logger.LogInformation($" - " + file.Name);
         }
 
         return IDomainResult.Success();

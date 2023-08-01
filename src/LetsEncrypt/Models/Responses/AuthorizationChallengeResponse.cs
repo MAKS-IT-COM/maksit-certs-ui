@@ -1,20 +1,20 @@
 ﻿
 using MaksIT.LetsEncrypt.Entities;
 
-namespace MaksIT.LetsEncrypt.Models.Responses {
-  public class AuthorizationChallengeResponse {
-    public OrderIdentifier? Identifier { get; set; }
+namespace MaksIT.LetsEncrypt.Models.Responses;
 
-    public string? Status { get; set; }
+public class AuthorizationChallengeResponse {
+  public OrderIdentifier? Identifier { get; set; }
 
-    public DateTime? Expires { get; set; }
+  public string? Status { get; set; }
 
-    public bool Wildcard { get; set; }
+  public DateTime? Expires { get; set; }
 
-    public AuthorizationChallenge[]? Challenges { get; set; }
-  }
+  public bool Wildcard { get; set; }
 
-  public class AuthorizeChallenge {
-    public string? KeyAuthorization { get; set; }
-  }
+  public AuthorizationChallenge[]? Challenges { get; set; }
+}
+
+public class AuthorizeChallenge {
+  public string? KeyAuthorization { get; set; }
 }
