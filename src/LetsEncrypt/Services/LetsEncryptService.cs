@@ -52,7 +52,7 @@ public class LetsEncryptService : ILetsEncryptService {
     
   private HttpClient _httpClient;
 
-  private IJwsService _jwsService;
+  private IJwsService? _jwsService;
   private AcmeDirectory? _directory;
   private RegistrationCache? _cache;
 

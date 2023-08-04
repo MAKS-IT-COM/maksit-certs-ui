@@ -42,8 +42,6 @@ class Program {
 
     #region Services
     services.RegisterLetsEncrypt();
-
-    services.AddSingleton<IKeyService, KeyService>();
     services.AddSingleton<ITerminalService, TerminalService>();
     #endregion
 

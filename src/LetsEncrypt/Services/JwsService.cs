@@ -106,7 +106,4 @@ public class JwsService : IJwsService {
       .Split('=').First() // Remove any trailing '='s
       .Replace('+', '-') // 62nd char of encoding
       .Replace('/', '_'); // 63rd char of encoding
-    
-
-
 }

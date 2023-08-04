@@ -23,20 +23,17 @@ public class App : IApp {
   private readonly ILogger<App> _logger;
   private readonly Configuration _appSettings;
   private readonly ILetsEncryptService _letsEncryptService;
-  private readonly IKeyService _keyService;
   private readonly ITerminalService _terminalService;
 
   public App(
     ILogger<App> logger,
     IOptions<Configuration> appSettings,
     ILetsEncryptService letsEncryptService,
-    IKeyService keyService,
     ITerminalService terminalService
   ) {
     _logger = logger;
     _appSettings = appSettings.Value;
     _letsEncryptService = letsEncryptService;
-    _keyService = keyService;
     _terminalService = terminalService;
   }
 
@@ -102,16 +99,12 @@ public class App : IApp {
                 // if valid check if cert and key exists otherwise recreate
                 // else continue with new certificate request
                 var certRes = new CachedCertificateResult();
-                if (registrationCache.TryGetCachedCertificate(site.Name, out certRes)) {
-                  string cert = Path.Combine(sslPath, $"{site.Name}.crt");
-                  //if(!File.Exists(cert))
-                  File.WriteAllText(cert, certRes.Certificate);
+                if (registrationCache != null && registrationCache.TryGetCachedCertificate(site.Name, out certRes)) {
 
-                  string key = Path.Combine(sslPath, $"{site.Name}.key");
-                  //if(!File.Exists(key)) {
-                  using (StreamWriter writer = File.CreateText(key))
-                    _keyService.ExportPrivateKey(certRes.PrivateKey, writer);
-                  //}
+                  File.WriteAllText(Path.Combine(sslPath, $"{site.Name}.crt"), certRes.Certificate);
+                  
+                  if (certRes.PrivateKey != null)
+                    File.WriteAllText(Path.Combine(sslPath, $"{site.Name}.key"), certRes.PrivateKey.ExportRSAPrivateKeyPem());
 
                   _logger.LogInformation("Certificate and Key exists and valid. Restored from cache.");
                 }
@@ -188,11 +181,10 @@ public class App : IApp {
                     certRes = new CachedCertificateResult();
                     if (registrationCache.TryGetCachedCertificate(site.Name, out certRes)) {
 
-                      File.WriteAllText(Path.Combine(sslPath, site.Name + ".crt"), certRes.Certificate);
+                      File.WriteAllText(Path.Combine(sslPath, $"{site.Name}.crt"), certRes.Certificate);
 
-                      using (var writer = File.CreateText(Path.Combine(sslPath, site.Name + ".key"))) {
-                        _keyService.ExportPrivateKey(certRes.PrivateKey, writer);
-                      }
+                      if(certRes.PrivateKey != null)
+                        File.WriteAllText(Path.Combine(sslPath, $"{site.Name}.key"), certRes.PrivateKey.ExportRSAPrivateKeyPem());
 
                       _logger.LogInformation("Certificate saved.");
 
@@ -256,7 +248,6 @@ public class App : IApp {
     string owner,
     string changeMode
   ) {
-
     using var sshService = new SSHService(logger, sshSettings.Host, sshSettings.Port, sshSettings.Username, sshSettings.Password);
     sshService.Connect();
 

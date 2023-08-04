@@ -1,9 +1,12 @@
-﻿using DomainResults.Common;
+﻿using System.Text;
+using System.Text.RegularExpressions;
+
 using Microsoft.Extensions.Logging;
+
+using DomainResults.Common;
 
 using Renci.SshNet;
 using Renci.SshNet.Common;
-using System.Text.RegularExpressions;
 
 namespace MaksIT.SSHProvider {
 
@@ -22,8 +25,6 @@ namespace MaksIT.SSHProvider {
     public readonly SshClient _sshClient;
     public readonly SftpClient _sftpClient;
 
- 
-
     public SSHService(
       ILogger logger,
       string host,
@@ -31,9 +32,38 @@ namespace MaksIT.SSHProvider {
       string username,
       string password
     ) {
+
+      if(string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        throw new ArgumentNullException($"{nameof(username)} or {nameof(password)} is null, empty or white space");
+
       _logger = logger;
       _sshClient = new SshClient(host, port, username, password);
       _sftpClient = new SftpClient(host, port, username, password);
+    }
+
+
+    public SSHService(
+      ILogger logger,
+      string host,
+      int port,
+      string username,
+      string [] privateKeys
+    ) {
+
+      if (string.IsNullOrWhiteSpace(username) || privateKeys.Any(x => string.IsNullOrWhiteSpace(x)))
+        throw new ArgumentNullException($"{nameof(username)} or {nameof(privateKeys)} contains key which is null, empty or white space");
+
+      _logger = logger;
+
+      var privateKeyFiles = new List<PrivateKeyFile>();
+      foreach (var privateKey in privateKeys) {
+        using (var ms = new MemoryStream(Encoding.ASCII.GetBytes(privateKey))) {
+          privateKeyFiles.Add(new PrivateKeyFile(ms));
+        }
+      }
+
+      _sshClient = new SshClient(host, port, username, privateKeyFiles.ToArray());
+      _sftpClient = new SftpClient(host, port, username, privateKeyFiles.ToArray());
     }
 
     public IDomainResult Connect() {
