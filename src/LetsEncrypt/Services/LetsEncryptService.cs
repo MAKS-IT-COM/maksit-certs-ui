@@ -18,24 +18,25 @@ using MaksIT.LetsEncrypt.Models.Responses;
 using MaksIT.LetsEncrypt.Models.Interfaces;
 using MaksIT.LetsEncrypt.Models.Requests;
 using MaksIT.LetsEncrypt.Entities.Jws;
+using DomainResults.Common;
 
 namespace MaksIT.LetsEncrypt.Services;
 
 public interface ILetsEncryptService {
 
-  Task ConfigureClient(string url);
+  Task<IDomainResult> ConfigureClient(string url);
 
-  Task Init(string[] contacts, RegistrationCache? registrationCache);
-
-  string GetTermsOfServiceUri();
-
-
-  Task<Dictionary<string, string>> NewOrder(string[] hostnames, string challengeType);
-  Task CompleteChallenges();
-  Task GetOrder(string[] hostnames);
-  Task<(X509Certificate2 Cert, RSA PrivateKey)> GetCertificate(string subject);
+  Task<IDomainResult> Init(string[] contacts, RegistrationCache? registrationCache);
 
   RegistrationCache? GetRegistrationCache();
+
+  (string?, IDomainResult) GetTermsOfServiceUri();
+
+
+  Task<(Dictionary<string, string>?, IDomainResult)> NewOrder(string[] hostnames, string challengeType);
+  Task<IDomainResult> CompleteChallenges();
+  Task<IDomainResult> GetOrder(string[] hostnames);
+  Task<((X509Certificate2 Cert, RSA PrivateKey)?, IDomainResult)> GetCertificate(string subject);
 }
 
 
@@ -76,11 +77,22 @@ public class LetsEncryptService : ILetsEncryptService {
   /// <param name="url"></param>
   /// <param name="contacts"></param>
   /// <returns></returns>
-  public async Task ConfigureClient(string url) {
+  public async Task<IDomainResult> ConfigureClient(string url) {
+    try {
+      _httpClient.BaseAddress ??= new Uri(url);
 
-    _httpClient.BaseAddress ??= new Uri(url);
+      var (directory, getAcmeDirectoryResult) = await SendAsync<AcmeDirectory>(HttpMethod.Get, new Uri("directory", UriKind.Relative), false, null);
+      if (!getAcmeDirectoryResult.IsSuccess)
+        return getAcmeDirectoryResult;
 
-    (_directory, _) = await SendAsync<AcmeDirectory>(HttpMethod.Get, new Uri("directory", UriKind.Relative), false, null);
+      _directory = directory.Result;
+
+      return IDomainResult.Success();
+    }
+    catch (Exception ex) {
+      _logger.LogError(ex, "Let's Encrypt client unhandled exception");
+      return IDomainResult.CriticalDependencyError();
+    }
   }
 
   /// <summary>
@@ -89,42 +101,57 @@ public class LetsEncryptService : ILetsEncryptService {
   /// <param name="contacts"></param>
   /// <param name="token"></param>
   /// <returns></returns>
-  public async Task Init(string? [] contacts, RegistrationCache? cache) {
+  public async Task<IDomainResult> Init(string? [] contacts, RegistrationCache? cache) {
 
-    if (contacts == null || contacts.Length == 0)
-      throw new ArgumentNullException();
+    try {
 
-    if (_directory == null)
-      throw new ArgumentNullException();
+      _logger.LogInformation($"Executing {nameof(Init)}...");
 
-    var accountKey = new RSACryptoServiceProvider(4096);
+      if (contacts == null || contacts.Length == 0)
+        return IDomainResult.Failed();
 
-    if (cache != null && cache.AccountKey != null) {
-      _cache = cache;
-      accountKey.ImportCspBlob(cache.AccountKey);
+      if (_directory == null)
+        return IDomainResult.Failed();
+
+      var accountKey = new RSACryptoServiceProvider(4096);
+
+      if (cache != null && cache.AccountKey != null) {
+        _cache = cache;
+        accountKey.ImportCspBlob(cache.AccountKey);
+      }
+
+      // New Account request
+      _jwsService = new JwsService(accountKey);
+
+
+      var letsEncryptOrder = new Account {
+        TermsOfServiceAgreed = true,
+        Contacts = contacts.Select(contact => $"mailto:{contact}").ToArray()
+      };
+
+      var (account, postAccuntResult) = await SendAsync<Account>(HttpMethod.Post, _directory.NewAccount, false, letsEncryptOrder);
+      _jwsService.SetKeyId(account.Result.Location.ToString());
+
+      if (account.Result.Status != "valid") {
+        _logger.LogError($"Account status is not valid, was: {account.Result.Status} \r\n {account.ResponseText}");
+        return IDomainResult.Failed();
+      }
+
+      _cache = new RegistrationCache {
+        Location = account.Result.Location,
+        AccountKey = accountKey.ExportCspBlob(true),
+        Id = account.Result.Id,
+        Key = account.Result.Key
+      };
+
+      return IDomainResult.Success();
     }
+    catch (Exception ex) {
+      var message = "Let's Encrypt client unhandled exception";
 
-    // New Account request
-    _jwsService = new JwsService(accountKey);
-
-
-    var letsEncryptOrder = new Account {
-      TermsOfServiceAgreed = true,
-      Contacts = contacts.Select(contact => $"mailto:{contact}").ToArray()
-    };
-
-    var (account, response) = await SendAsync<Account>(HttpMethod.Post, _directory.NewAccount, false, letsEncryptOrder);
-    _jwsService.SetKeyId(account.Location.ToString());
-
-    if (account.Status != "valid")
-      throw new InvalidOperationException($"Account status is not valid, was: {account.Status} \r\n {response}");
-
-    _cache = new RegistrationCache {
-      Location = account.Location,
-      AccountKey = accountKey.ExportCspBlob(true),
-      Id = account.Id,
-      Key = account.Key
-    };
+      _logger.LogError(ex, message);
+      return IDomainResult.CriticalDependencyError(message);
+    }
   }
 
   /// <summary>
@@ -139,15 +166,24 @@ public class LetsEncryptService : ILetsEncryptService {
   /// </summary>
   /// <param name="token"></param>
   /// <returns></returns>
-  public string GetTermsOfServiceUri() {
+  public (string?, IDomainResult) GetTermsOfServiceUri() {
+    try {
 
-    if (_directory == null)
-      throw new NullReferenceException();
+      _logger.LogInformation($"Executing {nameof(GetTermsOfServiceUri)}...");
 
-    return _directory.Meta.TermsOfService;
+      if (_directory == null) {
+        return IDomainResult.Failed<string?>();
+      }
+
+      return IDomainResult.Success(_directory.Meta.TermsOfService);
+    }
+    catch (Exception ex) {
+      var message = "Let's Encrypt client unhandled exception";
+
+      _logger.LogError(ex, message);
+      return IDomainResult.CriticalDependencyError<string?>(message);
+    }
   }
-
-
 
   /// <summary>
   /// Create new Certificate Order. In case you want the wildcard-certificate you must select dns-01 challange.
@@ -164,82 +200,104 @@ public class LetsEncryptService : ILetsEncryptService {
   /// <param name="challengeType"></param>
   /// <param name="token"></param>
   /// <returns></returns>
-  public async Task<Dictionary<string, string>> NewOrder(string[] hostnames, string challengeType) {
-    _challenges.Clear();
+  public async Task<(Dictionary<string, string>?, IDomainResult)> NewOrder(string[] hostnames, string challengeType) {
+    try {
 
-    var letsEncryptOrder = new Order {
-      Expires = DateTime.UtcNow.AddDays(2),
-      Identifiers = hostnames.Select(hostname => new OrderIdentifier {
-        Type = "dns",
-        Value = hostname
-      }).ToArray()
-    };
+      _logger.LogInformation($"Executing {nameof(NewOrder)}...");
 
-    var (order, response) = await SendAsync<Order>(HttpMethod.Post, _directory.NewOrder, false, letsEncryptOrder);
+      _challenges.Clear();
 
-    if (order.Status == "ready")
-      return new Dictionary<string, string>();
+      var letsEncryptOrder = new Order {
+        Expires = DateTime.UtcNow.AddDays(2),
+        Identifiers = hostnames.Select(hostname => new OrderIdentifier {
+          Type = "dns",
+          Value = hostname
+        }).ToArray()
+      };
 
-    if (order.Status != "pending")
-      throw new InvalidOperationException($"Created new order and expected status 'pending', but got: {order.Status} \r\n {response}");
-      
-    _currentOrder = order;
-
-    var results = new Dictionary<string, string>();
-    foreach (var item in order.Authorizations) {
-      var (challengeResponse, responseText) = await SendAsync<AuthorizationChallengeResponse>(HttpMethod.Post, item, true, null);
-
-      if (challengeResponse.Status == "valid")
-        continue;
-
-      if (challengeResponse.Status != "pending")
-        throw new InvalidOperationException($"Expected autorization status 'pending', but got: {order.Status} \r\n {responseText}");
-
-      var challenge = challengeResponse.Challenges.First(x => x.Type == challengeType);
-      _challenges.Add(challenge);
-
-      var keyToken = _jwsService.GetKeyAuthorization(challenge.Token);
-
-      switch (challengeType) {
-
-        // A client fulfills this challenge by constructing a key authorization
-        // from the "token" value provided in the challenge and the client's
-        // account key.  The client then computes the SHA-256 digest [FIPS180-4]
-        // of the key authorization.
-        // 
-        // The record provisioned to the DNS contains the base64url encoding of
-        // this digest.
-
-        case "dns-01": {
-            using (var sha256 = SHA256.Create()) {
-              var dnsToken = _jwsService.Base64UrlEncoded(sha256.ComputeHash(Encoding.UTF8.GetBytes(keyToken)));
-              results[challengeResponse.Identifier.Value] = dnsToken;
-            }
-            break;
-          }
-
-
-        // A client fulfills this challenge by constructing a key authorization
-        // from the "token" value provided in the challenge and the client's
-        // account key.  The client then provisions the key authorization as a
-        // resource on the HTTP server for the domain in question.
-        // 
-        // The path at which the resource is provisioned is comprised of the
-        // fixed prefix "/.well-known/acme-challenge/", followed by the "token"
-        // value in the challenge.  The value of the resource MUST be the ASCII
-        // representation of the key authorization.
-
-        case "http-01": {
-            results[challengeResponse.Identifier.Value] = keyToken;
-            break;
-          }
-
-        default:
-          throw new NotImplementedException();
+      var (order, postNewOrderResult) = await SendAsync<Order>(HttpMethod.Post, _directory.NewOrder, false, letsEncryptOrder);
+      if (!postNewOrderResult.IsSuccess) {
+        return (null, postNewOrderResult);
       }
-    }
 
-    return results;
+      if (order.Result.Status == "ready")
+        return IDomainResult.Success(new Dictionary<string, string>());
+
+      if (order.Result.Status != "pending") {
+        _logger.LogError($"Created new order and expected status 'pending', but got: {order.Result.Status} \r\n {order.Result}");
+        return IDomainResult.Failed<Dictionary<string, string>?>();
+      }
+
+      _currentOrder = order.Result;
+
+      var results = new Dictionary<string, string>();
+      foreach (var item in order.Result.Authorizations) {
+
+        var (challengeResponse, postAuthorisationChallengeResult) = await SendAsync<AuthorizationChallengeResponse>(HttpMethod.Post, item, true, null);
+        if (!postAuthorisationChallengeResult.IsSuccess) {
+          return (null, postAuthorisationChallengeResult);
+        }
+
+        if (challengeResponse.Result.Status == "valid")
+          continue;
+
+        if (challengeResponse.Result.Status != "pending") {
+          _logger.LogError($"Expected autorization status 'pending', but got: {order.Result.Status} \r\n {challengeResponse.ResponseText}");
+          return IDomainResult.Failed<Dictionary<string, string>?>();
+        }
+
+        var challenge = challengeResponse.Result.Challenges.First(x => x.Type == challengeType);
+        _challenges.Add(challenge);
+
+        var keyToken = _jwsService.GetKeyAuthorization(challenge.Token);
+
+        switch (challengeType) {
+
+          // A client fulfills this challenge by constructing a key authorization
+          // from the "token" value provided in the challenge and the client's
+          // account key.  The client then computes the SHA-256 digest [FIPS180-4]
+          // of the key authorization.
+          // 
+          // The record provisioned to the DNS contains the base64url encoding of
+          // this digest.
+
+          case "dns-01": {
+              using (var sha256 = SHA256.Create()) {
+                var dnsToken = _jwsService.Base64UrlEncoded(sha256.ComputeHash(Encoding.UTF8.GetBytes(keyToken)));
+                results[challengeResponse.Result.Identifier.Value] = dnsToken;
+              }
+              break;
+            }
+
+
+          // A client fulfills this challenge by constructing a key authorization
+          // from the "token" value provided in the challenge and the client's
+          // account key.  The client then provisions the key authorization as a
+          // resource on the HTTP server for the domain in question.
+          // 
+          // The path at which the resource is provisioned is comprised of the
+          // fixed prefix "/.well-known/acme-challenge/", followed by the "token"
+          // value in the challenge.  The value of the resource MUST be the ASCII
+          // representation of the key authorization.
+
+          case "http-01": {
+              results[challengeResponse.Result.Identifier.Value] = keyToken;
+              break;
+            }
+
+          default:
+            throw new NotImplementedException();
+        }
+      }
+
+      return IDomainResult.Success(results);
+    }
+    catch (Exception ex) {
+      var message = "Let's Encrypt client unhandled exception";
+
+      _logger.LogError(ex, message);
+      return IDomainResult.CriticalDependencyError<Dictionary<string, string>?>(message);
+    }
   }
 
   /// <summary>
@@ -247,36 +305,63 @@ public class LetsEncryptService : ILetsEncryptService {
   /// </summary>
   /// <returns></returns>
   /// <exception cref="InvalidOperationException"></exception>
-  public async Task CompleteChallenges() {
+  public async Task<IDomainResult> CompleteChallenges() {
+    try {
 
-    for (var index = 0; index < _challenges.Count; index++) {
+      _logger.LogInformation($"Executing {nameof(CompleteChallenges)}...");
 
-      var challenge = _challenges[index];
-
-      while (true) {
-        AuthorizeChallenge authorizeChallenge = new AuthorizeChallenge();
-
-        switch (challenge.Type) {
-          case "dns-01": {
-              authorizeChallenge.KeyAuthorization = _jwsService.GetKeyAuthorization(challenge.Token);
-              //var (result, responseText) = await SendAsync<AuthorizationChallengeResponse>(HttpMethod.Post, challenge.Url, authorizeChallenge, token);
-              break;
-            }
-
-          case "http-01": {
-              break;
-            }
-        }
-
-        var (result, responseText) = await SendAsync<AuthorizationChallengeResponse>(HttpMethod.Post, challenge.Url, false, "{}");
-
-        if (result.Status == "valid")
-          break;
-        if (result.Status != "pending")
-          throw new InvalidOperationException($"Failed autorization of {_currentOrder.Identifiers[index].Value} \r\n {responseText}");
-
-        await Task.Delay(1000);
+      if (_currentOrder?.Identifiers == null) {
+        return IDomainResult.Failed();
       }
+
+      for (var index = 0; index < _challenges.Count; index++) {
+
+        var challenge = _challenges[index];
+
+        var start = DateTime.UtcNow;
+
+        while (true) {
+          var authorizeChallenge = new AuthorizeChallenge();
+
+          switch (challenge.Type) {
+            case "dns-01": {
+                authorizeChallenge.KeyAuthorization = _jwsService.GetKeyAuthorization(challenge.Token);
+                //var (result, responseText) = await SendAsync<AuthorizationChallengeResponse>(HttpMethod.Post, challenge.Url, authorizeChallenge, token);
+                break;
+              }
+
+            case "http-01": {
+                break;
+              }
+          }
+
+          var (authChallenge, postAuthChallengeResult) = await SendAsync<AuthorizationChallengeResponse>(HttpMethod.Post, challenge.Url, false, "{}");
+          if (!postAuthChallengeResult.IsSuccess) {
+            return postAuthChallengeResult;
+          }
+
+          if (authChallenge.Result.Status == "valid")
+            break;
+
+          if (authChallenge.Result.Status != "pending") {
+            _logger.LogError($"Failed autorization of {_currentOrder.Identifiers[index].Value} \r\n {authChallenge.ResponseText}");
+            return IDomainResult.Failed();
+          }
+
+          await Task.Delay(1000);
+
+          if ((DateTime.UtcNow - start).Seconds > 120)
+            throw new TimeoutException();
+        }
+      }
+
+      return IDomainResult.Success();
+    }
+    catch (Exception ex) {
+      var message = "Let's Encrypt client unhandled exception";
+
+      _logger.LogError(ex, message);
+      return IDomainResult.CriticalDependencyError(message);
     }
   }
 
@@ -285,19 +370,34 @@ public class LetsEncryptService : ILetsEncryptService {
   /// </summary>
   /// <param name="hostnames"></param>
   /// <returns></returns>
-  public async Task GetOrder(string[] hostnames) {
+  public async Task<IDomainResult> GetOrder(string[] hostnames) {
 
-    var letsEncryptOrder = new Order {
-      Expires = DateTime.UtcNow.AddDays(2),
-      Identifiers = hostnames.Select(hostname => new OrderIdentifier {
-        Type = "dns",
-        Value = hostname
-      }).ToArray()
-    };
+    try {
 
-    var (order, response) = await SendAsync<Order>(HttpMethod.Post, _directory.NewOrder, false, letsEncryptOrder);
+      _logger.LogInformation($"Executing {nameof(GetOrder)}");
 
-    _currentOrder = order;
+      var letsEncryptOrder = new Order {
+        Expires = DateTime.UtcNow.AddDays(2),
+        Identifiers = hostnames.Select(hostname => new OrderIdentifier {
+          Type = "dns",
+          Value = hostname
+        }).ToArray()
+      };
+
+      var (order, postOrderResult) = await SendAsync<Order>(HttpMethod.Post, _directory.NewOrder, false, letsEncryptOrder);
+      if (!postOrderResult.IsSuccess)
+        return postOrderResult;
+
+      _currentOrder = order.Result;
+
+      return IDomainResult.Success();
+    }
+    catch (Exception ex) {
+      var message = "Let's Encrypt client unhandled exception";
+
+      _logger.LogError(ex, message);
+      return IDomainResult.CriticalDependencyError(message);
+    }
   }
 
   /// <summary>
@@ -306,71 +406,87 @@ public class LetsEncryptService : ILetsEncryptService {
   /// <param name="subject"></param>
   /// <returns>Cert and Private key</returns>
   /// <exception cref="InvalidOperationException"></exception>
-  public async Task<(X509Certificate2 Cert, RSA PrivateKey)> GetCertificate(string subject) {
+  public async Task<((X509Certificate2 Cert, RSA PrivateKey)?, IDomainResult)> GetCertificate(string subject) {
 
-    _logger.LogInformation($"Invoked: {nameof(GetCertificate)}");
+    try {
+      _logger.LogInformation($"Executing {nameof(GetCertificate)}...");
 
-
-    if (_currentOrder == null)
-      throw new ArgumentNullException();
-
-    var key = new RSACryptoServiceProvider(4096);
-    var csr = new CertificateRequest("CN=" + subject,
-        key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-
-    var san = new SubjectAlternativeNameBuilder();
-    foreach (var host in _currentOrder.Identifiers)
-      san.AddDnsName(host.Value);
-
-    csr.CertificateExtensions.Add(san.Build());
-
-    var letsEncryptOrder = new FinalizeRequest {
-      Csr = _jwsService.Base64UrlEncoded(csr.CreateSigningRequest())
-    };
-
-    Uri? certificateUrl = default;
-
-
-    var start = DateTime.UtcNow;
-
-    while (certificateUrl == null) {
-      // https://community.letsencrypt.org/t/breaking-changes-in-asynchronous-order-finalization-api/195882
-      await GetOrder(_currentOrder.Identifiers.Select(x => x.Value).ToArray());
-
-      if (_currentOrder.Status == "ready") {
-        var (response, responseText) = await SendAsync<Order>(HttpMethod.Post, _currentOrder.Finalize, false, letsEncryptOrder);
-
-        if (response.Status == "processing")
-          (response, responseText) = await SendAsync<Order>(HttpMethod.Post, _currentOrder.Location, true, null);
-
-        if (response.Status == "valid") {
-          certificateUrl = response.Certificate;
-        }
+      if (_currentOrder == null) {
+        return IDomainResult.Failed<(X509Certificate2 Cert, RSA PrivateKey)?>();
       }
 
-      if ((start - DateTime.UtcNow).Seconds > 120)
-        throw new TimeoutException();
+      var key = new RSACryptoServiceProvider(4096);
+      var csr = new CertificateRequest("CN=" + subject,
+          key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
 
-      await Task.Delay(1000);
-      continue;
+      var san = new SubjectAlternativeNameBuilder();
+      foreach (var host in _currentOrder.Identifiers)
+        san.AddDnsName(host.Value);
 
-      // throw new InvalidOperationException(/*$"Invalid order status: "*/);
+      csr.CertificateExtensions.Add(san.Build());
+
+      var letsEncryptOrder = new FinalizeRequest {
+        Csr = _jwsService.Base64UrlEncoded(csr.CreateSigningRequest())
+      };
+
+      Uri? certificateUrl = default;
+
+
+      var start = DateTime.UtcNow;
+
+      while (certificateUrl == null) {
+        // https://community.letsencrypt.org/t/breaking-changes-in-asynchronous-order-finalization-api/195882
+        await GetOrder(_currentOrder.Identifiers.Select(x => x.Value).ToArray());
+
+        if (_currentOrder.Status == "ready") {
+          var (order, postOrderResult) = await SendAsync<Order>(HttpMethod.Post, _currentOrder.Finalize, false, letsEncryptOrder);
+          if (!postOrderResult.IsSuccess || order?.Result == null)
+            return (null, postOrderResult);
+
+
+          if (order.Result.Status == "processing") {
+            (order, postOrderResult) = await SendAsync<Order>(HttpMethod.Post, _currentOrder.Location, true, null);
+            if (!postOrderResult.IsSuccess || order?.Result == null)
+              return (null, postOrderResult);
+          }
+
+          if (order.Result.Status == "valid") {
+            certificateUrl = order.Result.Certificate;
+          }
+        }
+
+        if ((DateTime.UtcNow - start).Seconds > 120)
+          throw new TimeoutException();
+
+        await Task.Delay(1000);
+      }
+
+      var (pem, postPemResult) = await SendAsync<string>(HttpMethod.Post, certificateUrl, true, null);
+      if (!postPemResult.IsSuccess || pem?.Result == null)
+        return (null, postPemResult);
+
+
+      if (_cache == null) {
+        _logger.LogError($"{nameof(_cache)} is null");
+        return IDomainResult.Failed<(X509Certificate2 Cert, RSA PrivateKey)?>();
+      }
+
+      _cache.CachedCerts ??= new Dictionary<string, CertificateCache>();
+      _cache.CachedCerts[subject] = new CertificateCache {
+        Cert = pem.Result,
+        Private = key.ExportCspBlob(true)
+      };
+
+      var cert = new X509Certificate2(Encoding.UTF8.GetBytes(pem.Result));
+
+      return IDomainResult.Success((cert, key));
     }
+    catch (Exception ex) {
+      var message = "Let's Encrypt client unhandled exception";
 
-    var (pem, _) = await SendAsync<string>(HttpMethod.Post, certificateUrl, true, null);
-
-    if (_cache == null)
-      throw new NullReferenceException();
-
-    _cache.CachedCerts ??= new Dictionary<string, CertificateCache>();
-    _cache.CachedCerts[subject] = new CertificateCache {
-      Cert = pem,
-      Private = key.ExportCspBlob(true)
-    };
-
-    var cert = new X509Certificate2(Encoding.UTF8.GetBytes(pem));
-
-    return (cert, key);
+      _logger.LogError(ex, message);
+      return IDomainResult.CriticalDependencyError< (X509Certificate2 Cert, RSA PrivateKey)?>(message);
+    }
   }
 
   /// <summary>
@@ -378,7 +494,7 @@ public class LetsEncryptService : ILetsEncryptService {
   /// </summary>
   /// <param name="token"></param>
   /// <returns></returns>
-  public Task KeyChange() {
+  public Task<IDomainResult> KeyChange() {
     throw new NotImplementedException();
   }
 
@@ -387,8 +503,35 @@ public class LetsEncryptService : ILetsEncryptService {
   /// </summary>
   /// <param name="token"></param>
   /// <returns></returns>
-  public Task RevokeCertificate() {
+  public Task<IDomainResult> RevokeCertificate() {
     throw new NotImplementedException();
+  }
+
+
+  /// <summary>
+  /// Request New Nonce to be able to start POST requests
+  /// </summary>
+  /// <param name="token"></param>
+  /// <returns></returns>
+  private async Task<(string?, IDomainResult)> NewNonce() {
+
+    try {
+
+      _logger.LogInformation($"Executing {nameof(NewNonce)}...");
+
+      if (_directory == null)
+        IDomainResult.Failed();
+
+      var result = await _httpClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, _directory.NewNonce));
+      return IDomainResult.Success(result.Headers.GetValues("Replay-Nonce").First());
+
+    }
+    catch (Exception ex) {
+      var message = "Let's Encrypt client unhandled exception";
+
+      _logger.LogError(ex, message);
+      return IDomainResult.CriticalDependencyError<string?>(message);
+    }
   }
 
   /// <summary>
@@ -397,78 +540,91 @@ public class LetsEncryptService : ILetsEncryptService {
   /// <typeparam name="TResult"></typeparam>
   /// <param name="method"></param>
   /// <param name="uri"></param>
-  /// <param name="message"></param>
+  /// <param name="requestModel"></param>
   /// <param name="token"></param>
   /// <returns></returns>
-  private async Task<(TResult, string)> SendAsync<TResult>(HttpMethod method, Uri uri, bool isPostAsGet, object? message) where TResult : class {
-    var request = new HttpRequestMessage(method, uri);
+  private async Task<(SendResult<TResult>?, IDomainResult)> SendAsync<TResult>(HttpMethod method, Uri uri, bool isPostAsGet, object? requestModel) {
+    try {
 
-    _nonce = uri.OriginalString != "directory"
-      ? await NewNonce()
-      : default;
+      _logger.LogInformation($"Executing {nameof(SendAsync)}...");
 
-    if (message != null || isPostAsGet) {
-      var jwsHeader = new JwsHeader {
-        Url = uri,
-      };
+      //if (_jwsService == null) {
+      //  _logger.LogError($"{nameof(_jwsService)} is null");
+      //  return IDomainResult.Failed<SendResult<TResult>?>();
+      //}
 
-      if (_nonce != null)
-        jwsHeader.Nonce = _nonce;
+      var request = new HttpRequestMessage(method, uri);
 
-      var encodedMessage = isPostAsGet
-        ? _jwsService.Encode(jwsHeader)
-        : _jwsService.Encode(message, jwsHeader);
+      if (uri.OriginalString != "directory") {
+        var (nonce, newNonceResult) = await NewNonce();
+        if (!newNonceResult.IsSuccess || nonce == null) {
+          return (null, newNonceResult);
+        }
 
-      var json = encodedMessage.ToJson();
+        _nonce = nonce;
+      }
+      else {
+        _nonce = default;
+      }
 
-      request.Content = new StringContent(json);
+      if (requestModel != null || isPostAsGet) {
+        var jwsHeader = new JwsHeader {
+          Url = uri,
+        };
 
-      var requestType = "application/json";
+        if (_nonce != null)
+          jwsHeader.Nonce = _nonce;
+
+        var encodedMessage = isPostAsGet
+          ? _jwsService.Encode(jwsHeader)
+          : _jwsService.Encode(requestModel, jwsHeader);
+
+        var json = encodedMessage.ToJson();
+
+        request.Content = new StringContent(json);
+
+        var requestType = "application/json";
+        if (method == HttpMethod.Post)
+          requestType = "application/jose+json";
+
+        request.Content.Headers.Remove("Content-Type");
+        request.Content.Headers.Add("Content-Type", requestType);
+      }
+
+      var response = await _httpClient.SendAsync(request);
+
       if (method == HttpMethod.Post)
-        requestType = "application/jose+json";
+        _nonce = response.Headers.GetValues("Replay-Nonce").First();
 
-      request.Content.Headers.Remove("Content-Type");
-      request.Content.Headers.Add("Content-Type", requestType);
+      var responseText = await response.Content.ReadAsStringAsync();
+
+      if (response.Content.Headers.ContentType?.MediaType == "application/problem+json")
+        throw new LetsEncrytException(responseText.ToObject<Problem>(), response);
+
+      if (response.Content.Headers.ContentType?.MediaType == "application/pem-certificate-chain" && typeof(TResult) == typeof(string)) {
+        return IDomainResult.Success(new SendResult<TResult> {
+          Result = (TResult)(object)responseText
+        });
+      }
+
+      var responseContent = responseText.ToObject<TResult>();
+
+      if (responseContent is IHasLocation ihl) {
+        if (response.Headers.Location != null)
+          ihl.Location = response.Headers.Location;
+      }
+
+      return IDomainResult.Success(new SendResult<TResult> {
+        Result = responseContent,
+        ResponseText = responseText
+      });
+
     }
+    catch (Exception ex) {
+      var message = "Let's Encrypt client unhandled exception";
 
-    var response = await _httpClient.SendAsync(request);
-
-    if (method == HttpMethod.Post)
-      _nonce = response.Headers.GetValues("Replay-Nonce").First();
-
-    if (response.Content.Headers.ContentType.MediaType == "application/problem+json") {
-      var problemJson = await response.Content.ReadAsStringAsync();
-      var problem = problemJson.ToObject<Problem>();
-      problem.RawJson = problemJson;
-      throw new LetsEncrytException(problem, response);
+      _logger.LogError(ex, message);
+      return IDomainResult.CriticalDependencyError<SendResult<TResult>?>(message);
     }
-
-    var responseText = await response.Content.ReadAsStringAsync();
-
-    if (typeof(TResult) == typeof(string) && response.Content.Headers.ContentType.MediaType == "application/pem-certificate-chain") {
-      return ((TResult)(object)responseText, null);
-    }
-
-    var responseContent = responseText.ToObject<TResult>();
-
-    if (responseContent is IHasLocation ihl) {
-      if (response.Headers.Location != null)
-        ihl.Location = response.Headers.Location;
-    }
-
-    return (responseContent, responseText);
-  }
-
-  /// <summary>
-  /// Request New Nonce to be able to start POST requests
-  /// </summary>
-  /// <param name="token"></param>
-  /// <returns></returns>
-  private async Task<string> NewNonce() {
-    if (_directory == null)
-      throw new NotImplementedException();
-
-    var result = await _httpClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, _directory.NewNonce));
-    return result.Headers.GetValues("Replay-Nonce").First();
   }
 }
