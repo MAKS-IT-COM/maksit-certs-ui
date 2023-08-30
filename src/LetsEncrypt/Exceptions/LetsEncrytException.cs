@@ -1,25 +1,19 @@
-﻿using System;
-using System.Net.Http;
+﻿using MaksIT.Core.Extensions;
+using MaksIT.LetsEncrypt.Models.Responses;
 
-namespace MaksIT.LetsEncrypt.Exceptions {
-  public class LetsEncrytException : Exception {
-    public LetsEncrytException(Problem problem, HttpResponseMessage response)
-        : base($"{problem.Type}: {problem.Detail}") {
-      Problem = problem;
-      Response = response;
-    }
+namespace MaksIT.LetsEncrypt.Exceptions;
+public class LetsEncrytException : Exception {
 
-    public Problem Problem { get; }
+  public Problem? Problem { get; }
 
-    public HttpResponseMessage Response { get; }
-  }
+  public HttpResponseMessage Response { get; }
 
+  public LetsEncrytException(
+    Problem? problem,
+    HttpResponseMessage response
+  ) : base(problem != null ? $"{problem.Type}: {problem.Detail}" : "") {
 
-  public class Problem {
-    public string Type { get; set; }
-
-    public string Detail { get; set; }
-
-    public string RawJson { get; set; }
+    Problem = problem;
+    Response = response;
   }
 }

@@ -7,57 +7,56 @@ using Xunit;
 //using PecMgr.VaultProvider;
 //using PecMgr.Core.Abstractions;
 
-namespace MaksIT.Tests.SSHProviderTests.Abstractions {
-  //[TestCaseOrderer(PriorityOrderer.Name, PriorityOrderer.Assembly)]
-  public abstract class ConfigurationBase {
+namespace MaksIT.Tests.SSHProviderTests.Abstractions;
+//[TestCaseOrderer(PriorityOrderer.Name, PriorityOrderer.Assembly)]
+public abstract class ConfigurationBase {
 
-    protected IConfiguration Configuration;
+  protected IConfiguration Configuration;
 
-    protected ServiceCollection ServiceCollection = new ServiceCollection();
+  protected ServiceCollection ServiceCollection = new ServiceCollection();
 
-    protected ServiceProvider ServiceProvider { get => ServiceCollection.BuildServiceProvider(); }
+  protected ServiceProvider ServiceProvider { get => ServiceCollection.BuildServiceProvider(); }
 
-    public ConfigurationBase() {
-      Configuration = InitConfig();
-      ConfigureServices(ServiceCollection);
-    }
+  public ConfigurationBase() {
+    Configuration = InitConfig();
+    ConfigureServices(ServiceCollection);
+  }
 
-    protected abstract void ConfigureServices(IServiceCollection services);
+  protected abstract void ConfigureServices(IServiceCollection services);
 
-    private IConfiguration InitConfig() {
-      var aspNetCoreEnvironment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
-      var currentDirectory = Directory.GetCurrentDirectory();
+  private IConfiguration InitConfig() {
+    var aspNetCoreEnvironment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+    var currentDirectory = Directory.GetCurrentDirectory();
 
-      var configurationBuilder = new ConfigurationBuilder()
-        .SetBasePath(Directory.GetCurrentDirectory())
-        .AddEnvironmentVariables();
+    var configurationBuilder = new ConfigurationBuilder()
+      .SetBasePath(Directory.GetCurrentDirectory())
+      .AddEnvironmentVariables();
 
-      if (!string.IsNullOrWhiteSpace(aspNetCoreEnvironment) && new FileInfo(Path.Combine(currentDirectory, $"appsettings.{aspNetCoreEnvironment}.json")).Exists)
-        configurationBuilder.AddJsonFile($"appsettings.{aspNetCoreEnvironment}.json", true);
-      else if (new FileInfo(Path.Combine(currentDirectory, "appsettings.json")).Exists)
-        configurationBuilder.AddJsonFile("appsettings.json", true, true);
-      else
-        throw new FileNotFoundException($"Unable to find appsetting.json in {currentDirectory}");
+    if (!string.IsNullOrWhiteSpace(aspNetCoreEnvironment) && new FileInfo(Path.Combine(currentDirectory, $"appsettings.{aspNetCoreEnvironment}.json")).Exists)
+      configurationBuilder.AddJsonFile($"appsettings.{aspNetCoreEnvironment}.json", true);
+    else if (new FileInfo(Path.Combine(currentDirectory, "appsettings.json")).Exists)
+      configurationBuilder.AddJsonFile("appsettings.json", true, true);
+    else
+      throw new FileNotFoundException($"Unable to find appsetting.json in {currentDirectory}");
 
-      //var builtConfig = configurationBuilder.Build();
-      //var vaultOptions = builtConfig.GetSection("Vault");
+    //var builtConfig = configurationBuilder.Build();
+    //var vaultOptions = builtConfig.GetSection("Vault");
 
-      //configurationBuilder.AddVault(options => {
-      //  options.Address = vaultOptions["Address"];
+    //configurationBuilder.AddVault(options => {
+    //  options.Address = vaultOptions["Address"];
 
-      //  options.UnsealKeys = vaultOptions.GetSection("UnsealKeys").Get<List<string>>();
+    //  options.UnsealKeys = vaultOptions.GetSection("UnsealKeys").Get<List<string>>();
 
-      //  options.AuthMethod = EnumerationStringId.FromValue<AuthenticationMethod>(vaultOptions["AuthMethod"]);
-      //  options.AppRoleAuthMethod = vaultOptions.GetSection("AppRoleAuthMethod").Get<AppRoleAuthMethod>();
-      //  options.TokenAuthMethod = vaultOptions.GetSection("TokenAuthMethod").Get<TokenAuthMethod>();
+    //  options.AuthMethod = EnumerationStringId.FromValue<AuthenticationMethod>(vaultOptions["AuthMethod"]);
+    //  options.AppRoleAuthMethod = vaultOptions.GetSection("AppRoleAuthMethod").Get<AppRoleAuthMethod>();
+    //  options.TokenAuthMethod = vaultOptions.GetSection("TokenAuthMethod").Get<TokenAuthMethod>();
 
-      //  options.MountPath = vaultOptions["MountPath"];
-      //  options.SecretType = vaultOptions["SecretType"];
+    //  options.MountPath = vaultOptions["MountPath"];
+    //  options.SecretType = vaultOptions["SecretType"];
 
-      //  options.ConfigurationMappings = vaultOptions.GetSection("ConfigurationMappings").Get<Dictionary<string, string>>();
-      //});
+    //  options.ConfigurationMappings = vaultOptions.GetSection("ConfigurationMappings").Get<Dictionary<string, string>>();
+    //});
 
-      return configurationBuilder.Build();
-    }
+    return configurationBuilder.Build();
   }
 }
