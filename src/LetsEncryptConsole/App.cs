@@ -16,6 +16,9 @@ public interface IApp {
   Task Run(string[] args);
 }
 
+
+
+
 public class App : IApp {
 
   private readonly string _appPath = AppDomain.CurrentDomain.BaseDirectory;
@@ -24,6 +27,10 @@ public class App : IApp {
   private readonly Configuration _appSettings;
   private readonly ILetsEncryptService _letsEncryptService;
   private readonly ITerminalService _terminalService;
+
+  private static readonly string _registerAccount = "--register-account";
+  private static readonly string _server = "--server";
+  private static readonly string _mail = "-m";
 
   public App(
     ILogger<App> logger,
@@ -38,6 +45,37 @@ public class App : IApp {
   }
 
   public async Task Run(string[] args) {
+
+    
+
+    var parsedArgs = args.Select(x => x.Split(' ')).ToDictionary(x => x[0].Trim(), x => x[1].Trim());
+
+    if (parsedArgs.ContainsKey(_registerAccount)) {
+      _logger.LogInformation("Registring accoount");
+
+      if(!parsedArgs.ContainsKey(_server))
+        throw new ArgumentNullException("Server is required");
+
+      if(!parsedArgs.ContainsKey(_mail))
+        throw new ArgumentNullException("Mail is required");
+
+      var mail = parsedArgs[_mail];
+
+      if (parsedArgs[_server] == "staging")
+         await _letsEncryptService.ConfigureClient("https://acme-staging-v02.api.letsencrypt.org/");
+      else if(parsedArgs[_server] == "production")
+        await _letsEncryptService.ConfigureClient("https://acme-v02.api.letsencrypt.org/");
+      else
+        throw new ArgumentException("Invalid server");
+
+      
+
+
+
+      return;
+    }
+    
+
 
     try {
       _logger.LogInformation("Let's Encrypt client. Started...");

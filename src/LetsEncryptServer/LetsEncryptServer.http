@@ -1,0 +1,6 @@
+@LetsEncryptServer_HostAddress = http://localhost:5016
+
+GET {{LetsEncryptServer_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

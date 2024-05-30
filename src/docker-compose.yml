@@ -1,0 +1,8 @@
+version: '3.4'
+
+services:
+  letsencryptserver:
+    image: ${DOCKER_REGISTRY-}letsencryptserver
+    build:
+      context: .
+      dockerfile: LetsEncryptServer/Dockerfile
