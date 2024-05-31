@@ -1,6 +1,20 @@
+using MaksIT.LetsEncryptServer;
 using MaksIT.LetsEncrypt.Services;
+using Microsoft.Extensions.DependencyInjection;
+using MaksIT.LetsEncryptServer.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Extract configuration
+var configuration = builder.Configuration;
+
+// Configure strongly typed settings objects
+var configurationSection = configuration.GetSection("Configuration");
+var appSettings = configurationSection.Get<Configuration>() ?? throw new ArgumentNullException();
+
+// Allow configurations to be available through IOptions<Configuration>
+builder.Services.Configure<Configuration>(configurationSection);
+
 
 // Add services to the container.
 
@@ -12,6 +26,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddMemoryCache();
 
 builder.Services.AddHttpClient<ILetsEncryptService, LetsEncryptService>();
+builder.Services.AddScoped<ICertsFlowService, CertsFlowService>();
 
 var app = builder.Build();
 

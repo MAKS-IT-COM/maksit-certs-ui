@@ -1,225 +1,115 @@
-using DomainResults.Mvc;
-using MaksIT.LetsEncrypt.Entities;
-using MaksIT.LetsEncrypt.Models.Responses;
-using MaksIT.LetsEncrypt.Services;
-using MaksIT.LetsEncryptServer.Models.Requests;
-using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
-using System.IO;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
 
-namespace LetsEncryptServer.Controllers;
+using DomainResults.Mvc;
 
-public class LetsEncryptSession {
-  public RegistrationCache? RegistrationCache { get; set; }
-  public Order? CurrentOrder { get; set; }
-  public List<AuthorizationChallenge>? Challenges { get; set; }
-  public string[] Hostnames { get; set; }
-}
+using MaksIT.LetsEncryptServer.Models.Requests;
+using MaksIT.LetsEncryptServer.Services;
+
+
+namespace MaksIT.LetsEncryptServer.Controllers;
 
 [ApiController]
 [Route("[controller]")]
 public class CertsFlowController : ControllerBase {
 
-  private readonly Configuration _appSettings;
-  private readonly IMemoryCache _memoryCache;
-  private readonly ILetsEncryptService _letsEncryptService;
-
-  private readonly string _acmePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "acme");
-  private readonly string _certPath = Path.Combine();
-
-  MemoryCacheEntryOptions _cacheEntryOptions = new MemoryCacheEntryOptions {
-    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5),
-    SlidingExpiration = TimeSpan.FromMinutes(2)
-  };
+  private readonly IOptions<Configuration> _appSettings;
+  private readonly ICertsFlowService _certsFlowService;
 
   public CertsFlowController(
     IOptions<Configuration> appSettings,
-    IMemoryCache memoryCache,
-    ILetsEncryptService letsEncryptService
+    ICertsFlowService certsFlowService
   ) {
-    _memoryCache = memoryCache;
-    _appSettings = appSettings.Value;
-    _letsEncryptService = letsEncryptService;
-
-    if (!Directory.Exists(_acmePath))
-      Directory.CreateDirectory(_acmePath);
-
-    Console.WriteLine(_acmePath);
+    _appSettings = appSettings;
+    _certsFlowService = certsFlowService;
   }
 
-  [HttpGet("[action]")]
-  public async Task<IActionResult> TermsOfService() {
-    var (config, configResult) = await _letsEncryptService.ConfigureClient("https://acme-staging-v02.api.letsencrypt.org/directory");
-    
-    if (!configResult.IsSuccess || config == null)
-      return configResult.ToActionResult();
-
-    return Ok(config.Meta.TermsOfService);
-  }
-
-
+  /// <summary>
+  /// Initialize certificate flow session
+  /// </summary>
+  /// <returns>sessionId</returns>
   [HttpPost("[action]")]
-  public async Task<IActionResult> Init([FromBody] InitRequest requestData) {
-
-    var (config, configResult) = await _letsEncryptService.ConfigureClient("https://acme-staging-v02.api.letsencrypt.org/directory");
-    if (!configResult.IsSuccess || config == null)
-      return configResult.ToActionResult();
-
-    var (cache, cacheResult) = await _letsEncryptService.Init(config.NewAccount, config.NewNonce, requestData.Contacts);
-    if(!cacheResult.IsSuccess || cache == null)
-      return cacheResult.ToActionResult();
-
-    var cacheData = new LetsEncryptSession {
-      RegistrationCache = cache,
-    };
-
-    var accountId = Guid.NewGuid().ToString();
-
-    _memoryCache.Set(accountId, cacheData, _cacheEntryOptions);
-
-    return Ok(accountId);
+  public async Task<IActionResult> ConfigureClient() {
+    var result = await _certsFlowService.ConfigureClientAsync();
+    return result.ToActionResult();
   }
 
-  [HttpPost("[action]/{accountId}")]
-  public async Task<IActionResult> NewOrder(string accountId, [FromBody] NewOrderRequest requestData) {
-
-   var cacheData = (LetsEncryptSession?)_memoryCache.Get(accountId);
-    if (cacheData?.RegistrationCache?.AccountKey == null)
-      return BadRequest();
-
-    var (config, configResult) = await _letsEncryptService.ConfigureClient("https://acme-staging-v02.api.letsencrypt.org/directory");
-    if (!configResult.IsSuccess || config == null)
-      return configResult.ToActionResult();
-
-
-    var (orderData, newOrderResult) = await _letsEncryptService.NewOrder(
-      config.NewOrder,
-      config.NewNonce,
-      cacheData.RegistrationCache.AccountKey,
-      cacheData.RegistrationCache.Location.ToString(),
-      requestData.Hostnames,
-      requestData.ChallengeType);
-
-    if (!newOrderResult.IsSuccess)
-      return newOrderResult.ToActionResult();
-
-    var(currentOrder, results, challenges) = orderData;
-
-    if (results?.Count == 0)
-      return StatusCode(500);
-
-    // TODO: save results to disk
-    var fullPaths = new List<string>();
-    foreach (var result in results) {
-      string[] splitToken = result.Value.Split('.');
-
-      System.IO.File.WriteAllText(Path.Combine(_acmePath, splitToken[0]), result.Value);
-
-      fullPaths.Add(splitToken[0]);
-    }
-
-    cacheData.CurrentOrder = currentOrder;
-    cacheData.Challenges = challenges;
-    cacheData.Hostnames = requestData.Hostnames;
-
-    _memoryCache.Set(accountId, cacheData, _cacheEntryOptions);
-
-    return Ok(fullPaths);
+  [HttpGet("[action]/{sessionId}")]
+  public IActionResult TermsOfService(Guid sessionId) {
+    var result = _certsFlowService.GetTermsOfService(sessionId);
+    return result.ToActionResult();
   }
 
-  [HttpPut("[action]/{accountId}")]
-  public async Task<IActionResult> CompleteChallenges(string accountId) {
-
-    var cacheData = (LetsEncryptSession?)_memoryCache.Get(accountId);
-    if (cacheData?.RegistrationCache?.AccountKey == null)
-      return BadRequest();
-
-    var (config, configResult) = await _letsEncryptService.ConfigureClient("https://acme-staging-v02.api.letsencrypt.org/directory");
-    if (!configResult.IsSuccess || config == null)
-      return configResult.ToActionResult();
-
-    var challengeResult = await _letsEncryptService.CompleteChallenges(
-      config.NewNonce,
-      cacheData.RegistrationCache.AccountKey,
-      cacheData.RegistrationCache.Location.ToString(),
-      cacheData.CurrentOrder,
-      cacheData.Challenges
-    );
-
-    if (!challengeResult.IsSuccess)
-      return challengeResult.ToActionResult();
-
-    return Ok();
+  /// <summary>
+  /// When new certificate session is created, create or retrieve cache data by accountId
+  /// </summary>
+  /// <param name="sessionId"></param>
+  /// <param name="accountId"></param>
+  /// <param name="requestData"></param>
+  /// <returns>accountId</returns>
+  [HttpPost("[action]/{sessionId}/{accountId?}")]
+  public async Task<IActionResult> Init(Guid sessionId, Guid? accountId, [FromBody] InitRequest requestData) {
+    var resurt = await _certsFlowService.InitAsync(sessionId, accountId, requestData);
+    return resurt.ToActionResult();
   }
 
-  [HttpGet("[action]/{accountId}")]
-  public async Task<IActionResult> GetOrder(string accountId) {
-
-    var cacheData = (LetsEncryptSession?)_memoryCache.Get(accountId);
-    if (cacheData?.RegistrationCache?.AccountKey == null)
-      return BadRequest();
-
-    var (config, configResult) = await _letsEncryptService.ConfigureClient("https://acme-staging-v02.api.letsencrypt.org/directory");
-    if (!configResult.IsSuccess || config == null)
-      return configResult.ToActionResult();
-
-
-    var (currentOrder, currentOrderResult) = await _letsEncryptService.GetOrder(
-      config.NewOrder,
-      config.NewNonce,
-      cacheData.RegistrationCache.AccountKey,
-      cacheData.RegistrationCache.Location.ToString(),
-      cacheData.Hostnames
-     );
-
-     if(!currentOrderResult.IsSuccess)
-      return currentOrderResult.ToActionResult();
-
-    cacheData.CurrentOrder = currentOrder;
-
-    _memoryCache.Set(accountId, cacheData, _cacheEntryOptions);
-
-    return Ok();
+  /// <summary>
+  /// After account initialization create new order request
+  /// </summary>
+  /// <param name="sessionId"></param>
+  /// <param name="requestData"></param>
+  /// <returns></returns>
+  [HttpPost("[action]/{sessionId}")]
+  public async Task<IActionResult> NewOrder(Guid sessionId, [FromBody] NewOrderRequest requestData) {
+    var result = await _certsFlowService.NewOrderAsync(sessionId, requestData);
+    return result.ToActionResult();
   }
 
-  [HttpPost("[action]/{accountId}")]
-  public async Task<IActionResult> GetCertificate(string accountId) {
-
-    var cacheData = (LetsEncryptSession?)_memoryCache.Get(accountId);
-    if (cacheData?.RegistrationCache?.AccountKey == null)
-      return BadRequest();
-
-    var (config, configResult) = await _letsEncryptService.ConfigureClient("https://acme-staging-v02.api.letsencrypt.org/directory");
-    if (!configResult.IsSuccess || config == null)
-      return configResult.ToActionResult();
-
-    var (cachedCerts, certsResult) = await _letsEncryptService.GetCertificate(
-      config.NewOrder,
-      config.NewNonce,
-      cacheData.RegistrationCache.AccountKey,
-      cacheData.CurrentOrder,
-      cacheData.RegistrationCache.Location.ToString(),
-      cacheData.Hostnames
-    );
-
-    if (!certsResult.IsSuccess || cachedCerts == null)
-      return certsResult.ToActionResult();
-
-    // TODO: write certs to filesystem
-    foreach (var (subject, cachedCert) in cachedCerts) {
-      var cert = new X509Certificate2(Encoding.UTF8.GetBytes(cachedCert.Cert));
-    }
-
-    if (!certsResult.IsSuccess)
-      return BadRequest();
-
-    return Ok();
+  /// <summary>
+  /// After new order request complete challenges
+  /// </summary>
+  /// <param name="sessionId"></param>
+  /// <returns></returns>
+  [HttpPost("[action]/{sessionId}")]
+  public async Task<IActionResult> CompleteChallenges(Guid sessionId) {
+    var result = await _certsFlowService.CompleteChallengesAsync(sessionId);
+    return result.ToActionResult();
   }
 
+  /// <summary>
+  /// Get order status before certs retrieval
+  /// </summary>
+  /// <param name="sessionId"></param>
+  /// <param name="requestData"></param>
+  /// <returns></returns>
+  [HttpPost("[action]/{sessionId}")]
+  public async Task<IActionResult> GetOrder(Guid sessionId, [FromBody] GetOrderRequest requestData) {
+    var result = await _certsFlowService.GetOrderAsync(sessionId, requestData);
+    return result.ToActionResult();
+  }
 
+  /// <summary>
+  /// Download certs to local cache
+  /// </summary>
+  /// <param name="sessionId"></param>
+  /// <param name="requestData"></param>
+  /// <returns></returns>
+  [HttpPost("[action]/{sessionId}")]
+  public async Task<IActionResult> GetCertificates(Guid sessionId, [FromBody] GetCertificatesRequest requestData) {
+    var result = await _certsFlowService.GetCertificatesAsync(sessionId, requestData);
+    return result.ToActionResult();
+  }
+
+  /// <summary>
+  /// Apply certs from local cache to remote server
+  /// </summary>
+  /// <param name="sessionId"></param>
+  /// <param name="requestData"></param>
+  /// <returns></returns>
+  [HttpPost("[action]/{sessionId}")]
+  public IActionResult ApplyCertificates(Guid sessionId, [FromBody] GetCertificatesRequest requestData) {
+    var result = _certsFlowService.ApplyCertificates(sessionId, requestData);
+    return result.ToActionResult();
+  }
 }
 
