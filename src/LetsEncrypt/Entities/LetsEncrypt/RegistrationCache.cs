@@ -12,6 +12,13 @@ public class CertificateCache {
 }
 
 public class RegistrationCache {
+
+  /// <summary>
+  /// Field used to identify cache by account id
+  /// </summary>
+  public Guid AccountId { get; set; }
+
+
   public Dictionary<string, CertificateCache>? CachedCerts { get; set; }
   public byte[]? AccountKey { get; set; }
   public string? Id { get; set; }

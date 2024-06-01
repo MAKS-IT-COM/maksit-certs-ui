@@ -17,8 +17,8 @@ namespace MaksIT.LetsEncrypt.Services;
 
 public interface ILetsEncryptService {
   Task<IDomainResult> ConfigureClient(Guid sessionId, string url);
-  Task<IDomainResult> Init(Guid sessionId, string[] contacts, RegistrationCache? registrationCache);
-  RegistrationCache? GetRegistrationCache(Guid sessionId);
+  Task<IDomainResult> Init(Guid sessionId,Guid accountId, string[] contacts, RegistrationCache? registrationCache);
+  (RegistrationCache?, IDomainResult) GetRegistrationCache(Guid sessionId);
   (string?, IDomainResult) GetTermsOfServiceUri(Guid sessionId);
   Task<(Dictionary<string, string>?, IDomainResult)> NewOrder(Guid sessionId, string[] hostnames, string challengeType);
   Task<IDomainResult> CompleteChallenges(Guid sessionId);
@@ -30,7 +30,7 @@ public interface ILetsEncryptService {
 public class LetsEncryptService : ILetsEncryptService {
   private readonly ILogger<LetsEncryptService> _logger;
   private readonly HttpClient _httpClient;
-  private readonly IMemoryCache _cache;
+  private readonly IMemoryCache _memoryCache;
 
   public LetsEncryptService(
       ILogger<LetsEncryptService> logger,
@@ -38,13 +38,13 @@ public class LetsEncryptService : ILetsEncryptService {
       IMemoryCache cache) {
     _logger = logger;
     _httpClient = httpClient;
-    _cache = cache;
+    _memoryCache = cache;
   }
 
   private State GetOrCreateState(Guid sessionId) {
-    if (!_cache.TryGetValue(sessionId, out State state)) {
+    if (!_memoryCache.TryGetValue(sessionId, out State state)) {
       state = new State();
-      _cache.Set(sessionId, state, TimeSpan.FromHours(1));
+      _memoryCache.Set(sessionId, state, TimeSpan.FromHours(1));
     }
     return state;
   }
@@ -74,7 +74,7 @@ public class LetsEncryptService : ILetsEncryptService {
   #endregion
 
   #region Init
-  public async Task<IDomainResult> Init(Guid sessionId, string[] contacts, RegistrationCache? cache) {
+  public async Task<IDomainResult> Init(Guid sessionId, Guid accountId, string[] contacts, RegistrationCache? cache) {
     if (sessionId == Guid.Empty) {
       _logger.LogError("Invalid sessionId");
       return IDomainResult.Failed();
@@ -119,6 +119,8 @@ public class LetsEncryptService : ILetsEncryptService {
         }
 
         state.Cache = new RegistrationCache {
+          AccountId = accountId,
+
           Location = account.Result.Location,
           AccountKey = accountKey.ExportCspBlob(true),
           Id = account.Result.Id,
@@ -135,12 +137,15 @@ public class LetsEncryptService : ILetsEncryptService {
     }
 
   }
-
   #endregion
 
-  public RegistrationCache? GetRegistrationCache(Guid sessionId) {
+  public (RegistrationCache?, IDomainResult) GetRegistrationCache(Guid sessionId) {
     var state = GetOrCreateState(sessionId);
-    return state.Cache;
+
+    if(state?.Cache == null)
+      return IDomainResult.Failed<RegistrationCache?>();
+
+    return IDomainResult.Success(state.Cache);
   }
 
   #region GetTermsOfService

@@ -27,6 +27,7 @@ builder.Services.AddMemoryCache();
 
 builder.Services.AddHttpClient<ILetsEncryptService, LetsEncryptService>();
 builder.Services.AddScoped<ICertsFlowService, CertsFlowService>();
+builder.Services.AddSingleton<ICacheService, CacheService>();
 
 var app = builder.Build();
 
