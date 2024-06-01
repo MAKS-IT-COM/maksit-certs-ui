@@ -1,15 +1,14 @@
 ﻿namespace MaksIT.LetsEncryptServer {
 
-  public class SSHClientConfing {
-    public required string User {  get; set; }
-    public required string Key { get; set; }
-  }
-
   public class Server {
     public required string Ip { get; set; }
-    public required int Port { get; set; }
-    public string Path { get; set; }
-    public required SSHClientConfing SSH { get; set; }
+    public required int SocketPort { get; set; }
+    public required int SSHPort { get; set; }
+    public required string Path { get; set; }
+
+    public required string Username { get; set; }
+    public string? Password { get; set; }
+    public string[]? PrivateKeys { get; set; }
   }
 
   public class Configuration {    

@@ -11,6 +11,23 @@ Simple client to obtain Let's Encrypt HTTPS certificates developed with .net cor
 ## Haproxy configuration
 
 ```bash
+# Create the user with a normal shell
+sudo useradd -m -s /bin/bash acme
+
+# Set the user's password
+sudo passwd acme
+```
+
+```bash
+sudo passwd acme
+```
+
+```bash
+sudo mkdir /etc/haproxy/certs
+chown acme:root /etc/haproxy/certs
+```
+
+```bash
 #---------------------------------------------------------------------
 # Example configuration for a possible web application.  See the
 # full configuration options online.
@@ -58,8 +75,6 @@ global
     # turn on stats unix socket
     # stats socket /var/lib/haproxy/stats level admin mode 660
     #stats socket /var/run/haproxy/admin.sock level admin mode 660 user haproxy group haproxy
-
-    setenv ACCOUNT_THUMBPRINT \'\'
 
     # utilize system-wide crypto-policies
     ssl-default-bind-ciphers PROFILE=SYSTEM

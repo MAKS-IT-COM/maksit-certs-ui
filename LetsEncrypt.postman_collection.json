@@ -50,48 +50,6 @@
 			"response": []
 		},
 		{
-			"name": "acme-challenge",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "http://maks-it.com/.well-known/acme-challenge/{{challenge}}",
-					"protocol": "http",
-					"host": [
-						"maks-it",
-						"com"
-					],
-					"path": [
-						".well-known",
-						"acme-challenge",
-						"{{challenge}}"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "acme-challenge local",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "http://localhost:8080/.well-known/acme-challenge/{{challenge}}",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "8080",
-					"path": [
-						".well-known",
-						"acme-challenge",
-						"{{challenge}}"
-					]
-				}
-			},
-			"response": []
-		},
-		{
 			"name": "terms of service",
 			"request": {
 				"method": "GET",
@@ -318,7 +276,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n  \"hostnames\": [\r\n    \"maks-it.com\",\r\n    \"www.maks-it.com\"\r\n  ],\r\n  \"challengeType\": \"http-01\"\r\n}",
+					"raw": "{\r\n  \"hostnames\": [\r\n    \"maks-it.com\"\r\n  ],\r\n  \"challengeType\": \"http-01\"\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -336,6 +294,48 @@
 						"CertsFlow",
 						"NewOrder",
 						"{{sessionId}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "acme-challenge local",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/.well-known/acme-challenge/{{challenge}}",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						".well-known",
+						"acme-challenge",
+						"{{challenge}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "acme-challenge",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://maks-it.com/.well-known/acme-challenge/{{challenge}}",
+					"protocol": "http",
+					"host": [
+						"maks-it",
+						"com"
+					],
+					"path": [
+						".well-known",
+						"acme-challenge",
+						"{{challenge}}"
 					]
 				}
 			},
@@ -396,7 +396,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n  \"hostnames\": [\r\n    \"maks-it.com\",\r\n    \"www.maks-it.com\"\r\n  ]\r\n}",
+					"raw": "{\r\n  \"hostnames\": [\r\n    \"maks-it.com\"\r\n  ]\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -435,7 +435,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n  \"hostnames\": [\r\n    \"maks-it.com\",\r\n    \"www.maks-it.com\"\r\n  ]\r\n}",
+					"raw": "{\r\n  \"hostnames\": [\r\n    \"maks-it.com\"\r\n  ]\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -474,7 +474,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n  \"hostnames\": [\r\n    \"maks-it.com\",\r\n    \"www.maks-it.com\"\r\n  ]\r\n}",
+					"raw": "{\r\n  \"hostnames\": [\r\n    \"maks-it.com\"\r\n  ]\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
