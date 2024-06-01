@@ -50,27 +50,6 @@
 			"response": []
 		},
 		{
-			"name": "terms of service",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "http://localhost:8080/CertsFlow/TermsOfService/{{sessionId}}",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "8080",
-					"path": [
-						"CertsFlow",
-						"TermsOfService",
-						"{{sessionId}}"
-					]
-				}
-			},
-			"response": []
-		},
-		{
 			"name": "configure client",
 			"event": [
 				{
@@ -125,6 +104,27 @@
 					"path": [
 						"CertsFlow",
 						"ConfigureClient"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "terms of service",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/CertsFlow/TermsOfService/{{sessionId}}",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"CertsFlow",
+						"TermsOfService",
+						"{{sessionId}}"
 					]
 				}
 			},
@@ -276,7 +276,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n  \"hostnames\": [\r\n    \"maks-it.com\"\r\n  ],\r\n  \"challengeType\": \"http-01\"\r\n}",
+					"raw": "{\r\n  \"hostnames\": [\r\n    \"staging.maks-it.com\"\r\n  ],\r\n  \"challengeType\": \"http-01\"\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -326,9 +326,10 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://maks-it.com/.well-known/acme-challenge/{{challenge}}",
+					"raw": "http://staging.maks-it.com/.well-known/acme-challenge/{{challenge}}",
 					"protocol": "http",
 					"host": [
+						"staging",
 						"maks-it",
 						"com"
 					],
@@ -396,7 +397,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n  \"hostnames\": [\r\n    \"maks-it.com\"\r\n  ]\r\n}",
+					"raw": "{\r\n  \"hostnames\": [\r\n    \"staging.maks-it.com\"\r\n  ]\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -435,7 +436,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n  \"hostnames\": [\r\n    \"maks-it.com\"\r\n  ]\r\n}",
+					"raw": "{\r\n  \"hostnames\": [\r\n    \"staging.maks-it.com\"\r\n  ]\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -474,7 +475,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n  \"hostnames\": [\r\n    \"maks-it.com\"\r\n  ]\r\n}",
+					"raw": "{\r\n  \"hostnames\": [\r\n    \"staging.maks-it.com\"\r\n  ]\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"

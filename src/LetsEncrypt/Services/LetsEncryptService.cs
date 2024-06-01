@@ -12,6 +12,7 @@ using MaksIT.LetsEncrypt.Models.Requests;
 using MaksIT.LetsEncrypt.Entities.Jws;
 using DomainResults.Common;
 using System.Net.Http.Headers;
+using System.Security.Principal;
 
 namespace MaksIT.LetsEncrypt.Services;
 
@@ -100,10 +101,13 @@ public class LetsEncryptService : ILetsEncryptService {
       if (cache != null && cache.AccountKey != null) {
         state.Cache = cache;
         accountKey.ImportCspBlob(cache.AccountKey);
+
+        state.JwsService = new JwsService(accountKey);
+        state.JwsService.SetKeyId(cache.Location.ToString());
       }
       else {
         // New Account request
-        state.JwsService = new JwsService(accountKey);
+        
 
         var letsEncryptOrder = new Account {
           TermsOfServiceAgreed = true,
@@ -111,6 +115,10 @@ public class LetsEncryptService : ILetsEncryptService {
         };
 
         var (account, postAccountResult) = await SendAsync<Account>(sessionId, HttpMethod.Post, state.Directory.NewAccount, false, letsEncryptOrder);
+        if (!postAccountResult.IsSuccess || account?.Result?.Location == null)
+          return postAccountResult;
+
+        state.JwsService = new JwsService(accountKey);
         state.JwsService.SetKeyId(account.Result.Location.ToString());
 
         if (account.Result.Status != "valid") {
