@@ -154,9 +154,13 @@ public class CertsFlowService : ICertsFlowService {
     if (!uploadResult.IsSuccess)
       return (null, uploadResult);
 
-    var notifyResult = NotifyHaproxy(results.Select(x => x.Key));
-    if (!notifyResult.IsSuccess)
-      return (null, notifyResult);
+    //var notifyResult = NotifyHaproxy(results);
+    //if (!notifyResult.IsSuccess)
+    //  return (null, notifyResult);
+
+    var reloadResult = ReloadServer();
+    if (!reloadResult.IsSuccess)
+      return (null, reloadResult);
 
     return IDomainResult.Success(results);
   }
@@ -201,8 +205,40 @@ public class CertsFlowService : ICertsFlowService {
 
     return IDomainResult.Success();
   }
+  private IDomainResult ReloadServer() {
+    var server = _appSettings.Server;
 
-  private IDomainResult NotifyHaproxy(IEnumerable<string> certFiles) {
+    try {
+      using (SSHService sshClient = (server.PrivateKeys != null && server.PrivateKeys.Any(x => !string.IsNullOrWhiteSpace(x)))
+        ? new SSHService(_logger, server.Ip, server.SSHPort, server.Username, server.PrivateKeys)
+        : !string.IsNullOrWhiteSpace(server.Password)
+          ? new SSHService(_logger, server.Ip, server.SSHPort, server.Username, server.Password)
+          : throw new ArgumentNullException("Neither private keys nor password was provided")) {
+
+        var sshConnectResult = sshClient.Connect();
+        if (!sshConnectResult.IsSuccess)
+          return sshConnectResult;
+
+        // TODO: Prefer to create the native linux service which can receive the signal to reload the services
+        return sshClient.RunSudoCommand("", "systemctl reload haproxy");
+      }
+    }
+    catch (Exception ex) {
+      var message = "Unable to upload files to remote server";
+      _logger.LogError(ex, message);
+
+      return IDomainResult.CriticalDependencyError(message);
+    }
+
+    return IDomainResult.Success();
+  }
+
+  /// <summary>
+  /// Currently not working
+  /// </summary>
+  /// <param name="results"></param>
+  /// <returns></returns>
+  private IDomainResult NotifyHaproxy(Dictionary<string, string> results) {
     var server = _appSettings.Server;
 
     try {
@@ -212,25 +248,38 @@ public class CertsFlowService : ICertsFlowService {
       using (var reader = new StreamReader(networkStream, Encoding.ASCII)) {
         writer.AutoFlush = true;
 
-        foreach (var certFile in certFiles) {
+        foreach (var result in results) {
+          var certFile = result.Key;
 
           // Prepare the certificate
-          string prepareCommand = $"new ssl cert {server.Path}/{certFile}\n";
+          string prepareCommand = $"new ssl cert {server.Path}/{certFile}";
           writer.WriteLine(prepareCommand);
+          writer.Flush();
           string prepareResponse = reader.ReadLine();
-          if (prepareResponse.Contains("error", StringComparison.OrdinalIgnoreCase)) {
-            _logger.LogError($"Error while preparing certificate {certFile}: {prepareResponse}");
-            return IDomainResult.CriticalDependencyError($"Error while preparing certificate {certFile}");
-          }
+          //if (prepareResponse.Contains("error", StringComparison.OrdinalIgnoreCase)) {
+          //  _logger.LogError($"Error while preparing certificate {certFile}: {prepareResponse}");
+          //  return IDomainResult.CriticalDependencyError($"Error while preparing certificate {certFile}");
+          //}
+
+          // Set the certificate
+          string setCommand = $"set ssl cert {server.Path}/{certFile} <<\n{result.Value}\n";
+          writer.WriteLine(setCommand);
+          writer.Flush();
+          string setResponse = reader.ReadLine();
+          //if (setResponse.Contains("error", StringComparison.OrdinalIgnoreCase)) {
+          //  _logger.LogError($"Error while setting certificate {certFile}: {setResponse}");
+          //  return IDomainResult.CriticalDependencyError($"Error while setting certificate {certFile}");
+          //}
 
           // Commit the certificate
-          string commitCommand = $"commit ssl cert {server.Path}/{certFile}\n";
+          string commitCommand = $"commit ssl cert {server.Path}/{certFile}";
           writer.WriteLine(commitCommand);
+          writer.Flush();
           string commitResponse = reader.ReadLine();
-          if (commitResponse.Contains("error", StringComparison.OrdinalIgnoreCase)) {
-            _logger.LogError($"Error while committing certificate {certFile}: {commitResponse}");
-            return IDomainResult.CriticalDependencyError($"Error while committing certificate {certFile}");
-          }
+          //if (commitResponse.Contains("error", StringComparison.OrdinalIgnoreCase)) {
+          //  _logger.LogError($"Error while committing certificate {certFile}: {commitResponse}");
+          //  return IDomainResult.CriticalDependencyError($"Error while committing certificate {certFile}");
+          //}
         }
 
         _logger.LogInformation("Certificates committed successfully.");
@@ -245,6 +294,7 @@ public class CertsFlowService : ICertsFlowService {
 
     return IDomainResult.Success();
   }
+
 
 
 

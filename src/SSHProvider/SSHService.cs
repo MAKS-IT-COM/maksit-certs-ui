@@ -125,42 +125,36 @@ namespace MaksIT.SSHProvider {
     }
 
     public IDomainResult RunSudoCommand(string password, string command) {
-
       try {
         command = $"sudo {command}";
 
+        using (var shellStream = _sshClient.CreateShellStream("xterm", 80, 24, 800, 600, 1024, new Dictionary<TerminalModes, uint> {
+            { TerminalModes.ECHO, 53 }
+        })) {
+          // Get logged in
+          string rep = shellStream.Expect(new Regex(@"[$>]"), TimeSpan.FromSeconds(10)); // expect user prompt with timeout
+          _logger.LogInformation("Initial prompt: {Prompt}", rep);
 
-        var shellStream = _sshClient.CreateShellStream("xterm", 80, 24, 800, 600, 1024, new Dictionary<TerminalModes, uint> {
-          { TerminalModes.ECHO, 53 }
-        });
+          // Send command
+          shellStream.WriteLine(command);
+          rep = shellStream.Expect(new Regex(@"([$#>:])"), TimeSpan.FromSeconds(10)); // expect password or user prompt with timeout
+          _logger.LogInformation("After command prompt: {Prompt}", rep);
 
-        //Get logged in
-        string rep = shellStream.Expect(new Regex(@"[$>]")); //expect user prompt
-        //this.writeOutput(results, rep);
-        _logger.LogInformation(rep);
+          // Check to send password
+          if (rep.Contains(":")) {
+            // Send password
+            shellStream.WriteLine(password);
+            rep = shellStream.Expect(new Regex(@"[$#>]"), TimeSpan.FromSeconds(10)); // expect user or root prompt with timeout
+            _logger.LogInformation("After password prompt: {Prompt}", rep);
+          }
 
-        //send command
-        shellStream.WriteLine(command);
-        rep = shellStream.Expect(new Regex(@"([$#>:])")); //expect password or user prompt
-        _logger.LogInformation(rep);
-
-        //check to send password
-        if (rep.Contains(":")) {
-          //send password
-          shellStream.WriteLine(password);
-          rep = shellStream.Expect(new Regex(@"[$#>]")); //expect user or root prompt
-          _logger.LogInformation(rep);
+          return IDomainResult.Success();
         }
-
-        return IDomainResult.Success();
       }
       catch (Exception ex) {
-        _logger.LogError(ex, "SSH Service unhandled exeption");
+        _logger.LogError(ex, "SSH Service unhandled exception");
         return IDomainResult.CriticalDependencyError();
       }
-    
-      
-
     }
 
     public void Dispose() {

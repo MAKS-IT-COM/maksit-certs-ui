@@ -107,7 +107,7 @@ public class LetsEncryptService : ILetsEncryptService {
       }
       else {
         // New Account request
-        
+        state.JwsService = new JwsService(accountKey);
 
         var letsEncryptOrder = new Account {
           TermsOfServiceAgreed = true,
@@ -118,7 +118,7 @@ public class LetsEncryptService : ILetsEncryptService {
         if (!postAccountResult.IsSuccess || account?.Result?.Location == null)
           return postAccountResult;
 
-        state.JwsService = new JwsService(accountKey);
+        
         state.JwsService.SetKeyId(account.Result.Location.ToString());
 
         if (account.Result.Status != "valid") {
