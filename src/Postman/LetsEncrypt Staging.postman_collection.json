@@ -1,7 +1,7 @@
 {
 	"info": {
-		"_postman_id": "728f64b6-893b-43fa-802e-ee836d1dc372",
-		"name": "LetsEncrypt",
+		"_postman_id": "95186b61-1197-4a6e-a90f-d97223528d90",
+		"name": "LetsEncrypt Staging",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "33635244"
 	},
@@ -25,27 +25,6 @@
 					]
 				},
 				"description": "[https://letsencrypt.status.io/](https://letsencrypt.status.io/)"
-			},
-			"response": []
-		},
-		{
-			"name": "letsencrypt production",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "https://acme-v02.api.letsencrypt.org/directory",
-					"protocol": "https",
-					"host": [
-						"acme-v02",
-						"api",
-						"letsencrypt",
-						"org"
-					],
-					"path": [
-						"directory"
-					]
-				}
 			},
 			"response": []
 		},

@@ -1,0 +1,479 @@
+{
+	"info": {
+		"_postman_id": "728f64b6-893b-43fa-802e-ee836d1dc372",
+		"name": "LetsEncrypt Production",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "33635244"
+	},
+	"item": [
+		{
+			"name": "letsencrypt production",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://acme-v02.api.letsencrypt.org/directory",
+					"protocol": "https",
+					"host": [
+						"acme-v02",
+						"api",
+						"letsencrypt",
+						"org"
+					],
+					"path": [
+						"directory"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "configure client",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Ensure the response status code is 200 (OK)\r",
+							"if (pm.response.code === 200) {\r",
+							"    // Get the plain text response\r",
+							"    let responseBody = pm.response.text();\r",
+							"    \r",
+							"    // Remove the surrounding quotes if present\r",
+							"    responseBody = responseBody.replace(/^\"|\"$/g, '');\r",
+							"    \r",
+							"    // Check if the response body is a valid GUID\r",
+							"    if (/^[0-9a-fA-F-]{36}$/.test(responseBody)) {\r",
+							"        // Set the environment variable sessionId with the response\r",
+							"        pm.environment.set(\"sessionId\", responseBody);\r",
+							"        console.log(`sessionId set to: ${responseBody}`);\r",
+							"    } else {\r",
+							"        console.log(\"Response body is not a valid GUID\");\r",
+							"    }\r",
+							"} else {\r",
+							"    console.log(`Request failed with status code: ${pm.response.code}`);\r",
+							"}\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/CertsFlow/ConfigureClient",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"CertsFlow",
+						"ConfigureClient"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "terms of service",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/CertsFlow/TermsOfService/{{sessionId}}",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"CertsFlow",
+						"TermsOfService",
+						"{{sessionId}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "init",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Ensure the response status code is 200 (OK)\r",
+							"if (pm.response.code === 200) {\r",
+							"    // Get the plain text response\r",
+							"    let responseBody = pm.response.text();\r",
+							"    \r",
+							"    // Remove the surrounding quotes if present\r",
+							"    responseBody = responseBody.replace(/^\"|\"$/g, '');\r",
+							"    \r",
+							"    // Check if the response body is a valid GUID\r",
+							"    if (/^[0-9a-fA-F-]{36}$/.test(responseBody)) {\r",
+							"        // Set the environment variable accountId with the response\r",
+							"        pm.environment.set(\"accountId\", responseBody);\r",
+							"        console.log(`accountId set to: ${responseBody}`);\r",
+							"    } else {\r",
+							"        console.log(\"Response body is not a valid GUID\");\r",
+							"    }\r",
+							"} else {\r",
+							"    console.log(`Request failed with status code: ${pm.response.code}`);\r",
+							"}\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Retrieve sessionId and accountId from environment variables or global variables\r",
+							"var sessionId = pm.environment.get(\"sessionId\") || pm.globals.get(\"sessionId\");\r",
+							"var accountId = pm.environment.get(\"accountId\") || pm.globals.get(\"accountId\");\r",
+							"\r",
+							"// Base URL without the optional accountId parameter\r",
+							"var baseUrl = `http://localhost:8080/CertsFlow/Init/${sessionId}`;\r",
+							"\r",
+							"// Append the accountId if it is provided\r",
+							"if (accountId) {\r",
+							"    pm.request.url = `${baseUrl}/${accountId}`;\r",
+							"} else {\r",
+							"    pm.request.url = baseUrl;\r",
+							"}"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"contacts\": [\r\n    \"maksym.sadovnychyy@gmail.com\"\r\n  ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/CertsFlow/Init/{{sessionId}}/{{accountId}}",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"CertsFlow",
+						"Init",
+						"{{sessionId}}",
+						"{{accountId}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "new order",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Ensure the response status code is 200 (OK)\r",
+							"if (pm.response.code === 200) {\r",
+							"    // Parse the JSON response\r",
+							"    let responseBody;\r",
+							"    try {\r",
+							"        responseBody = pm.response.json();\r",
+							"    } catch (e) {\r",
+							"        console.error(\"Failed to parse JSON response:\", e);\r",
+							"        return;\r",
+							"    }\r",
+							"\r",
+							"    // Check if the response is an array and has at least one element\r",
+							"    if (Array.isArray(responseBody) && responseBody.length > 0) {\r",
+							"        // Get the first element of the array\r",
+							"        const firstElement = responseBody[0];\r",
+							"        \r",
+							"        // Set the environment variable challenge with the first element\r",
+							"        pm.environment.set(\"challenge\", firstElement);\r",
+							"        console.log(`challenge set to: ${firstElement}`);\r",
+							"    } else {\r",
+							"        console.log(\"Response body is not an array or is empty\");\r",
+							"    }\r",
+							"} else {\r",
+							"    console.log(`Request failed with status code: ${pm.response.code}`);\r",
+							"}\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"hostnames\": [\r\n    \"maks-it.com\",\r\n    \"auth.maks-it.com\"\r\n  ],\r\n  \"challengeType\": \"http-01\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/CertsFlow/NewOrder/{{sessionId}}",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"CertsFlow",
+						"NewOrder",
+						"{{sessionId}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "acme-challenge local",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/.well-known/acme-challenge/{{challenge}}",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						".well-known",
+						"acme-challenge",
+						"{{challenge}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "acme-challenge",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://maks-it.com/.well-known/acme-challenge/{{challenge}}",
+					"protocol": "http",
+					"host": [
+						"maks-it",
+						"com"
+					],
+					"path": [
+						".well-known",
+						"acme-challenge",
+						"{{challenge}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "complete challenges",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/CertsFlow/CompleteChallenges/{{sessionId}}",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"CertsFlow",
+						"CompleteChallenges",
+						"{{sessionId}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "get order",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"hostnames\": [\r\n    \"maks-it.com\",\r\n    \"auth.maks-it.com\"\r\n  ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/CertsFlow/GetOrder/{{sessionId}}",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"CertsFlow",
+						"GetOrder",
+						"{{sessionId}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "get certificates",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"hostnames\": [\r\n    \"maks-it.com\",\r\n    \"auth.maks-it.com\"\r\n  ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/CertsFlow/GetCertificates/{{sessionId}}",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"CertsFlow",
+						"GetCertificates",
+						"{{sessionId}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "apply certificates",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"hostnames\": [\r\n    \"maks-it.com\",\r\n    \"auth.maks-it.com\"\r\n  ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/CertsFlow/ApplyCertificates/{{sessionId}}",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"CertsFlow",
+						"ApplyCertificates",
+						"{{sessionId}}"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

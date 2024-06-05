@@ -3,8 +3,8 @@ using Microsoft.Extensions.Options;
 
 using DomainResults.Mvc;
 
-using MaksIT.LetsEncryptServer.Models.Requests;
 using MaksIT.LetsEncryptServer.Services;
+using MaksIT.Models.LetsEncryptServer.Requests;
 
 
 namespace MaksIT.LetsEncryptServer.Controllers;
@@ -107,8 +107,8 @@ public class CertsFlowController : ControllerBase {
   /// <param name="requestData"></param>
   /// <returns></returns>
   [HttpPost("[action]/{sessionId}")]
-  public IActionResult ApplyCertificates(Guid sessionId, [FromBody] GetCertificatesRequest requestData) {
-    var result = _certsFlowService.ApplyCertificates(sessionId, requestData);
+  public async Task<IActionResult> ApplyCertificates(Guid sessionId, [FromBody] GetCertificatesRequest requestData) {
+    var result = await _certsFlowService.ApplyCertificates(sessionId, requestData);
     return result.ToActionResult();
   }
 }

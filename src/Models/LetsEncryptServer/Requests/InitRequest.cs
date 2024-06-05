@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MaksIT.LetsEncryptServer.Models.Requests {
+namespace MaksIT.Models.LetsEncryptServer.Requests {
   public class InitRequest {
     public string[] Contacts { get; set; }
   }

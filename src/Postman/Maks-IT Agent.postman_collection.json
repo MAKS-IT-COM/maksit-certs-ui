@@ -1,0 +1,77 @@
+{
+	"info": {
+		"_postman_id": "1e13f461-ccaa-436a-92e4-e14c05131b96",
+		"name": "Maks-IT Agent",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "33635244"
+	},
+	"item": [
+		{
+			"name": "reload service",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "x-api-key",
+						"value": "{{agentKey}}"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"serviceName\": {{serviceName}}\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://lblsrv0001.corp.maks-it.com:5000/Service/Reload",
+					"protocol": "http",
+					"host": [
+						"lblsrv0001",
+						"corp",
+						"maks-it",
+						"com"
+					],
+					"port": "5000",
+					"path": [
+						"Service",
+						"Reload"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "hello world",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://lblsrv0001.corp.maks-it.com:5000/HelloWorld",
+					"protocol": "http",
+					"host": [
+						"lblsrv0001",
+						"corp",
+						"maks-it",
+						"com"
+					],
+					"port": "5000",
+					"path": [
+						"HelloWorld"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

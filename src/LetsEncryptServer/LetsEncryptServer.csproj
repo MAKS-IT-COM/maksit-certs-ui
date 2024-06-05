@@ -17,11 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\LetsEncrypt\LetsEncrypt.csproj" />
-    <ProjectReference Include="..\SSHProvider\SSHProvider.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Models\Responses\" />
+    <ProjectReference Include="..\Models\Models.csproj" />
   </ItemGroup>
 
 </Project>

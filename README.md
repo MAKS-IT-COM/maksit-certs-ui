@@ -123,3 +123,63 @@ frontend web
 backend acme_challenge_backend
     server acme_challenge 127.0.0.1:8080
 ```
+
+
+
+
+## MaksIT agent
+
+```bash
+openssl rand -base64 32
+```
+
+```bash
+sudo rpm -Uvh https://packages.microsoft.com/config/centos/8/packages-microsoft-prod.rpm
+sudo dnf install -y dotnet-sdk-8.0
+```
+
+
+Copy sources to
+
+```bash
+sudo mkdir -p /opt/maks-it-agent
+```
+
+
+```bash
+dotnet build --configuration Release
+dotnet publish -c Release -o /opt/maks-it-agent
+```
+
+
+
+
+```bash
+sudo nano /etc/systemd/system/maks-it-agent.service
+```
+
+```bash
+[Unit]
+Description=Maks-IT Agent
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/maks-it-agent
+ExecStart=/usr/bin/dotnet /opt/maks-it-agent/Agent.dll --urls "http://*:5000"
+Restart=always
+# Restart service after 10 seconds if the dotnet service crashes:
+RestartSec=10
+KillSignal=SIGINT
+SyslogIdentifier=dotnet-servicereloader
+User=root
+Environment=ASPNETCORE_ENVIRONMENT=Production
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now maks-it-agent.service
+sudo systemctl status maks-it-agent.service
+```
