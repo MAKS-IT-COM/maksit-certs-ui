@@ -26,7 +26,35 @@ public class RegistrationCache {
   public Uri? Location { get; set; }
 
   /// <summary>
-  /// 
+  /// Returns a list of hosts with upcoming SSL expiry
+  /// </summary>
+  public string[] HostsWithUpcomingSslExpiry {
+
+    get {
+
+      var hostsWithUpcomingSslExpiry = new List<string>();
+
+      if (CachedCerts == null)
+        return hostsWithUpcomingSslExpiry.ToArray();
+
+      foreach (var result in CachedCerts) {
+        var (subject, cachedChert) = result;
+
+        if (cachedChert.Cert != null) {
+          var cert = new X509Certificate2(Encoding.ASCII.GetBytes(cachedChert.Cert));
+
+          // if it is about to expire, we need to refresh
+          if ((cert.NotAfter - DateTime.UtcNow).TotalDays < 30)
+            hostsWithUpcomingSslExpiry.Add(subject);
+        }
+      }
+
+      return hostsWithUpcomingSslExpiry.ToArray();
+    }
+  }
+
+  /// <summary>
+  /// Returns cached certificate. Certs older than 30 days are not returned
   /// </summary>
   /// <param name="subject"></param>
   /// <param name="value"></param>
@@ -43,7 +71,6 @@ public class RegistrationCache {
 
     var cert = new X509Certificate2(Encoding.ASCII.GetBytes(cache.Cert));
 
-    // if it is about to expire, we need to refresh
     if ((cert.NotAfter - DateTime.UtcNow).TotalDays < 30)
       return false;
 
