@@ -108,7 +108,18 @@ public class CertsFlowController : ControllerBase {
   /// <returns></returns>
   [HttpPost("[action]/{sessionId}")]
   public async Task<IActionResult> ApplyCertificates(Guid sessionId, [FromBody] GetCertificatesRequest requestData) {
-    var result = await _certsFlowService.ApplyCertificates(sessionId, requestData);
+    var result = await _certsFlowService.ApplyCertificatesAsync(sessionId, requestData);
+    return result.ToActionResult();
+  }
+
+  /// <summary>
+  /// Returns a list of hosts with upcoming SSL expiry
+  /// </summary>
+  /// <param name="sessionId"></param>
+  /// <returns></returns>
+  [HttpGet("[action]/{sessionId}")] 
+  public IActionResult HostsWithUpcomingSslExpiry(Guid sessionId) {
+    var result = _certsFlowService.HostsWithUpcomingSslExpiry(sessionId);
     return result.ToActionResult();
   }
 }

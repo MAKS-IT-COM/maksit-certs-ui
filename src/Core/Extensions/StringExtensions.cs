@@ -36,4 +36,20 @@ public static class StringExtensions {
       ? JsonSerializer.Deserialize<T>(s, options)
       : default;
   }
+
+  public static Guid? ToNullabeGuid(this string? s) {
+    if (Guid.TryParse(s, out var result)) {
+      return result;
+    }
+
+    return null;
+  }
+
+  public static Guid ToGuid(this string s) {
+    if (Guid.TryParse(s, out var result)) {
+      return result;
+    }
+
+    return Guid.Empty;
+  }
 }

@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
 
 using DomainResults.Common;
-
+using MaksIT.Core.Extensions;
 using MaksIT.LetsEncrypt.Entities;
 
 namespace MaksIT.LetsEncryptServer.Services;
@@ -10,6 +10,7 @@ public interface ICacheService {
   Task<(RegistrationCache?, IDomainResult)> LoadFromCacheAsync(Guid accountId);
   Task<IDomainResult> SaveToCacheAsync(Guid accountId, RegistrationCache cache);
   Task<IDomainResult> DeleteFromCacheAsync(Guid accountId);
+  Task<(Guid[]?, IDomainResult)> ListCachedAccountsAsync();
 }
 
 public class CacheService : ICacheService, IDisposable {
@@ -111,6 +112,29 @@ public class CacheService : ICacheService, IDisposable {
       _logger.LogError(ex, message);
 
       return IDomainResult.Failed(message);
+    }
+    finally {
+      _cacheLock.Release();
+    }
+  }
+
+  public async Task<(Guid[]?, IDomainResult)> ListCachedAccountsAsync() {
+    await _cacheLock.WaitAsync();
+
+    try {
+      var cacheFiles = Directory.GetFiles(_cacheDirectory);
+      if (cacheFiles == null)
+        return IDomainResult.Success(new Guid[0]);
+
+      var accountIds = cacheFiles.Select(x => Path.GetFileNameWithoutExtension(x).ToGuid()).ToArray();
+
+      return IDomainResult.Success(accountIds);
+    }
+    catch (Exception ex) {
+      var message = "Error listing cache files";
+      _logger.LogError(ex, message);
+
+      return IDomainResult.Failed<Guid[]?> (message);
     }
     finally {
       _cacheLock.Release();

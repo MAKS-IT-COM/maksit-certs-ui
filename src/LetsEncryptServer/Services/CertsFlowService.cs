@@ -23,7 +23,8 @@ public interface ICertsFlowService : ICertsFlowServiceBase {
   Task<IDomainResult> CompleteChallengesAsync(Guid sessionId);
   Task<IDomainResult> GetOrderAsync(Guid sessionId, GetOrderRequest requestData);
   Task<IDomainResult> GetCertificatesAsync(Guid sessionId, GetCertificatesRequest requestData);
-  Task<(Dictionary<string, string>?, IDomainResult)> ApplyCertificates(Guid sessionId, GetCertificatesRequest requestData);
+  Task<(Dictionary<string, string>?, IDomainResult)> ApplyCertificatesAsync(Guid sessionId, GetCertificatesRequest requestData);
+  (string[]?, IDomainResult) HostsWithUpcomingSslExpiry(Guid sessionId);
 }
 
 public class CertsFlowService : ICertsFlowService {
@@ -140,7 +141,7 @@ public class CertsFlowService : ICertsFlowService {
     return IDomainResult.Success();
   }
 
-  public async Task<(Dictionary<string, string>?, IDomainResult)> ApplyCertificates(Guid sessionId, GetCertificatesRequest requestData) {
+  public async Task<(Dictionary<string, string>?, IDomainResult)> ApplyCertificatesAsync(Guid sessionId, GetCertificatesRequest requestData) {
     var results = new Dictionary<string, string>();
 
     foreach (var subject in requestData.Hostnames) {
@@ -163,6 +164,28 @@ public class CertsFlowService : ICertsFlowService {
 
     return IDomainResult.Success(results);
   }
+
+
+  public (string[]?, IDomainResult) HostsWithUpcomingSslExpiry(Guid sessionId) {
+
+    var (hostnames, hostnamesResult) = _letsEncryptService.HostsWithUpcomingSslExpiry(sessionId);
+    if(!hostnamesResult.IsSuccess)
+      return (null, hostnamesResult);
+
+    return IDomainResult.Success(hostnames);
+  }
+
+
+
+
+
+
+
+
+
+
+
+
 
   public (string?, IDomainResult) AcmeChallenge(string fileName) {
     DeleteExporedChallenges();

@@ -1,7 +1,7 @@
 using MaksIT.LetsEncryptServer;
 using MaksIT.LetsEncrypt.Services;
-using Microsoft.Extensions.DependencyInjection;
 using MaksIT.LetsEncryptServer.Services;
+using MaksIT.LetsEncryptServer.BackgroundServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,9 +26,10 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddMemoryCache();
 
 builder.Services.AddHttpClient<ILetsEncryptService, LetsEncryptService>();
-builder.Services.AddScoped<ICertsFlowService, CertsFlowService>();
+builder.Services.AddSingleton<ICertsFlowService, CertsFlowService>();
 builder.Services.AddSingleton<ICacheService, CacheService>();
 builder.Services.AddHttpClient<IAgentService, AgentService>();
+builder.Services.AddHostedService<AutoRenewal>();
 
 var app = builder.Build();
 

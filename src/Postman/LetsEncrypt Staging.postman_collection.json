@@ -476,6 +476,38 @@
 				}
 			},
 			"response": []
+		},
+		{
+			"name": "host with upcoming ssl expire Copy",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"disabled": true
+					},
+					{
+						"key": "Accept",
+						"value": "application/json",
+						"disabled": true
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/CertsFlow/HostsWithUpcomingSslExpiry/{{sessionId}}",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"CertsFlow",
+						"HostsWithUpcomingSslExpiry",
+						"{{sessionId}}"
+					]
+				}
+			},
+			"response": []
 		}
 	]
 }

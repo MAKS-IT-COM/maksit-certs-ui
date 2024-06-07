@@ -25,6 +25,7 @@ public interface ILetsEncryptService {
   Task<IDomainResult> CompleteChallenges(Guid sessionId);
   Task<IDomainResult> GetOrder(Guid sessionId, string[] hostnames);
   Task<IDomainResult> GetCertificate(Guid sessionId, string subject);
+  (string[]?, IDomainResult) HostsWithUpcomingSslExpiry(Guid sessionId);
   (CachedCertificateResult?, IDomainResult) TryGetCachedCertificate(Guid sessionId, string subject);
 }
 
@@ -128,6 +129,7 @@ public class LetsEncryptService : ILetsEncryptService {
 
         state.Cache = new RegistrationCache {
           AccountId = accountId,
+          Contacts = contacts,
 
           Location = account.Result.Location,
           AccountKey = accountKey.ExportCspBlob(true),
@@ -432,6 +434,15 @@ public class LetsEncryptService : ILetsEncryptService {
   #endregion
 
   #region TryGetCachedCertificate
+  public (string[]?, IDomainResult) HostsWithUpcomingSslExpiry(Guid sessionId) {
+
+    var state = GetOrCreateState(sessionId);
+    if (state.Cache == null)
+      return IDomainResult.Failed<string[]?>();
+
+    return IDomainResult.Success(state.Cache.GetHostsWithUpcomingSslExpiry());
+  }
+
   public (CachedCertificateResult?, IDomainResult) TryGetCachedCertificate(Guid sessionId, string subject) {
 
     var state = GetOrCreateState(sessionId);
@@ -567,10 +578,10 @@ public class LetsEncryptService : ILetsEncryptService {
       }
 
       var response = await _httpClient.SendAsync(request);
-      await UpdateStateNonceIfNeededAsync(response, state, method);
+      UpdateStateNonceIfNeededAsync(response, state, method);
 
       var responseText = await response.Content.ReadAsStringAsync();
-      await HandleProblemResponseAsync(response, responseText);
+      HandleProblemResponseAsync(response, responseText);
 
       var result = ProcessResponseContent<TResult>(response, responseText);
       return IDomainResult.Success(result);
@@ -634,13 +645,13 @@ public class LetsEncryptService : ILetsEncryptService {
     request.Content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
   }
 
-  private async Task UpdateStateNonceIfNeededAsync(HttpResponseMessage response, State state, HttpMethod method) {
+  private void UpdateStateNonceIfNeededAsync(HttpResponseMessage response, State state, HttpMethod method) {
     if (method == HttpMethod.Post && response.Headers.Contains("Replay-Nonce")) {
       state.Nonce = response.Headers.GetValues("Replay-Nonce").First();
     }
   }
 
-  private async Task HandleProblemResponseAsync(HttpResponseMessage response, string responseText) {
+  private void HandleProblemResponseAsync(HttpResponseMessage response, string responseText) {
     if (response.Content.Headers.ContentType?.MediaType == "application/problem+json") {
       throw new LetsEncrytException(responseText.ToObject<Problem>(), response);
     }

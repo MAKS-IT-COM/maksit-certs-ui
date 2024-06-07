@@ -1,8 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Security.Cryptography.X509Certificates;
-using System.Security.Cryptography;
+﻿
 using System.Text;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+
 using MaksIT.LetsEncrypt.Entities.Jws;
 
 namespace MaksIT.LetsEncrypt.Entities;
@@ -17,6 +17,7 @@ public class RegistrationCache {
   /// Field used to identify cache by account id
   /// </summary>
   public Guid AccountId { get; set; }
+  public string[]? Contacts { get; set; }
 
 
   public Dictionary<string, CertificateCache>? CachedCerts { get; set; }
@@ -28,29 +29,25 @@ public class RegistrationCache {
   /// <summary>
   /// Returns a list of hosts with upcoming SSL expiry
   /// </summary>
-  public string[] HostsWithUpcomingSslExpiry {
+  public string[] GetHostsWithUpcomingSslExpiry(int days = 30) {
+    var hostsWithUpcomingSslExpiry = new List<string>();
 
-    get {
-
-      var hostsWithUpcomingSslExpiry = new List<string>();
-
-      if (CachedCerts == null)
-        return hostsWithUpcomingSslExpiry.ToArray();
-
-      foreach (var result in CachedCerts) {
-        var (subject, cachedChert) = result;
-
-        if (cachedChert.Cert != null) {
-          var cert = new X509Certificate2(Encoding.ASCII.GetBytes(cachedChert.Cert));
-
-          // if it is about to expire, we need to refresh
-          if ((cert.NotAfter - DateTime.UtcNow).TotalDays < 30)
-            hostsWithUpcomingSslExpiry.Add(subject);
-        }
-      }
-
+    if (CachedCerts == null)
       return hostsWithUpcomingSslExpiry.ToArray();
+
+    foreach (var result in CachedCerts) {
+      var (subject, cachedChert) = result;
+
+      if (cachedChert.Cert != null) {
+        var cert = new X509Certificate2(Encoding.ASCII.GetBytes(cachedChert.Cert));
+
+        // if it is about to expire, we need to refresh
+        if ((cert.NotAfter - DateTime.UtcNow).TotalDays < days)
+          hostsWithUpcomingSslExpiry.Add(subject);
+      }
     }
+
+    return hostsWithUpcomingSslExpiry.ToArray();
   }
 
   /// <summary>
