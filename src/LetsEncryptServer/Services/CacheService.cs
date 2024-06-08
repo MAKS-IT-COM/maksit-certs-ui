@@ -3,6 +3,7 @@
 using DomainResults.Common;
 using MaksIT.Core.Extensions;
 using MaksIT.LetsEncrypt.Entities;
+using MaksIT.Models.LetsEncryptServer.Cache.Requests;
 
 namespace MaksIT.LetsEncryptServer.Services;
 
@@ -11,6 +12,8 @@ public interface ICacheService {
   Task<IDomainResult> SaveToCacheAsync(Guid accountId, RegistrationCache cache);
   Task<IDomainResult> DeleteFromCacheAsync(Guid accountId);
   Task<(Guid[]?, IDomainResult)> ListCachedAccountsAsync();
+  Task<(string[]?, IDomainResult)> GetContactsAsync(Guid accountId);
+  Task<IDomainResult> SetContactsAsync(Guid accountId, SetContactsRequest requestData);
 }
 
 public class CacheService : ICacheService, IDisposable {
@@ -140,6 +143,25 @@ public class CacheService : ICacheService, IDisposable {
       _cacheLock.Release();
     }
   }
+
+  public async Task<(string[]?, IDomainResult)> GetContactsAsync(Guid accountId) {
+    var (cache, loadResult) = await LoadFromCacheAsync(accountId);
+    if (!loadResult.IsSuccess || cache == null)
+      return (null, loadResult);
+
+    return IDomainResult.Success(cache.Contacts);
+  }
+
+
+  public async Task<IDomainResult> SetContactsAsync(Guid accountId, SetContactsRequest requestData) {
+    var (cache, loadResult) = await LoadFromCacheAsync(accountId);
+    if (!loadResult.IsSuccess || cache == null)
+      return loadResult;
+
+    cache.Contacts = requestData.Contacts;
+    return await SaveToCacheAsync(accountId, cache);
+  }
+
 
   public void Dispose() {
     _cacheLock?.Dispose();

@@ -33,7 +33,10 @@ if [[ "$1" != "$NO_NEW_KEY_FLAG" ]]; then
     jq --arg newApiKey "$NEW_API_KEY" '.Configuration.ApiKey = $newApiKey' $APPSETTINGS_FILE > tmp.$$.json && mv tmp.$$.json $APPSETTINGS_FILE
 fi
 
+cd 
+
 # Build and publish the .NET application
+cd "$(dirname "$(realpath "$0")")/Agent"
 sudo dotnet build --configuration Release
 sudo dotnet publish -c Release -o $INSTALL_DIR
 

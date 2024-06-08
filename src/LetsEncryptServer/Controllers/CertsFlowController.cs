@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 using DomainResults.Mvc;
 
 using MaksIT.LetsEncryptServer.Services;
-using MaksIT.Models.LetsEncryptServer.Requests;
+using Models.LetsEncryptServer.CertsFlow.Requests;
 
 
 namespace MaksIT.LetsEncryptServer.Controllers;

@@ -8,7 +8,8 @@
 
   <ItemGroup>
     <Folder Include="Agent\Responses\" />
-    <Folder Include="LetsEncryptServer\Responses\" />
+    <Folder Include="LetsEncryptServer\Cache\Responses\" />
+    <Folder Include="LetsEncryptServer\CertsFlow\Responses\" />
   </ItemGroup>
 
 </Project>

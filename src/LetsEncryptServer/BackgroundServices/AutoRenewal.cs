@@ -1,8 +1,10 @@
-﻿using DomainResults.Common;
+﻿using Microsoft.Extensions.Options;
+
+using DomainResults.Common;
+
+
 using MaksIT.LetsEncryptServer.Services;
-using MaksIT.Models.LetsEncryptServer.Requests;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using Models.LetsEncryptServer.CertsFlow.Requests;
 
 namespace MaksIT.LetsEncryptServer.BackgroundServices {
   public class AutoRenewal : BackgroundService {

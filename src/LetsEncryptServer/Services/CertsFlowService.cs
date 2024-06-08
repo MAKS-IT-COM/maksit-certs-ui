@@ -6,7 +6,7 @@ using DomainResults.Common;
 
 using MaksIT.LetsEncrypt.Entities;
 using MaksIT.LetsEncrypt.Services;
-using MaksIT.Models.LetsEncryptServer.Requests;
+using Models.LetsEncryptServer.CertsFlow.Requests;
 
 
 namespace MaksIT.LetsEncryptServer.Services;

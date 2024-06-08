@@ -5,5 +5,8 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
+    volumes:
+      - ./docker_compose/LetsEncryptServer/acme:/app/bin/Debug/net8.0/acme
+      - ./docker_compose/LetsEncryptServer/cache:/app/bin/Debug/net8.0/cache
     ports:
       - "8080:8080"
