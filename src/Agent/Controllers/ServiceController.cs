@@ -1,12 +1,16 @@
 using System.Diagnostics;
-using MaksIT.Models.Agent.Requests;
+
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+
+using MaksIT.Agent.AuthorizationFilters;
+using MaksIT.Models.Agent.Requests;
 
 namespace MaksIT.Agent.Controllers;
 
 [ApiController]
 [Route("[controller]")]
+[ServiceFilter(typeof(ApiKeyAuthorizationFilter))]
 public class ServiceController : ControllerBase {
 
   private readonly Configuration _appSettings;
@@ -20,14 +24,6 @@ public class ServiceController : ControllerBase {
   [HttpPost("[action]")]
   public IActionResult Reload([FromBody] ServiceReloadRequest requestData) {
     var serviceName = requestData.ServiceName;
-
-    if (!Request.Headers.TryGetValue("X-API-KEY", out var extractedApiKey)) {
-      return Unauthorized("API Key is missing");
-    }
-
-    if (!_appSettings.ApiKey.Equals(extractedApiKey)) {
-      return Unauthorized("Unauthorized client");
-    }
 
     try {
       var processStartInfo = new ProcessStartInfo {

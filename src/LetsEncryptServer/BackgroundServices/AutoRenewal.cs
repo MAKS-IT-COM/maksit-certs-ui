@@ -52,8 +52,14 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
       }
 
       var hostnames = cache.GetHostsWithUpcomingSslExpiry();
-      if (hostnames == null || !hostnames.Any()) {
-        _logger.LogError("No hosts found with upcoming SSL expiry");
+      if (hostnames == null) {
+        _logger.LogError("Unexpected hostnames null");
+        return IDomainResult.Success();
+      }
+
+
+      if (!hostnames.Any()) {
+        _logger.LogInformation("No hosts found with upcoming SSL expiry");
         return IDomainResult.Success();
       }
 
