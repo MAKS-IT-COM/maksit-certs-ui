@@ -1,6 +1,16 @@
-version: '3.4'
+version: '3.9'
 
 services:
+
+  haproxy:
+    image: haproxy:3.0.0-alpine
+
+  letsencryptapp:
+    image: ${DOCKER_REGISTRY-}letsencryptapp
+    build:
+      context: .
+      dockerfile: ClientApp/Dockerfile
+
   letsencryptserver:
     image: ${DOCKER_REGISTRY-}letsencryptserver
     build:

@@ -10,7 +10,7 @@ using Models.LetsEncryptServer.CertsFlow.Requests;
 namespace MaksIT.LetsEncryptServer.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("api/[controller]")]
 public class CertsFlowController : ControllerBase {
 
   private readonly IOptions<Configuration> _appSettings;

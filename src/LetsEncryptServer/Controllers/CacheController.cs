@@ -11,7 +11,7 @@ using MaksIT.Models.LetsEncryptServer.Cache.Requests;
 namespace MaksIT.LetsEncryptServer.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("api/[controller]")]
 public class CacheController {
 
   private readonly Configuration _appSettings;

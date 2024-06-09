@@ -24,13 +24,14 @@
 							}
 						],
 						"url": {
-							"raw": "http://localhost:8080/Cache/GetContacts/{{accountId}}",
+							"raw": "http://localhost:8080/api/Cache/GetContacts/{{accountId}}",
 							"protocol": "http",
 							"host": [
 								"localhost"
 							],
 							"port": "8080",
 							"path": [
+								"api",
 								"Cache",
 								"GetContacts",
 								"{{accountId}}"
@@ -63,13 +64,14 @@
 							}
 						},
 						"url": {
-							"raw": "http://localhost:8080/Cache/SetContacts/{{accountId}}",
+							"raw": "http://localhost:8080/api/Cache/SetContacts/{{accountId}}",
 							"protocol": "http",
 							"host": [
 								"localhost"
 							],
 							"port": "8080",
 							"path": [
+								"api",
 								"Cache",
 								"SetContacts",
 								"{{accountId}}"
@@ -95,13 +97,14 @@
 							}
 						],
 						"url": {
-							"raw": "http://localhost:8080/CertsFlow/HostsWithUpcomingSslExpiry/{{sessionId}}",
+							"raw": "http://localhost:8080/api/CertsFlow/HostsWithUpcomingSslExpiry/{{sessionId}}",
 							"protocol": "http",
 							"host": [
 								"localhost"
 							],
 							"port": "8080",
 							"path": [
+								"api",
 								"CertsFlow",
 								"HostsWithUpcomingSslExpiry",
 								"{{sessionId}}"
@@ -182,13 +185,14 @@
 							}
 						],
 						"url": {
-							"raw": "http://localhost:8080/CertsFlow/ConfigureClient",
+							"raw": "http://localhost:8080/api/CertsFlow/ConfigureClient",
 							"protocol": "http",
 							"host": [
 								"localhost"
 							],
 							"port": "8080",
 							"path": [
+								"api",
 								"CertsFlow",
 								"ConfigureClient"
 							]
@@ -202,13 +206,14 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "http://localhost:8080/CertsFlow/TermsOfService/{{sessionId}}",
+							"raw": "http://localhost:8080/api/CertsFlow/TermsOfService/{{sessionId}}",
 							"protocol": "http",
 							"host": [
 								"localhost"
 							],
 							"port": "8080",
 							"path": [
+								"api",
 								"CertsFlow",
 								"TermsOfService",
 								"{{sessionId}}"
@@ -294,13 +299,14 @@
 							}
 						},
 						"url": {
-							"raw": "http://localhost:8080/CertsFlow/Init/{{sessionId}}/{{accountId}}",
+							"raw": "http://localhost:8080/api/CertsFlow/Init/{{sessionId}}/{{accountId}}",
 							"protocol": "http",
 							"host": [
 								"localhost"
 							],
 							"port": "8080",
 							"path": [
+								"api",
 								"CertsFlow",
 								"Init",
 								"{{sessionId}}",
@@ -371,13 +377,14 @@
 							}
 						},
 						"url": {
-							"raw": "http://localhost:8080/CertsFlow/NewOrder/{{sessionId}}",
+							"raw": "http://localhost:8080/api/CertsFlow/NewOrder/{{sessionId}}",
 							"protocol": "http",
 							"host": [
 								"localhost"
 							],
 							"port": "8080",
 							"path": [
+								"api",
 								"CertsFlow",
 								"NewOrder",
 								"{{sessionId}}"
@@ -452,13 +459,14 @@
 							}
 						},
 						"url": {
-							"raw": "http://localhost:8080/CertsFlow/CompleteChallenges/{{sessionId}}",
+							"raw": "http://localhost:8080/api/CertsFlow/CompleteChallenges/{{sessionId}}",
 							"protocol": "http",
 							"host": [
 								"localhost"
 							],
 							"port": "8080",
 							"path": [
+								"api",
 								"CertsFlow",
 								"CompleteChallenges",
 								"{{sessionId}}"
@@ -491,13 +499,14 @@
 							}
 						},
 						"url": {
-							"raw": "http://localhost:8080/CertsFlow/GetOrder/{{sessionId}}",
+							"raw": "http://localhost:8080/api/CertsFlow/GetOrder/{{sessionId}}",
 							"protocol": "http",
 							"host": [
 								"localhost"
 							],
 							"port": "8080",
 							"path": [
+								"api",
 								"CertsFlow",
 								"GetOrder",
 								"{{sessionId}}"
@@ -530,13 +539,14 @@
 							}
 						},
 						"url": {
-							"raw": "http://localhost:8080/CertsFlow/GetCertificates/{{sessionId}}",
+							"raw": "http://localhost:8080/api/CertsFlow/GetCertificates/{{sessionId}}",
 							"protocol": "http",
 							"host": [
 								"localhost"
 							],
 							"port": "8080",
 							"path": [
+								"api",
 								"CertsFlow",
 								"GetCertificates",
 								"{{sessionId}}"
@@ -569,13 +579,14 @@
 							}
 						},
 						"url": {
-							"raw": "http://localhost:8080/CertsFlow/ApplyCertificates/{{sessionId}}",
+							"raw": "http://localhost:8080/api/CertsFlow/ApplyCertificates/{{sessionId}}",
 							"protocol": "http",
 							"host": [
 								"localhost"
 							],
 							"port": "8080",
 							"path": [
+								"api",
 								"CertsFlow",
 								"ApplyCertificates",
 								"{{sessionId}}"

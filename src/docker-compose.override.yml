@@ -1,12 +1,26 @@
-version: '3.4'
+version: '3.9'
 
 services:
+  haproxy:
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./docker-compose/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - letsencryptapp
+      - letsencryptserver
+
+  letsencryptapp:
+    ports:
+    - "3000:3000"
+
   letsencryptserver:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_HTTP_PORTS=8080
+      - ASPNETCORE_HTTP_PORTS=5000
     volumes:
-      - ./docker_compose/LetsEncryptServer/acme:/app/bin/Debug/net8.0/acme
-      - ./docker_compose/LetsEncryptServer/cache:/app/bin/Debug/net8.0/cache
+      - ./docker-compose/LetsEncryptServer/acme:/app/bin/Debug/net8.0/acme
+      - ./docker-compose/LetsEncryptServer/cache:/app/bin/Debug/net8.0/cache
     ports:
-      - "8080:8080"
+      - "5000:5000"
+

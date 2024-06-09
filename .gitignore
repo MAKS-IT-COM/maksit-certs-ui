@@ -262,4 +262,5 @@ __pycache__/
 *.pyc
 
 
-**/*docker_compose
+**/*docker_compose/LetsEncryptServer/acme
+**/*docker_compose/LetsEncryptServer/cache
