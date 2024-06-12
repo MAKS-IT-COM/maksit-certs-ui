@@ -2,6 +2,7 @@ using MaksIT.LetsEncryptServer;
 using MaksIT.LetsEncrypt.Services;
 using MaksIT.LetsEncryptServer.Services;
 using MaksIT.LetsEncryptServer.BackgroundServices;
+using MaksIT.LetsEncryptServer.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +24,8 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddCors();
+
 builder.Services.AddMemoryCache();
 
 builder.Services.AddHttpClient<ILetsEncryptService, LetsEncryptService>();
@@ -37,7 +40,13 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment()) {
   app.UseSwagger();
   app.UseSwaggerUI();
+  app.UseCors(builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 }
+else {
+  // app.UseMiddleware<GlobalExceptionMiddleware>();
+}
+
+app.UseMiddleware<GlobalExceptionMiddleware>();
 
 app.UseAuthorization();
 

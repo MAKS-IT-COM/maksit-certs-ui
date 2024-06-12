@@ -1,4 +1,4 @@
-import React, { FC } from 'react';
+import React, { FC, useEffect, useRef } from 'react';
 import { FaHome, FaUser, FaCog, FaBars } from 'react-icons/fa';
 
 interface SideMenuProps {
@@ -7,12 +7,13 @@ interface SideMenuProps {
 }
 
 const SideMenu: FC<SideMenuProps> = ({ isCollapsed, toggleSidebar }) => {
+
   return (
     <div className={`flex flex-col bg-gray-800 text-white transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'} h-full`}>
       <div className="flex items-center h-16 bg-gray-900 relative">
-        {/* <button onClick={toggleSidebar} className="absolute left-4">
+        <button onClick={toggleSidebar} className="absolute left-4">
           <FaBars />
-        </button> */}
+        </button>
         <h1 className={`${isCollapsed ? 'hidden' : 'block'} text-2xl font-bold ml-12`}>Logo</h1>
       </div>
       <nav className="flex-1">

@@ -17,7 +17,7 @@ const TopMenu: FC<TopMenuProps> = ({ onToggleOffCanvas }) => {
 
   return (
     <header className="bg-gray-900 text-white flex items-center p-4">
-      <nav className="flex-1 flex justify-between items-center">
+      <nav className="flex-1 flex justify-between items-center h-8">
         <ul className="hidden md:flex space-x-4">
           <li className="hover:bg-gray-700 p-2 rounded">
             <Link href="/">Home</Link>
@@ -29,9 +29,7 @@ const TopMenu: FC<TopMenuProps> = ({ onToggleOffCanvas }) => {
             <Link href="/contact">Contact</Link>
           </li>
         </ul>
-        <button onClick={toggleMenu} className="md:hidden">
-          <FaBars />
-        </button>
+
         {isMenuOpen && (
           <ul className="absolute top-16 right-0 bg-gray-900 w-48 md:hidden">
             <li className="hover:bg-gray-700 p-2">
@@ -48,6 +46,9 @@ const TopMenu: FC<TopMenuProps> = ({ onToggleOffCanvas }) => {
       </nav>
       <button onClick={onToggleOffCanvas} className="ml-4">
         <FaCog />
+      </button>
+      <button onClick={toggleMenu} className="md:hidden">
+          <FaBars />
       </button>
     </header>
   );

@@ -1,18 +1,18 @@
 version: '3.9'
 
 services:
-  haproxy:
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./docker-compose/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
-    depends_on:
-      - letsencryptapp
-      - letsencryptserver
+  # haproxy:
+  #   ports:
+  #     - "8080:8080"
+  #   volumes:
+  #     - ./docker-compose/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+  #   depends_on:
+  #     - letsencryptapp
+  #     - letsencryptserver
 
-  letsencryptapp:
-    ports:
-    - "3000:3000"
+  # letsencryptapp:
+  #   ports:
+  #   - "3000:3000"
 
   letsencryptserver:
     environment:

@@ -27,6 +27,12 @@ public class CacheController {
   }
 
 
+  [HttpGet("[action]")]
+  public async Task<IActionResult> GetAccounts() {
+    var result = await _cacheService.ListCachedAccountsAsync();
+    return result.ToActionResult();
+  }
+
   [HttpGet("[action]/{accountId}")]
   public async Task<IActionResult> GetContacts(Guid accountId) {
     var result = await _cacheService.GetContactsAsync(accountId);
