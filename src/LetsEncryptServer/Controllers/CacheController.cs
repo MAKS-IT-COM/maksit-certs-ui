@@ -29,7 +29,7 @@ public class CacheController {
 
   [HttpGet("[action]")]
   public async Task<IActionResult> GetAccounts() {
-    var result = await _cacheService.ListCachedAccountsAsync();
+    var result = await _cacheService.GetAccountsAsync();
     return result.ToActionResult();
   }
 
@@ -43,6 +43,12 @@ public class CacheController {
   [HttpPost("[action]/{accountId}")]
   public async Task<IActionResult> SetContacts(Guid accountId, [FromBody] SetContactsRequest requestData) {
     var result = await _cacheService.SetContactsAsync(accountId, requestData);
+    return result.ToActionResult();
+  }
+
+  [HttpGet("[action]/{accountId}")]
+  public async Task<IActionResult> GetHostnames(Guid accountId) {
+    var result = await _cacheService.GetHostnames(accountId);
     return result.ToActionResult();
   }
 }

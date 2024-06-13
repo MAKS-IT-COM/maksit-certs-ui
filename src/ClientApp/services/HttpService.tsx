@@ -92,19 +92,19 @@ class HttpService {
         });
     }
 
-    public get<TResponse>(url: string): Promise<TResponse | ProblemDetails> {
+    public get<TResponse>(url: string): Promise<TResponse> {
         return this.request<TResponse>('GET', url);
     }
 
-    public post<TRequest, TResponse>(url: string, data: TRequest): Promise<TResponse | ProblemDetails> {
+    public post<TRequest, TResponse>(url: string, data: TRequest): Promise<TResponse> {
         return this.request<TResponse>('POST', url, data);
     }
 
-    public put<TRequest, TResponse>(url: string, data: TRequest): Promise<TResponse | ProblemDetails> {
+    public put<TRequest, TResponse>(url: string, data: TRequest): Promise<TResponse> {
         return this.request<TResponse>('PUT', url, data);
     }
 
-    public delete<TResponse>(url: string): Promise<TResponse | ProblemDetails> {
+    public delete<TResponse>(url: string): Promise<TResponse> {
         return this.request<TResponse>('DELETE', url);
     }
 
@@ -112,11 +112,24 @@ class HttpService {
         this.requestInterceptors.push(interceptor);
     }
 
-    public addResponseInterceptor<TResponse>(interceptor: ResponseInterceptor<TResponse | ProblemDetails>): void {
+    public addResponseInterceptor<TResponse>(interceptor: ResponseInterceptor<TResponse>): void {
         this.responseInterceptors.push(interceptor);
     }
 }
 
+
+const httpService = new HttpService();
+
+httpService.addRequestInterceptor(xhr => {
+
+});
+
+httpService.addResponseInterceptor(response => {
+
+    return response;
+});
+
+
 export {
-    HttpService
-};
+    httpService
+}

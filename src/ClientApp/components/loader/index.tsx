@@ -1,5 +1,5 @@
-import React from 'react';
-import './loader.css'; // Add your loader styles here
+import React from 'react'
+import './loader.css' // Add your loader styles here
 
 const Loader: React.FC = () => {
   return (
@@ -7,7 +7,7 @@ const Loader: React.FC = () => {
       <div className="spinner"></div>
       <div className="loading-text">Loading...</div>
     </div>
-  );
-};
+  )
+}
 
-export default Loader;
+export default Loader

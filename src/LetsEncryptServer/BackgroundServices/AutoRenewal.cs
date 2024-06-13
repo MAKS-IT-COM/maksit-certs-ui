@@ -30,13 +30,13 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
       while (!stoppingToken.IsCancellationRequested) {
         _logger.LogInformation("Background service is running.");
 
-        var (accountIds, getAccountIdsResult) = await _cacheService.ListCachedAccountsAsync();
-        if (!getAccountIdsResult.IsSuccess || accountIds == null) {
+        var (accountsResponse, getAccountIdsResult) = await _cacheService.GetAccountsAsync();
+        if (!getAccountIdsResult.IsSuccess || accountsResponse == null) {
           LogErrors(getAccountIdsResult.Errors);
           continue;
         }
 
-        foreach (var accountId in accountIds) {
+        foreach (var accountId in accountsResponse.AccountIds) {
           await ProcessAccountAsync(accountId);
         }
 

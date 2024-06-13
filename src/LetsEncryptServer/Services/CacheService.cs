@@ -1,9 +1,12 @@
-﻿using System.Text.Json;
+﻿using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Text.Json;
 
 using DomainResults.Common;
 using MaksIT.Core.Extensions;
 using MaksIT.LetsEncrypt.Entities;
 using MaksIT.Models.LetsEncryptServer.Cache.Requests;
+using Models.LetsEncryptServer.Cache.Responses;
 
 namespace MaksIT.LetsEncryptServer.Services;
 
@@ -11,9 +14,11 @@ public interface ICacheService {
   Task<(RegistrationCache?, IDomainResult)> LoadFromCacheAsync(Guid accountId);
   Task<IDomainResult> SaveToCacheAsync(Guid accountId, RegistrationCache cache);
   Task<IDomainResult> DeleteFromCacheAsync(Guid accountId);
-  Task<(Guid[]?, IDomainResult)> ListCachedAccountsAsync();
-  Task<(string[]?, IDomainResult)> GetContactsAsync(Guid accountId);
+  Task<(GetAccountsResponse?, IDomainResult)> GetAccountsAsync();
+  Task<(GetContactsResponse?, IDomainResult)> GetContactsAsync(Guid accountId);
   Task<IDomainResult> SetContactsAsync(Guid accountId, SetContactsRequest requestData);
+
+  Task<(GetHostnamesResponse?, IDomainResult)> GetHostnames(Guid accountId);
 }
 
 public class CacheService : ICacheService, IDisposable {
@@ -121,35 +126,41 @@ public class CacheService : ICacheService, IDisposable {
     }
   }
 
-  public async Task<(Guid[]?, IDomainResult)> ListCachedAccountsAsync() {
+  public async Task<(GetAccountsResponse?, IDomainResult)> GetAccountsAsync() {
     await _cacheLock.WaitAsync();
 
     try {
       var cacheFiles = Directory.GetFiles(_cacheDirectory);
       if (cacheFiles == null)
-        return IDomainResult.Success(new Guid[0]);
+        return IDomainResult.Success(new GetAccountsResponse {
+          AccountIds = Array.Empty<Guid>()
+        });
 
       var accountIds = cacheFiles.Select(x => Path.GetFileNameWithoutExtension(x).ToGuid()).ToArray();
 
-      return IDomainResult.Success(accountIds);
+      return IDomainResult.Success(new GetAccountsResponse {
+        AccountIds = accountIds
+      });
     }
     catch (Exception ex) {
       var message = "Error listing cache files";
       _logger.LogError(ex, message);
 
-      return IDomainResult.Failed<Guid[]?> (message);
+      return IDomainResult.Failed<GetAccountsResponse?> (message);
     }
     finally {
       _cacheLock.Release();
     }
   }
 
-  public async Task<(string[]?, IDomainResult)> GetContactsAsync(Guid accountId) {
+  public async Task<(GetContactsResponse?, IDomainResult)> GetContactsAsync(Guid accountId) {
     var (cache, loadResult) = await LoadFromCacheAsync(accountId);
     if (!loadResult.IsSuccess || cache == null)
       return (null, loadResult);
 
-    return IDomainResult.Success(cache.Contacts);
+    return IDomainResult.Success(new GetContactsResponse {
+      Contacts = cache.Contacts ?? Array.Empty<string>()
+    });
   }
 
 
@@ -160,6 +171,33 @@ public class CacheService : ICacheService, IDisposable {
 
     cache.Contacts = requestData.Contacts;
     return await SaveToCacheAsync(accountId, cache);
+  }
+
+  public async Task<(GetHostnamesResponse?, IDomainResult)> GetHostnames(Guid accountId) {
+    var (cache, loadResult) = await LoadFromCacheAsync(accountId);
+    if (!loadResult.IsSuccess || cache?.CachedCerts == null)
+      return (null, loadResult);
+
+    var hoststWithUpcomingSslExpire = cache.GetHostsWithUpcomingSslExpiry();
+
+
+    var response = new GetHostnamesResponse {
+      Hostnames = new List<HostnameResponse>()
+    };
+
+    foreach (var result in cache.CachedCerts) {
+      var (subject, cachedChert) = result;
+
+      var cert = new X509Certificate2(Encoding.ASCII.GetBytes(cachedChert.Cert));
+
+      response.Hostnames.Add(new HostnameResponse {
+        Hostname = subject,
+        Expires = cert.NotBefore,
+        IsUpcomingExpire = hoststWithUpcomingSslExpire.Contains(subject)
+      });
+    }
+
+    return IDomainResult.Success(response);
   }
 
 

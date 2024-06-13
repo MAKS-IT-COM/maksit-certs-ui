@@ -1,19 +1,19 @@
-"use client"; // Add this line
+"use client" // Add this line
 
-import React, { FC, useState } from 'react';
-import { FaCog, FaBars } from 'react-icons/fa';
-import Link from 'next/link';
+import React, { FC, useState } from 'react'
+import { FaCog, FaBars } from 'react-icons/fa'
+import Link from 'next/link'
 
 interface TopMenuProps {
-  onToggleOffCanvas: () => void;
+  onToggleOffCanvas: () => void
 }
 
 const TopMenu: FC<TopMenuProps> = ({ onToggleOffCanvas }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen);
-  };
+    setIsMenuOpen(!isMenuOpen)
+  }
 
   return (
     <header className="bg-gray-900 text-white flex items-center p-4">
@@ -51,9 +51,9 @@ const TopMenu: FC<TopMenuProps> = ({ onToggleOffCanvas }) => {
           <FaBars />
       </button>
     </header>
-  );
-};
+  )
+}
 
 export {
   TopMenu
-};
+}
