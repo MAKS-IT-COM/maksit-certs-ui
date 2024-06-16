@@ -13,11 +13,14 @@ public class CertificateCache {
 
 public class RegistrationCache {
 
+  #region Custom Properties
   /// <summary>
   /// Field used to identify cache by account id
   /// </summary>
   public Guid AccountId { get; set; }
+  public string? Description { get; set; }
   public string[]? Contacts { get; set; }
+  #endregion
 
 
   public Dictionary<string, CertificateCache>? CachedCerts { get; set; }

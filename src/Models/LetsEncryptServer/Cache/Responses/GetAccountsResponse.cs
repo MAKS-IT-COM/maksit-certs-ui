@@ -1,11 +1,12 @@
-﻿using System;
+﻿using Models.LetsEncryptServer.Cache.Responses;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Models.LetsEncryptServer.Cache.Responses {
+namespace MaksIT.Models.LetsEncryptServer.Cache.Responses {
   public class GetAccountsResponse {
-    public Guid[] AccountIds { get; set; }
+    public GetAccountResponse[] Accounts { get; set; }
   }
 }

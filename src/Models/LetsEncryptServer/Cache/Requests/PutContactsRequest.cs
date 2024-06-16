@@ -2,7 +2,7 @@
 
 
 namespace MaksIT.Models.LetsEncryptServer.Cache.Requests {
-  public class SetContactsRequest : IValidatableObject {
+  public class PutContactsRequest : IValidatableObject {
 
     public required string[] Contacts { get; set; }
 

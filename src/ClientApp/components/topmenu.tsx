@@ -9,7 +9,7 @@ interface TopMenuProps {
 }
 
 const TopMenu: FC<TopMenuProps> = ({ onToggleOffCanvas }) => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen)

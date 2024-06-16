@@ -24,8 +24,7 @@ public interface ICertsFlowService : ICertsFlowServiceBase {
   Task<IDomainResult> GetOrderAsync(Guid sessionId, GetOrderRequest requestData);
   Task<IDomainResult> GetCertificatesAsync(Guid sessionId, GetCertificatesRequest requestData);
   Task<(Dictionary<string, string>?, IDomainResult)> ApplyCertificatesAsync(Guid sessionId, GetCertificatesRequest requestData);
-  (string[]?, IDomainResult) HostsWithUpcomingSslExpiry(Guid sessionId);
-}
+ }
 
 public class CertsFlowService : ICertsFlowService {
 
@@ -164,17 +163,6 @@ public class CertsFlowService : ICertsFlowService {
 
     return IDomainResult.Success(results);
   }
-
-
-  public (string[]?, IDomainResult) HostsWithUpcomingSslExpiry(Guid sessionId) {
-
-    var (hostnames, hostnamesResult) = _letsEncryptService.HostsWithUpcomingSslExpiry(sessionId);
-    if(!hostnamesResult.IsSuccess)
-      return (null, hostnamesResult);
-
-    return IDomainResult.Success(hostnames);
-  }
-
 
 
 

@@ -1,9 +1,9 @@
-import React, { FC, useEffect, useRef } from 'react';
-import { FaHome, FaUser, FaCog, FaBars } from 'react-icons/fa';
+import React, { FC, useEffect, useRef } from 'react'
+import { FaHome, FaUser, FaCog, FaBars } from 'react-icons/fa'
 
 interface SideMenuProps {
-  isCollapsed: boolean;
-  toggleSidebar: () => void;
+  isCollapsed: boolean
+  toggleSidebar: () => void
 }
 
 const SideMenu: FC<SideMenuProps> = ({ isCollapsed, toggleSidebar }) => {
@@ -33,9 +33,9 @@ const SideMenu: FC<SideMenuProps> = ({ isCollapsed, toggleSidebar }) => {
         </ul>
       </nav>
     </div>
-  );
-};
+  )
+}
 
 export {
   SideMenu
-};
+}

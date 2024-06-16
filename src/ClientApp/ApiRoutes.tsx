@@ -1,9 +1,16 @@
 enum ApiRoutes {
 
   CACHE_GET_ACCOUNTS = `api/Cache/GetAccounts`,
+
   CACHE_GET_CONTACTS = `api/Cache/GetContacts/{accountId}`,
-  CACHE_SET_CONTACTS = `api/Cache/SetContacts/{accountId}`,
+  CACHE_ADD_CONTACT = `api/Cache/AddContact/{accountId}`,
+  CACHE_DELETE_CONTACT = `api/Cache/DeleteContact/{accountId}?contact={contact}`,
+
+  
   CACHE_GET_HOSTNAMES = `api/Cache/GetHostnames/{accountId}`,
+  // TODO: here is different flow via CertsFlowController, cache update is the result of add order and invalidate cert
+  // CACHE_ADD_HOSTNAME = `api/Cache/AddHostname/{accountId}`,
+  // CACHE_DELETE_HOSTNAME = `api/Cache/DeleteHostname/{accountId}?hostname={hostname}`,
 
   CERTS_FLOW_CONFIGURE_CLIENT =  `api/CertsFlow/ConfigureClient`,
   CERTS_FLOW_TERMS_OF_SERVICE = `api/CertsFlow/TermsOfService/{sessionId}`,
