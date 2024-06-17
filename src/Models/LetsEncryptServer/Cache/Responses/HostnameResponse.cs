@@ -5,8 +5,10 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Models.LetsEncryptServer.Cache.Responses {
-
-  public class GetHostnamesResponse {
-    public List<HostnameResponse> Hostnames { get; set; }
+  public class HostnameResponse {
+    public string Hostname { get; set; }
+    public DateTime Expires { get; set; }
+    public bool IsUpcomingExpire { get; set; }
   }
+
 }

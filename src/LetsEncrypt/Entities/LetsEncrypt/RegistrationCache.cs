@@ -11,6 +11,18 @@ public class CertificateCache {
   public byte[]? Private { get; set; }
 }
 
+public class CachedHostname {
+  public string Hostname { get; set; }
+  public DateTime Expires { get; set; }
+  public bool IsUpcomingExpire { get; set; }
+
+  public CachedHostname(string hostname, DateTime expires, bool isUpcomingExpire) {
+    Hostname = hostname;
+    Expires = expires;
+    IsUpcomingExpire = isUpcomingExpire;
+  }
+}
+
 public class RegistrationCache {
 
   #region Custom Properties
@@ -51,6 +63,26 @@ public class RegistrationCache {
     }
 
     return hostsWithUpcomingSslExpiry.ToArray();
+  }
+
+
+  public CachedHostname[] GetHosts() {
+    if (CachedCerts == null)
+      return Array.Empty<CachedHostname>();
+
+    var hosts = new List<CachedHostname>();
+
+    foreach (var result in CachedCerts) {
+      var (subject, cachedChert) = result;
+
+      if (cachedChert.Cert != null) {
+        var cert = new X509Certificate2(Encoding.ASCII.GetBytes(cachedChert.Cert));
+
+        hosts.Add(new CachedHostname(subject, cert.NotAfter, (cert.NotAfter - DateTime.UtcNow).TotalDays < 30));
+      }
+    }
+
+    return hosts.ToArray();
   }
 
   /// <summary>

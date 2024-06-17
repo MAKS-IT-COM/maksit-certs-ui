@@ -12,6 +12,6 @@ namespace Models.LetsEncryptServer.Cache.Responses {
 
     public string []? Contacts { get; set; }
 
-    public string[]? Hostnames { get; set; }
+    public HostnameResponse[]? Hostnames { get; set; }
   }
 }

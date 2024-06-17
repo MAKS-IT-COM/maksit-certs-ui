@@ -5,8 +5,8 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace MaksIT.Models.LetsEncryptServer.Cache.Requests {
-
-  public class PatchContactRequest {
-    public List<PatchAction<string>> Contacts { get; set; }
+  public class PutAccountRequest {
+    public string Description { get; set; }
+    public string[] Contacts { get; set; }
   }
 }

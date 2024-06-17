@@ -9,7 +9,7 @@ using MaksIT.Models.LetsEncryptServer.Cache.Requests;
 namespace MaksIT.LetsEncryptServer.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/cache")]
 public class CacheController : ControllerBase {
   private readonly Configuration _appSettings;
   private readonly ICacheRestService _cacheService;
@@ -28,27 +28,39 @@ public class CacheController : ControllerBase {
     return result.ToActionResult();
   }
 
+  [HttpPut("account/{accountId:guid}")]
+  public async Task<IActionResult> PutAccount(Guid accountId, [FromBody] PutAccountRequest requestData) {
+    var result = await _cacheService.PutAccountAsync(accountId, requestData);
+    return result.ToActionResult();
+  }
+
+  [HttpPatch("account/{accountId:guid}")]
+  public async Task<IActionResult> PatchAccount(Guid accountId, [FromBody] PatchAccountRequest requestData) {
+    var result = await _cacheService.PatchAccountAsync(accountId, requestData);
+    return result.ToActionResult();
+  }
+
   #region Contacts
 
-  [HttpGet("{accountId}/contacts")]
+  [HttpGet("account/{accountId:guid}/contacts")]
   public async Task<IActionResult> GetContacts(Guid accountId) {
     var result = await _cacheService.GetContactsAsync(accountId);
     return result.ToActionResult();
   }
 
-  [HttpPut("{accountId}/contacts")]
+  [HttpPut("account/{accountId:guid}/contacts")]
   public async Task<IActionResult> PutContacts(Guid accountId, [FromBody] PutContactsRequest requestData) {
     var result = await _cacheService.PutContactsAsync(accountId, requestData);
     return result.ToActionResult();
   }
 
-  [HttpPatch("{accountId}/contacts")]
-  public async Task<IActionResult> PatchContacts(Guid accountId, [FromBody] PatchContactRequest requestData) {
+  [HttpPatch("account/{accountId:guid}/contacts")]
+  public async Task<IActionResult> PatchContacts(Guid accountId, [FromBody] PatchContactsRequest requestData) {
     var result = await _cacheService.PatchContactsAsync(accountId, requestData);
     return result.ToActionResult();
   }
 
-  [HttpDelete("{accountId}/contacts/{index}")]
+  [HttpDelete("account/{accountId:guid}/contacts/{index:int}")]
   public async Task<IActionResult> DeleteContact(Guid accountId, int index) {
     var result = await _cacheService.DeleteContactAsync(accountId, index);
     return result.ToActionResult();
@@ -57,7 +69,7 @@ public class CacheController : ControllerBase {
 
   #region Hostnames
 
-  [HttpGet("{accountId}/hostnames")]
+  [HttpGet("account/{accountId:guid}/hostnames")]
   public async Task<IActionResult> GetHostnames(Guid accountId) {
     var result = await _cacheService.GetHostnames(accountId);
     return result.ToActionResult();
