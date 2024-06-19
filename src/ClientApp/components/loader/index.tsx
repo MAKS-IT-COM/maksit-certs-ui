@@ -30,8 +30,7 @@ const Loader: React.FC = () => {
 
   return (
     <div className="loader-overlay">
-      <div className="spinner"></div>
-      <div className="loading-text">Loading...</div>
+      <span className="loader"></span>
     </div>
   )
 }

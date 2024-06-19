@@ -11,15 +11,12 @@ namespace MaksIT.LetsEncryptServer.Controllers;
 [ApiController]
 [Route("api/cache")]
 public class CacheController : ControllerBase {
-  private readonly Configuration _appSettings;
   private readonly ICacheRestService _cacheService;
 
   public CacheController(
-      IOptions<Configuration> appSettings,
       ICacheService cacheService
   ) {
-    _appSettings = appSettings.Value;
-    _cacheService = (ICacheRestService)cacheService;
+    _cacheService = cacheService;
   }
 
   [HttpGet("accounts")]

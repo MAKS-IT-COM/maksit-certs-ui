@@ -83,7 +83,7 @@ public class CertsFlowService : ICertsFlowService {
       accountId = Guid.NewGuid();
     }
     else {
-      var (loadedCache, loadCaceResutl) = await _cacheService.LoadFromCacheAsync(accountId.Value);
+      var (loadedCache, loadCaceResutl) = await _cacheService.LoadAccountFromCacheAsync(accountId.Value);
       if (!loadCaceResutl.IsSuccess || loadCaceResutl == null) {
         accountId = Guid.NewGuid();
       }

@@ -1,14 +1,12 @@
 "use client"
 
 import { ApiRoutes, GetApiRoute } from "@/ApiRoutes"
-import { GetAccountsResponse } from "@/models/letsEncryptServer/cache/GetAccountsResponse"
-import { GetContactsResponse } from "@/models/letsEncryptServer/cache/GetContactsResponse"
-import { GetHostnamesResponse } from "@/models/letsEncryptServer/cache/GetHostnamesResponse"
 import { httpService } from "@/services/httpService"
 import { FormEvent, useEffect, useRef, useState } from "react"
 import { useValidation, isValidEmail, isValidHostname } from "@/hooks/useValidation"
 import { CustomButton, CustomInput } from "@/controls"
 import { TrashIcon, PlusIcon } from "@heroicons/react/24/solid"
+import { GetAccountResponse } from "@/models/letsEncryptServer/cache/responses/GetAccountResponse"
 
 interface CacheAccountHostname {
     hostname: string
@@ -32,39 +30,44 @@ export default function Page() {
         value: newContact,
         error: contactError,
         handleChange: handleContactChange
-    } = useValidation("", isValidEmail, "Invalid email format.")
+    } = useValidation({
+        initialValue:"",
+        validateFn: isValidEmail,
+        errorMessage: "Invalid email format."
+    })
     const {
         value: newHostname,
         error: hostnameError,
         handleChange: handleHostnameChange
-    } = useValidation("", isValidHostname, "Invalid hostname format.")
+    } = useValidation({
+        initialValue: "",
+        validateFn: isValidHostname,
+        errorMessage: "Invalid hostname format."})
 
     const init = useRef(false)
 
     useEffect(() => {
         if (init.current) return
 
+
+        console.log("Fetching accounts")
+
         const fetchAccounts = async () => {
             const newAccounts: CacheAccount[] = []
-            const accountsResponse = await httpService.get<GetAccountsResponse>(GetApiRoute(ApiRoutes.CACHE_GET_ACCOUNTS))
+            const accounts = await httpService.get<GetAccountResponse []>(GetApiRoute(ApiRoutes.CACHE_ACCOUNTS))
 
-            for (const accountId of accountsResponse.accountIds) {
-                const [contactsResponse, hostnamesResponse] = await Promise.all([
-                    httpService.get<GetContactsResponse>(GetApiRoute(ApiRoutes.CACHE_GET_CONTACTS, accountId)),
-                    httpService.get<GetHostnamesResponse>(GetApiRoute(ApiRoutes.CACHE_GET_HOSTNAMES, accountId))
-                ])
-
+            accounts?.forEach((account) => {
                 newAccounts.push({
-                    accountId: accountId,
-                    contacts: contactsResponse.contacts,
-                    hostnames: hostnamesResponse.hostnames.map(h => ({
+                    accountId: account.accountId,
+                    contacts: account.contacts,
+                    hostnames: account.hostnames.map(h => ({
                         hostname: h.hostname,
                         expires: new Date(h.expires),
                         isUpcomingExpire: h.isUpcomingExpire
                     })),
                     isEditMode: false
                 })
-            }
+            });
 
             setAccounts(newAccounts)
             setInitialAccounts(JSON.parse(JSON.stringify(newAccounts))) // Clone initial state
@@ -92,7 +95,7 @@ export default function Page() {
         if (account?.contacts.length ?? 0 < 1) return
 
         // TODO: Remove from cache
-        httpService.delete(GetApiRoute(ApiRoutes.CACHE_DELETE_CONTACT, accountId, contact))
+        httpService.delete(GetApiRoute(ApiRoutes.CACHE_ACCOUNT_CONTACT, accountId, contact))
 
         setAccounts(accounts.map(account =>
             account.accountId === accountId
@@ -192,7 +195,7 @@ export default function Page() {
 
     return (
         <div className="container mx-auto p-4">
-            <h1 className="text-4xl font-bold text-center mb-8">LetsEncrypt Client Dashboard</h1>
+            <h1 className="text-4xl font-bold text-center mb-8">LetsEncrypt Auto Renew</h1>
             {
                 accounts.map(account => (
                     <div key={account.accountId} className="bg-white shadow-lg rounded-lg p-6 mb-6">

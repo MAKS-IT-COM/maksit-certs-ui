@@ -1,16 +1,16 @@
-"use client" // Add this line
+"use client"
 
 import React, { FC, useState, useEffect, useRef } from 'react'
-import './globals.css'
 import { SideMenu } from '@/components/sidemenu'
 import { TopMenu } from '@/components/topmenu'
 import { Footer } from '@/components/footer'
 import { OffCanvas } from '@/components/offcanvas'
-import { Loader } from '@/components/loader' // Import the Loader component
+import { Loader } from '@/components/loader'
 import { Metadata } from 'next'
 import { Toast } from '@/components/toast'
 import { Provider } from 'react-redux'
-import { store }  from '@/redux/store'
+import { store } from '@/redux/store'
+import './globals.css'
 
 const metadata: Metadata = {
   title: "Create Next App",
@@ -20,7 +20,6 @@ const metadata: Metadata = {
 const Layout: FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [isManuallyCollapsed, setManuallyCollapsed] = useState(false)
-  //const [isLoading, setIsLoading] = useState(true) // State to control the loader visibility
 
   const init = useRef(false)
 
@@ -43,7 +42,6 @@ const Layout: FC<{ children: React.ReactNode }> = ({ children }) => {
     } else {
       if (isManuallyCollapsed) return
 
-      // Reset manualCollapse if the window is resized to a state that should automatically collapse/expand the sidebar
       if (window.innerWidth > 768 && isSidebarCollapsed) {
         setIsSidebarCollapsed(false)
       } else if (window.innerWidth <= 768 && !isSidebarCollapsed) {
@@ -54,7 +52,7 @@ const Layout: FC<{ children: React.ReactNode }> = ({ children }) => {
 
   useEffect(() => {
     if (!init.current) {
-      handleResize() // Set the initial state based on the current window width
+      handleResize()
       init.current = true
     }
 
@@ -72,20 +70,23 @@ const Layout: FC<{ children: React.ReactNode }> = ({ children }) => {
 
   return (
     <html lang="en">
-      <body className="h-screen overflow-hidden">
+      <body className="h-screen overflow-hidden flex flex-col">
         <Provider store={store}>
           <Loader />
 
-          <div className="flex h-full">
+          <div className="flex flex-1 overflow-hidden">
             <SideMenu isCollapsed={isSidebarCollapsed} toggleSidebar={manuallyToggleSidebar} />
-            <div className="flex flex-col flex-1">
+            
+            <div className="flex flex-col flex-1 overflow-hidden">
               <TopMenu onToggleOffCanvas={toggleOffCanvas} />
-              <main className="flex-1 p-4 transition-transform duration-300">
+              <main className="flex-1 p-4 overflow-y-auto">
                 {children}
               </main>
-              <Footer />
+              <Footer className="flex-shrink-0" />
             </div>
+
           </div>
+
           <OffCanvas isOpen={isOffCanvasOpen} onClose={toggleOffCanvas} />
           <Toast />
         </Provider>

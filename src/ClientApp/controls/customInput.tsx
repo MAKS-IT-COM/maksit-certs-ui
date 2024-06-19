@@ -4,7 +4,7 @@ import React from 'react'
 
 interface CustomInputProps {
     value: string
-    onChange: (value: string) => void
+    onChange?: (value: string) => void
     placeholder?: string
     type: 'text' | 'password' | 'email' | 'number' | 'tel' | 'url'
     error?: string
@@ -25,13 +25,18 @@ const CustomInput: React.FC<CustomInputProps> = ({
     errorClassName = '',
     className = ''
 }) => {
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        onChange?.(e.target.value);
+    }
+
     return (
         <div className={className}>
             {title && <label>{title}</label>}
             <input
                 type={type}
                 value={value}
-                onChange={(e) => onChange(e.target.value)}
+                onChange={handleChange}
                 placeholder={placeholder}
                 className={inputClassName}
             />

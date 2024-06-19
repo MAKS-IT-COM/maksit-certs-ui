@@ -10,8 +10,9 @@ using Models.LetsEncryptServer.Cache.Responses;
 
 namespace MaksIT.LetsEncryptServer.Services;
 
-public interface ICacheService {
-  Task<(RegistrationCache?, IDomainResult)> LoadFromCacheAsync(Guid accountId);
+public interface ICacheInternalsService {
+  Task<(RegistrationCache[]?, IDomainResult)> LoadAccountsFromCacheAsync();
+  Task<(RegistrationCache?, IDomainResult)> LoadAccountFromCacheAsync(Guid accountId);
   Task<IDomainResult> SaveToCacheAsync(Guid accountId, RegistrationCache cache);
   Task<IDomainResult> DeleteFromCacheAsync(Guid accountId);
 }
@@ -28,7 +29,9 @@ public interface ICacheRestService {
   Task<(GetHostnamesResponse?, IDomainResult)> GetHostnames(Guid accountId);
 }
 
-public class CacheService : ICacheService, ICacheRestService, IDisposable {
+public interface ICacheService : ICacheInternalsService, ICacheRestService {}
+
+public class CacheService : ICacheService, IDisposable {
   private readonly ILogger<CacheService> _logger;
   private readonly string _cacheDirectory;
   private readonly LockManager _lockManager;
@@ -36,7 +39,7 @@ public class CacheService : ICacheService, ICacheRestService, IDisposable {
   public CacheService(ILogger<CacheService> logger) {
     _logger = logger;
     _cacheDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "cache");
-    _lockManager = new LockManager(1, 1);
+    _lockManager = new LockManager();
 
     if (!Directory.Exists(_cacheDirectory)) {
       Directory.CreateDirectory(_cacheDirectory);
@@ -50,9 +53,39 @@ public class CacheService : ICacheService, ICacheRestService, IDisposable {
     return Path.Combine(_cacheDirectory, $"{accountId}.json");
   }
 
+  private Guid[] GetCachedAccounts() {
+    return GetCacheFilesPaths().Select(x => Path.GetFileNameWithoutExtension(x).ToGuid()).Where(x => x != Guid.Empty).ToArray();
+  }
+
+  private string[] GetCacheFilesPaths() {
+    return Directory.GetFiles(_cacheDirectory);
+  }
+
   #region Cache Operations
 
-  public Task<(RegistrationCache?, IDomainResult)> LoadFromCacheAsync(Guid accountId) {
+  public async Task<(RegistrationCache[]?, IDomainResult)> LoadAccountsFromCacheAsync() {
+    return await _lockManager.ExecuteWithLockAsync(async () => {
+      var accountIds = GetCachedAccounts();
+      var cacheLoadTasks = accountIds.Select(accountId => LoadFromCacheInternalAsync(accountId)).ToList();
+
+      var caches = new List<RegistrationCache>();
+      foreach (var task in cacheLoadTasks) {
+        var (registrationCache, getRegistrationCacheResult) = await task;
+        if (!getRegistrationCacheResult.IsSuccess || registrationCache == null) {
+          // Depending on how you want to handle partial failures, you might want to return here
+          // or continue loading other caches. For now, let's continue.
+          continue;
+        }
+
+        caches.Add(registrationCache);
+      }
+
+      return IDomainResult.Success(caches.ToArray());
+    });
+  }
+
+
+  public Task<(RegistrationCache?, IDomainResult)> LoadAccountFromCacheAsync(Guid accountId) {
     return _lockManager.ExecuteWithLockAsync(() => LoadFromCacheInternalAsync(accountId));
   }
 
@@ -110,8 +143,8 @@ public class CacheService : ICacheService, ICacheRestService, IDisposable {
 
   public async Task<(GetAccountResponse[]?, IDomainResult)> GetAccountsAsync() {
     return await _lockManager.ExecuteWithLockAsync(async () => {
-      var cacheFiles = Directory.GetFiles(_cacheDirectory);
-      var accountIds = cacheFiles.Select(x => Path.GetFileNameWithoutExtension(x).ToGuid()).ToArray();
+
+      var accountIds = GetCachedAccounts();
       var accounts = new List<GetAccountResponse>();
 
       foreach (var accountId in accountIds) {
@@ -128,7 +161,7 @@ public class CacheService : ICacheService, ICacheRestService, IDisposable {
 
   public async Task<(GetAccountResponse?, IDomainResult)> GetAccountAsync(Guid accountId) {
     return await _lockManager.ExecuteWithLockAsync(async () => {
-      var (cache, result) = await LoadFromCacheAsync(accountId);
+      var (cache, result) = await LoadAccountFromCacheAsync(accountId);
       if (!result.IsSuccess || cache == null) {
         return (null, result);
       }
@@ -145,7 +178,7 @@ public class CacheService : ICacheService, ICacheRestService, IDisposable {
   }
 
   public async Task<(GetAccountResponse?, IDomainResult)> PutAccountAsync(Guid accountId, PutAccountRequest requestData) {
-    var (cache, loadResult) = await LoadFromCacheAsync(accountId);
+    var (cache, loadResult) = await LoadAccountFromCacheAsync(accountId);
     if (!loadResult.IsSuccess || cache == null) {
       return (null, loadResult);
     }
@@ -162,7 +195,7 @@ public class CacheService : ICacheService, ICacheRestService, IDisposable {
   }
 
   public async Task<(GetAccountResponse?, IDomainResult)> PatchAccountAsync(Guid accountId, PatchAccountRequest requestData) {
-    var (cache, loadResult) = await LoadFromCacheAsync(accountId);
+    var (cache, loadResult) = await LoadAccountFromCacheAsync(accountId);
     if (!loadResult.IsSuccess || cache == null) {
       return (null, loadResult);
     }
@@ -209,7 +242,7 @@ public class CacheService : ICacheService, ICacheRestService, IDisposable {
   #region Contacts Operations
 
   public async Task<(GetContactsResponse?, IDomainResult)> GetContactsAsync(Guid accountId) {
-    var (cache, loadResult) = await LoadFromCacheAsync(accountId);
+    var (cache, loadResult) = await LoadAccountFromCacheAsync(accountId);
     if (!loadResult.IsSuccess || cache == null) {
       return (null, loadResult);
     }
@@ -220,7 +253,7 @@ public class CacheService : ICacheService, ICacheRestService, IDisposable {
   }
 
   public async Task<(GetAccountResponse?, IDomainResult)> PutContactsAsync(Guid accountId, PutContactsRequest requestData) {
-    var (cache, loadResult) = await LoadFromCacheAsync(accountId);
+    var (cache, loadResult) = await LoadAccountFromCacheAsync(accountId);
     if (!loadResult.IsSuccess || cache == null) {
       return (null, loadResult);
     }
@@ -235,7 +268,7 @@ public class CacheService : ICacheService, ICacheRestService, IDisposable {
   }
 
   public async Task<(GetAccountResponse?, IDomainResult)> PatchContactsAsync(Guid accountId, PatchContactsRequest requestData) {
-    var (cache, loadResult) = await LoadFromCacheAsync(accountId);
+    var (cache, loadResult) = await LoadAccountFromCacheAsync(accountId);
     if (!loadResult.IsSuccess || cache == null) {
       return (null, loadResult);
     }
@@ -274,7 +307,7 @@ public class CacheService : ICacheService, ICacheRestService, IDisposable {
   }
 
   public async Task<IDomainResult> DeleteContactAsync(Guid accountId, int index) {
-    var (cache, loadResult) = await LoadFromCacheAsync(accountId);
+    var (cache, loadResult) = await LoadAccountFromCacheAsync(accountId);
     if (!loadResult.IsSuccess || cache == null) {
       return loadResult;
     }
@@ -299,7 +332,7 @@ public class CacheService : ICacheService, ICacheRestService, IDisposable {
   #region Hostnames Operations
 
   public async Task<(GetHostnamesResponse?, IDomainResult)> GetHostnames(Guid accountId) {
-    var (cache, loadResult) = await LoadFromCacheAsync(accountId);
+    var (cache, loadResult) = await LoadAccountFromCacheAsync(accountId);
     if (!loadResult.IsSuccess || cache?.CachedCerts == null) {
       return (null, loadResult);
     }

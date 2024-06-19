@@ -1,25 +1,21 @@
 enum ApiRoutes {
 
-  CACHE_GET_ACCOUNTS = `api/Cache/GetAccounts`,
-
-  CACHE_GET_CONTACTS = `api/Cache/GetContacts/{accountId}`,
-  CACHE_ADD_CONTACT = `api/Cache/AddContact/{accountId}`,
-  CACHE_DELETE_CONTACT = `api/Cache/DeleteContact/{accountId}?contact={contact}`,
+  CACHE_ACCOUNTS = 'api/cache/accounts',
+  CACHE_ACCOUNT = 'api/cache/account/{accountId}',
+  CACHE_ACCOUNT_CONTACTS = 'api/cache/account/{accountId}/contacts',
+  CACHE_ACCOUNT_CONTACT = 'api/cache/account/{accountId}/contacts/{index}',
+  CACHE_ACCOUNT_HOSTNAMES = 'api/cache/account/{accountId}/hostnames',
 
   
-  CACHE_GET_HOSTNAMES = `api/Cache/GetHostnames/{accountId}`,
-  // TODO: here is different flow via CertsFlowController, cache update is the result of add order and invalidate cert
-  // CACHE_ADD_HOSTNAME = `api/Cache/AddHostname/{accountId}`,
-  // CACHE_DELETE_HOSTNAME = `api/Cache/DeleteHostname/{accountId}?hostname={hostname}`,
 
-  CERTS_FLOW_CONFIGURE_CLIENT =  `api/CertsFlow/ConfigureClient`,
-  CERTS_FLOW_TERMS_OF_SERVICE = `api/CertsFlow/TermsOfService/{sessionId}`,
-  CERTS_FLOW_INIT = `api/CertsFlow/Init/{sessionId}/{accountId}`,
-  CERTS_FLOW_NEW_ORDER = `api/CertsFlow/NewOrder/{sessionId}`,  
-  CERTS_FLOW_GET_ORDER = `api/CertsFlow/GetOrder/{sessionId}`,
-  CERTS_FLOW_GET_CERTIFICATES = `api/CertsFlow/GetCertificates/{sessionId}`,
-  CERTS_FLOW_APPLY_CERTIFICATES = `api/CertsFlow/ApplyCertificates/{sessionId}`,
-  CERTS_FLOW_HOSRS_WITH_UPCOMING_SSL_EXPIRY = `api/CertsFlow/HostsWithUpcomingSslExpiry/{sessionId}`
+  // CERTS_FLOW_CONFIGURE_CLIENT =  `api/CertsFlow/ConfigureClient`,
+  // CERTS_FLOW_TERMS_OF_SERVICE = `api/CertsFlow/TermsOfService/{sessionId}`,
+  // CERTS_FLOW_INIT = `api/CertsFlow/Init/{sessionId}/{accountId}`,
+  // CERTS_FLOW_NEW_ORDER = `api/CertsFlow/NewOrder/{sessionId}`,  
+  // CERTS_FLOW_GET_ORDER = `api/CertsFlow/GetOrder/{sessionId}`,
+  // CERTS_FLOW_GET_CERTIFICATES = `api/CertsFlow/GetCertificates/{sessionId}`,
+  // CERTS_FLOW_APPLY_CERTIFICATES = `api/CertsFlow/ApplyCertificates/{sessionId}`,
+  // CERTS_FLOW_HOSRS_WITH_UPCOMING_SSL_EXPIRY = `api/CertsFlow/HostsWithUpcomingSslExpiry/{sessionId}`
 }
 
 const GetApiRoute = (route: ApiRoutes, ...args: string[]): string => {
@@ -27,7 +23,7 @@ const GetApiRoute = (route: ApiRoutes, ...args: string[]): string => {
   args.forEach(arg => {
     result = result.replace(/{.*?}/, arg);
   });
-  return  'http://localhost:5000/' + result;
+  return  `http://localhost:5000/${result}`;
 }
 
 

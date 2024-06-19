@@ -5,6 +5,8 @@ using DomainResults.Common;
 
 using MaksIT.LetsEncryptServer.Services;
 using Models.LetsEncryptServer.CertsFlow.Requests;
+using Models.LetsEncryptServer.Cache.Responses;
+using MaksIT.LetsEncrypt.Entities;
 
 namespace MaksIT.LetsEncryptServer.BackgroundServices {
   public class AutoRenewal : BackgroundService {
@@ -30,26 +32,23 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
       while (!stoppingToken.IsCancellationRequested) {
         _logger.LogInformation("Background service is running.");
 
-        var (accountsResponse, getAccountIdsResult) = await _cacheService.GetAccountsAsync();
+        var (accountsResponse, getAccountIdsResult) = await _cacheService.LoadAccountsFromCacheAsync();
         if (!getAccountIdsResult.IsSuccess || accountsResponse == null) {
           LogErrors(getAccountIdsResult.Errors);
           continue;
         }
 
-        foreach (var accountId in accountsResponse.AccountIds) {
-          await ProcessAccountAsync(accountId);
+        foreach (var account in accountsResponse) {
+          await ProcessAccountAsync(account);
         }
 
         await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
       }
     }
 
-    private async Task<IDomainResult> ProcessAccountAsync(Guid accountId) {
-      var (cache, loadResult) = await _cacheService.LoadFromCacheAsync(accountId);
-      if (!loadResult.IsSuccess || cache == null) {
-        LogErrors(loadResult.Errors);
-        return loadResult;
-      }
+    private async Task<IDomainResult> ProcessAccountAsync(RegistrationCache cache) {
+      
+      
 
       var hostnames = cache.GetHostsWithUpcomingSslExpiry();
       if (hostnames == null) {
@@ -63,11 +62,11 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
         return IDomainResult.Success();
       }
 
-      var renewResult = await RenewCertificatesForHostnames(accountId, cache.Contacts, hostnames);
+      var renewResult = await RenewCertificatesForHostnames(cache.AccountId, cache.Contacts, hostnames);
       if (!renewResult.IsSuccess)
         return renewResult;
 
-      _logger.LogInformation($"Certificates renewed for account {accountId}");
+      _logger.LogInformation($"Certificates renewed for account {cache.AccountId}");
 
       return IDomainResult.Success();
     }
