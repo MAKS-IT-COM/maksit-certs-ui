@@ -1,5 +1,5 @@
-import { HostnameResponse } from "./HostnameResponse";
+import { HostnameResponse } from './HostnameResponse'
 
 export interface GetHostnamesResponse {
-    hostnames: HostnameResponse[]
+  hostnames: HostnameResponse[]
 }

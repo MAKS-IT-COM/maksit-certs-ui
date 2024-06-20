@@ -1,8 +1,8 @@
 import React, { FC } from 'react'
 
 interface OffCanvasProps {
-    isOpen: boolean
-    onClose: () => void
+  isOpen: boolean
+  onClose: () => void
 }
 
 const OffCanvas: FC<OffCanvasProps> = ({ isOpen, onClose }) => {
@@ -29,6 +29,4 @@ const OffCanvas: FC<OffCanvasProps> = ({ isOpen, onClose }) => {
   )
 }
 
-export {
-    OffCanvas
-}
+export { OffCanvas }

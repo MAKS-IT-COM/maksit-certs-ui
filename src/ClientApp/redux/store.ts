@@ -3,10 +3,10 @@ import loaderReducer from '@/redux/slices//loaderSlice'
 import toastReducer from '@/redux/slices/toastSlice'
 
 export const store = configureStore({
-    reducer: {
-        loader: loaderReducer,
-        toast: toastReducer,
-    },
+  reducer: {
+    loader: loaderReducer,
+    toast: toastReducer
+  }
 })
 
 export type RootState = ReturnType<typeof store.getState>

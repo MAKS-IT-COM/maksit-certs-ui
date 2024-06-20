@@ -34,8 +34,8 @@ const Toast = () => {
   }, [toastState, dispatch])
 
   return (
-    <ToastContainer 
-      position="bottom-right" 
+    <ToastContainer
+      position="bottom-right"
       theme="dark"
       autoClose={5000}
       hideProgressBar={false}

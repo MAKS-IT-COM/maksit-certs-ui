@@ -1,12 +1,10 @@
 import React from 'react'
 
-
 interface FooterProps {
   className?: string
 }
 
 const Footer = (props: FooterProps) => {
-
   const { className } = props
   return (
     <footer className={`bg-gray-900 text-white text-center p-4 ${className}`}>
@@ -15,6 +13,4 @@ const Footer = (props: FooterProps) => {
   )
 }
 
-export {
-    Footer
-}
+export { Footer }

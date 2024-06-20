@@ -1,3 +1,3 @@
 export interface GetContactsResponse {
-    contacts: string[]
+  contacts: string[]
 }

@@ -1,9 +1,7 @@
-import { HostnameResponse } from "./HostnameResponse";
+import { HostnameResponse } from './HostnameResponse'
 
 export interface GetAccountResponse {
-    accountId: string,
-    contacts: string[],
-    hostnames: HostnameResponse[],
+  accountId: string
+  contacts: string[]
+  hostnames: HostnameResponse[]
 }
-
-

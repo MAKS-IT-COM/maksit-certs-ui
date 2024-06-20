@@ -1,4 +1,4 @@
-"use client" // Add this line
+'use client' // Add this line
 
 import React, { FC, useState } from 'react'
 import { FaCog, FaBars } from 'react-icons/fa'
@@ -48,12 +48,10 @@ const TopMenu: FC<TopMenuProps> = ({ onToggleOffCanvas }) => {
         <FaCog />
       </button>
       <button onClick={toggleMenu} className="md:hidden">
-          <FaBars />
+        <FaBars />
       </button>
     </header>
   )
 }
 
-export {
-  TopMenu
-}
+export { TopMenu }

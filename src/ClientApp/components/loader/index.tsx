@@ -7,7 +7,9 @@ import './loader.css'
 
 const Loader: React.FC = () => {
   const dispatch = useDispatch()
-  const activeRequests = useSelector((state: RootState) => state.loader.activeRequests)
+  const activeRequests = useSelector(
+    (state: RootState) => state.loader.activeRequests
+  )
 
   useEffect(() => {
     let timeout: NodeJS.Timeout | null = null
@@ -35,6 +37,4 @@ const Loader: React.FC = () => {
   )
 }
 
-export {
-  Loader
-}
+export { Loader }
