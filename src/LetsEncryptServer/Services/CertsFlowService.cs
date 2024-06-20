@@ -6,16 +6,21 @@ using DomainResults.Common;
 
 using MaksIT.LetsEncrypt.Entities;
 using MaksIT.LetsEncrypt.Services;
-using Models.LetsEncryptServer.CertsFlow.Requests;
+using MaksIT.Models.LetsEncryptServer.CertsFlow.Requests;
 
 
 namespace MaksIT.LetsEncryptServer.Services;
 
-public interface ICertsFlowServiceBase {
+public interface ICertsInternalService {
+
+}
+
+
+public interface ICertsRestChallengeService {
   (string?, IDomainResult) AcmeChallenge(string fileName);
 }
 
-public interface ICertsFlowService : ICertsFlowServiceBase {
+public interface ICertsRestService {
   Task<(Guid?, IDomainResult)> ConfigureClientAsync();
   (string?, IDomainResult) GetTermsOfService(Guid sessionId);
   Task<(Guid?, IDomainResult)> InitAsync(Guid sessionId, Guid? accountId, InitRequest requestData);
@@ -24,7 +29,12 @@ public interface ICertsFlowService : ICertsFlowServiceBase {
   Task<IDomainResult> GetOrderAsync(Guid sessionId, GetOrderRequest requestData);
   Task<IDomainResult> GetCertificatesAsync(Guid sessionId, GetCertificatesRequest requestData);
   Task<(Dictionary<string, string>?, IDomainResult)> ApplyCertificatesAsync(Guid sessionId, GetCertificatesRequest requestData);
- }
+}
+
+public interface ICertsFlowService
+  : ICertsInternalService,
+    ICertsRestService,
+    ICertsRestChallengeService {}
 
 public class CertsFlowService : ICertsFlowService {
 

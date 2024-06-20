@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 // Helper functions for validation
 const isValidEmail = (email: string) => {
@@ -21,38 +21,68 @@ const isValidHostname = (hostname: string) => {
 }
 
 // Props interface for useValidation hook
-interface UseValidationProps {
-  initialValue: string
-  validateFn: (value: string) => boolean
+interface UseValidationProps<T> {
+  initialValue: T
+  validateFn: (value: T) => boolean
   errorMessage: string
+  emptyFieldMessage?: string // Optional custom message for empty fields
+  defaultResetValue?: T // Optional default reset value
 }
 
 // Custom hook for input validation
-const useValidation = ({
-  initialValue,
-  validateFn,
-  errorMessage
-}: UseValidationProps) => {
-  const [value, setValue] = useState(initialValue)
+const useValidation = <T extends string | number | Date>(
+  props: UseValidationProps<T>
+) => {
+  const {
+    initialValue,
+    validateFn,
+    errorMessage,
+    emptyFieldMessage = 'This field cannot be empty.', // Default message
+    defaultResetValue
+  } = props
+
+  const [value, setValue] = useState<T>(initialValue)
   const [error, setError] = useState('')
 
-  const handleChange = (newValue: string) => {
-    console.log(newValue)
-    setValue(newValue)
-    if (newValue.trim() === '') {
-      setError('This field cannot be empty.')
-    } else if (!validateFn(newValue.trim())) {
-      setError(errorMessage)
-    } else {
-      setError('')
-    }
-  }
+  const handleChange = useCallback(
+    (newValue: T) => {
+      setValue(newValue)
+      const stringValue =
+        newValue instanceof Date
+          ? newValue.toISOString()
+          : newValue.toString().trim()
+      if (stringValue === '') {
+        setError(emptyFieldMessage)
+      } else if (!validateFn(newValue)) {
+        setError(errorMessage)
+      } else {
+        setError('')
+      }
+    },
+    [emptyFieldMessage, errorMessage, validateFn]
+  )
 
   useEffect(() => {
     handleChange(initialValue)
-  }, [initialValue])
+  }, [initialValue, handleChange])
 
-  return { value, error, handleChange, reset: () => setValue('') }
+  const reset = useCallback(() => {
+    const resetValue =
+      defaultResetValue !== undefined ? defaultResetValue : initialValue
+
+    setValue(resetValue)
+    const stringValue =
+      resetValue instanceof Date
+        ? resetValue.toISOString()
+        : resetValue.toString().trim()
+    if (stringValue === '') {
+      setError(emptyFieldMessage)
+    } else {
+      setError('')
+    }
+  }, [defaultResetValue, initialValue, emptyFieldMessage])
+
+  return { value, error, handleChange, reset }
 }
 
 export {

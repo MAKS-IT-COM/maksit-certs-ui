@@ -21,17 +21,20 @@ export default function Page() {
   const {
     value: newContact,
     error: contactError,
-    handleChange: handleContactChange
-  } = useValidation({
+    handleChange: handleContactChange,
+    reset: resetContact
+  } = useValidation<string>({
     initialValue: '',
     validateFn: isValidEmail,
     errorMessage: 'Invalid email format.'
   })
+
   const {
     value: newHostname,
     error: hostnameError,
-    handleChange: handleHostnameChange
-  } = useValidation({
+    handleChange: handleHostnameChange,
+    reset: resetHostname
+  } = useValidation<string>({
     initialValue: '',
     validateFn: isValidHostname,
     errorMessage: 'Invalid hostname format.'
@@ -110,25 +113,25 @@ export default function Page() {
   }
 
   const addContact = (accountId: string) => {
-    if (newContact.trim() === '' || contactError) {
+    if (newContact === '' || contactError) {
       return
     }
 
     if (
       accounts
         .find((account) => account.accountId === accountId)
-        ?.contacts.includes(newContact.trim())
+        ?.contacts.includes(newContact)
     )
       return
 
     setAccounts(
       accounts.map((account) =>
         account.accountId === accountId
-          ? { ...account, contacts: [...account.contacts, newContact.trim()] }
+          ? { ...account, contacts: [...account.contacts, newContact] }
           : account
       )
     )
-    handleContactChange('')
+    resetContact()
   }
 
   const deleteHostname = (accountId: string, hostname: string) => {
@@ -153,14 +156,14 @@ export default function Page() {
   }
 
   const addHostname = (accountId: string) => {
-    if (newHostname.trim() === '' || hostnameError) {
+    if (newHostname === '' || hostnameError) {
       return
     }
 
     if (
       accounts
         .find((account) => account.accountId === accountId)
-        ?.hostnames.some((h) => h.hostname === newHostname.trim())
+        ?.hostnames.some((h) => h.hostname === newHostname)
     )
       return
 
@@ -172,7 +175,7 @@ export default function Page() {
               hostnames: [
                 ...account.hostnames,
                 {
-                  hostname: newHostname.trim(),
+                  hostname: newHostname,
                   expires: new Date(),
                   isUpcomingExpire: false
                 }
@@ -181,7 +184,7 @@ export default function Page() {
           : account
       )
     )
-    handleHostnameChange('')
+    resetHostname()
   }
 
   const handleSubmit = async (
@@ -279,14 +282,15 @@ export default function Page() {
                       className="text-gray-700 flex justify-between items-center mb-2"
                     >
                       {contact}
-                      <button
+                      <CustomButton
+                        type="button"
                         onClick={() =>
                           deleteContact(account.accountId, contact)
                         }
-                        className="bg-red-500 text-white px-2 py-1 rounded ml-4 h-10"
+                        className="bg-red-500 text-white p-2 rounded ml-2"
                       >
                         <TrashIcon className="h-5 w-5 text-white" />
-                      </button>
+                      </CustomButton>
                     </li>
                   ))}
                 </ul>
@@ -301,13 +305,15 @@ export default function Page() {
                     inputClassName="border p-2 rounded w-full"
                     errorClassName="text-red-500 text-sm mt-1"
                     className="mr-2 flex-grow"
-                  />
-                  <button
-                    onClick={() => addContact(account.accountId)}
-                    className="bg-green-500 text-white p-2 rounded ml-2 h-10 flex items-center"
                   >
-                    <PlusIcon className="h-5 w-5 text-white" />
-                  </button>
+                    <CustomButton
+                      type="button"
+                      onClick={() => addContact(account.accountId)}
+                      className="bg-green-500 text-white p-2 rounded ml-2"
+                    >
+                      <PlusIcon className="h-5 w-5 text-white" />
+                    </CustomButton>
+                  </CustomInput>
                 </div>
               </div>
               <div>
@@ -329,14 +335,15 @@ export default function Page() {
                             : 'Not Upcoming'}
                         </span>
                       </div>
-                      <button
+                      <CustomButton
+                        type="button"
                         onClick={() =>
                           deleteHostname(account.accountId, hostname.hostname)
                         }
-                        className="bg-red-500 text-white px-2 py-1 rounded ml-4 h-10"
+                        className="bg-red-500 text-white p-2 rounded ml-2"
                       >
                         <TrashIcon className="h-5 w-5 text-white" />
-                      </button>
+                      </CustomButton>
                     </li>
                   ))}
                 </ul>
@@ -351,25 +358,27 @@ export default function Page() {
                     inputClassName="border p-2 rounded w-full"
                     errorClassName="text-red-500 text-sm mt-1"
                     className="mr-2 flex-grow"
-                  />
-                  <button
-                    onClick={() => addHostname(account.accountId)}
-                    className="bg-green-500 text-white p-2 rounded ml-2 h-10 flex items-center"
                   >
-                    <PlusIcon className="h-5 w-5 text-white" />
-                  </button>
+                    <CustomButton
+                      type="button"
+                      onClick={() => addHostname(account.accountId)}
+                      className="bg-green-500 text-white p-2 rounded ml-2"
+                    >
+                      <PlusIcon className="h-5 w-5 text-white" />
+                    </CustomButton>
+                  </CustomInput>
                 </div>
               </div>
               <div className="flex justify-between mt-4">
-                <button
+                <CustomButton
                   onClick={() => deleteAccount(account.accountId)}
-                  className="bg-red-500 text-white px-3 py-1 rounded"
+                  className="bg-red-500 text-white p-2 rounded ml-2"
                 >
                   <TrashIcon className="h-5 w-5 text-white" />
-                </button>
+                </CustomButton>
                 <CustomButton
                   type="submit"
-                  className="bg-green-500 text-white px-3 py-1 rounded"
+                  className="bg-green-500 text-white p-2 rounded ml-2"
                 >
                   Submit
                 </CustomButton>

@@ -6,7 +6,7 @@ using MaksIT.Core.Extensions;
 using MaksIT.LetsEncrypt.Entities;
 using MaksIT.Models;
 using MaksIT.Models.LetsEncryptServer.Cache.Requests;
-using Models.LetsEncryptServer.Cache.Responses;
+using MaksIT.Models.LetsEncryptServer.Cache.Responses;
 
 namespace MaksIT.LetsEncryptServer.Services;
 

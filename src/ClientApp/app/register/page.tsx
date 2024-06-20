@@ -10,24 +10,26 @@ import {
 } from '@/hooks/useValidation'
 import { CustomButton, CustomInput } from '@/controls'
 import { FaTrash, FaPlus } from 'react-icons/fa'
-import { GetAccountResponse } from '@/models/letsEncryptServer/cache/responses/GetAccountResponse'
 import { deepCopy } from '../functions'
-
-interface CacheAccount {
-  description?: string
-  contacts: string[]
-  hostnames: string[]
-}
+import {
+  PostAccountRequest,
+  validatePostAccountRequest
+} from '@/models/letsEncryptServer/certsFlow/PostAccountRequest'
+import App from 'next/app'
+import { useAppDispatch } from '@/redux/store'
+import { showToast } from '@/redux/slices/toastSlice'
 
 const RegisterPage = () => {
-  const [account, setAccount] = useState<CacheAccount | null>(null)
+  const [account, setAccount] = useState<PostAccountRequest | null>(null)
+
+  const dispatch = useAppDispatch()
 
   const {
     value: newContact,
     error: contactError,
     handleChange: handleContactChange,
     reset: resetContact
-  } = useValidation({
+  } = useValidation<string>({
     initialValue: '',
     validateFn: isValidContact,
     errorMessage: 'Invalid contact. Must be a valid email or phone number.'
@@ -38,7 +40,7 @@ const RegisterPage = () => {
     error: hostnameError,
     handleChange: handleHostnameChange,
     reset: resetHostname
-  } = useValidation({
+  } = useValidation<string>({
     initialValue: '',
     validateFn: isValidHostname,
     errorMessage: 'Invalid hostname format.'
@@ -55,10 +57,17 @@ const RegisterPage = () => {
   const handleDescription = (description: string) => {}
 
   const handleAddContact = () => {
-    if (newContact !== '' || contactError) return
+    if (
+      newContact === '' ||
+      account?.contacts.includes(newContact) ||
+      contactError !== ''
+    ) {
+      resetContact()
+      return
+    }
 
     setAccount((prev) => {
-      const newAccount: CacheAccount =
+      const newAccount: PostAccountRequest =
         prev !== null
           ? deepCopy(prev)
           : {
@@ -75,10 +84,17 @@ const RegisterPage = () => {
   }
 
   const handleAddHostname = () => {
-    if (newHostname !== '' || hostnameError) return
+    if (
+      newHostname === '' ||
+      account?.hostnames.includes(newHostname) ||
+      hostnameError !== ''
+    ) {
+      resetHostname()
+      return
+    }
 
     setAccount((prev) => {
-      const newAccount: CacheAccount =
+      const newAccount: PostAccountRequest =
         prev !== null
           ? deepCopy(prev)
           : {
@@ -119,6 +135,17 @@ const RegisterPage = () => {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
+    const error = validatePostAccountRequest(account)
+    if (error) {
+      console.error(`Validation failed: ${error}`)
+      // dipatch toasterror
+      dispatch(showToast({ message: error, type: 'error' }))
+
+      return
+    }
+
+    // httpService.post<PostAccountRequest, GetAccountResponse>('', account)
+
     console.log(account)
   }
 
@@ -148,13 +175,13 @@ const RegisterPage = () => {
                 className="text-gray-700 flex justify-between items-center mb-2"
               >
                 {contact}
-                <button
+                <CustomButton
                   type="button"
                   onClick={() => handleDeleteContact(contact)}
-                  className="bg-red-500 text-white px-2 py-1 rounded ml-4"
+                  className="bg-red-500 text-white p-2 rounded ml-2"
                 >
                   <FaTrash />
-                </button>
+                </CustomButton>
               </li>
             ))}
           </ul>
@@ -169,14 +196,15 @@ const RegisterPage = () => {
               inputClassName="border p-2 rounded w-full"
               errorClassName="text-red-500 text-sm mt-1"
               className="mr-2 flex-grow"
-            />
-            <button
-              type="button"
-              onClick={handleAddContact}
-              className="bg-green-500 text-white p-2 rounded ml-2 h-10 flex items-center"
             >
-              <FaPlus />
-            </button>
+              <CustomButton
+                type="button"
+                onClick={handleAddContact}
+                className="bg-green-500 text-white p-2 rounded ml-2"
+              >
+                <FaPlus />
+              </CustomButton>
+            </CustomInput>
           </div>
         </div>
         <div className="mb-4">
@@ -188,13 +216,13 @@ const RegisterPage = () => {
                 className="text-gray-700 flex justify-between items-center mb-2"
               >
                 {hostname}
-                <button
+                <CustomButton
                   type="button"
                   onClick={() => handleDeleteHostname(hostname)}
-                  className="bg-red-500 text-white px-2 py-1 rounded ml-4"
+                  className="bg-red-500 text-white p-2 rounded ml-2"
                 >
                   <FaTrash />
-                </button>
+                </CustomButton>
               </li>
             ))}
           </ul>
@@ -209,14 +237,15 @@ const RegisterPage = () => {
               inputClassName="border p-2 rounded w-full"
               errorClassName="text-red-500 text-sm mt-1"
               className="mr-2 flex-grow"
-            />
-            <button
-              type="button"
-              onClick={handleAddHostname}
-              className="bg-green-500 text-white p-2 rounded ml-2 h-10 flex items-center"
             >
-              <FaPlus />
-            </button>
+              <CustomButton
+                type="button"
+                onClick={handleAddHostname}
+                className="bg-green-500 text-white p-2 rounded ml-2"
+              >
+                <FaPlus />
+              </CustomButton>
+            </CustomInput>
           </div>
         </div>
         <CustomButton

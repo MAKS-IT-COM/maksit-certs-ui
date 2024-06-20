@@ -2,11 +2,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using DomainResults.Mvc;
 using MaksIT.LetsEncryptServer.Services;
-using Models.LetsEncryptServer.CertsFlow.Requests;
+using MaksIT.Models.LetsEncryptServer.CertsFlow.Requests;
 
 namespace MaksIT.LetsEncryptServer.Controllers {
   [ApiController]
-  [Route("api/[controller]")]
+  [Route("api/certs")]
   public class CertsFlowController : ControllerBase {
     private readonly Configuration _appSettings;
     private readonly ICertsFlowService _certsFlowService;
@@ -34,7 +34,7 @@ namespace MaksIT.LetsEncryptServer.Controllers {
     /// </summary>
     /// <param name="sessionId">Session ID</param>
     /// <returns>Terms of service</returns>
-    [HttpGet("terms-of-service/{sessionId}")]
+    [HttpGet("{sessionId}/terms-of-service")]
     public IActionResult TermsOfService(Guid sessionId) {
       var result = _certsFlowService.GetTermsOfService(sessionId);
       return result.ToActionResult();

@@ -57,7 +57,7 @@ public class CacheController : ControllerBase {
     return result.ToActionResult();
   }
 
-  [HttpDelete("account/{accountId:guid}/contacts/{index:int}")]
+  [HttpDelete("account/{accountId:guid}/contact/{index:int}")]
   public async Task<IActionResult> DeleteContact(Guid accountId, int index) {
     var result = await _cacheService.DeleteContactAsync(accountId, index);
     return result.ToActionResult();

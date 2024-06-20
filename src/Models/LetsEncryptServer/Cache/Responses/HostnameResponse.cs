@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Models.LetsEncryptServer.Cache.Responses {
+namespace MaksIT.Models.LetsEncryptServer.Cache.Responses {
   public class HostnameResponse {
     public string Hostname { get; set; }
     public DateTime Expires { get; set; }

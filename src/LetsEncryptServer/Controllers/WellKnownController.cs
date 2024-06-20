@@ -13,7 +13,7 @@ namespace MaksIT.LetsEncryptServer.Controllers;
 public class WellKnownController : ControllerBase {
 
   private readonly Configuration _appSettings;
-  private readonly ICertsFlowServiceBase _certsFlowService;
+  private readonly ICertsRestChallengeService _certsFlowService;
 
   private readonly string _acmePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "acme");
 

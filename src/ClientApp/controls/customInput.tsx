@@ -1,6 +1,6 @@
 // components/CustomInput.tsx
 'use client'
-import React from 'react'
+import React, { FC } from 'react'
 
 interface CustomInputProps {
   value: string
@@ -12,9 +12,10 @@ interface CustomInputProps {
   inputClassName?: string
   errorClassName?: string
   className?: string
+  children?: React.ReactNode // Added for additional elements
 }
 
-const CustomInput: React.FC<CustomInputProps> = ({
+const CustomInput: FC<CustomInputProps> = ({
   value,
   onChange,
   placeholder = '',
@@ -23,23 +24,29 @@ const CustomInput: React.FC<CustomInputProps> = ({
   title,
   inputClassName = '',
   errorClassName = '',
-  className = ''
+  className = '',
+  children // Added for additional elements
 }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange?.(e.target.value)
   }
 
   return (
-    <div className={className}>
-      {title && <label>{title}</label>}
-      <input
-        type={type}
-        value={value}
-        onChange={handleChange}
-        placeholder={placeholder}
-        className={inputClassName}
-      />
-      {error && <p className={errorClassName}>{error}</p>}
+    <div className={`flex flex-col ${className}`}>
+      {title && <label className="mb-1">{title}</label>}
+      <div className="flex items-center">
+        <input
+          type={type}
+          value={value}
+          onChange={handleChange}
+          placeholder={placeholder}
+          className={`flex-grow ${inputClassName}`}
+        />
+        {children && <div className="ml-2">{children}</div>}
+      </div>
+      {error && (
+        <p className={`text-red-500 mt-1 ${errorClassName}`}>{error}</p>
+      )}
     </div>
   )
 }

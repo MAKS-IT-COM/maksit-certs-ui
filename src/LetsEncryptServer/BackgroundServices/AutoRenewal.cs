@@ -4,9 +4,8 @@ using DomainResults.Common;
 
 
 using MaksIT.LetsEncryptServer.Services;
-using Models.LetsEncryptServer.CertsFlow.Requests;
-using Models.LetsEncryptServer.Cache.Responses;
 using MaksIT.LetsEncrypt.Entities;
+using MaksIT.Models.LetsEncryptServer.CertsFlow.Requests;
 
 namespace MaksIT.LetsEncryptServer.BackgroundServices {
   public class AutoRenewal : BackgroundService {
@@ -62,7 +61,7 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
         return IDomainResult.Success();
       }
 
-      var renewResult = await RenewCertificatesForHostnames(cache.AccountId, cache.Contacts, hostnames);
+      var renewResult = await RenewCertificatesForHostnames(cache.AccountId, cache.Description, cache.Contacts, hostnames);
       if (!renewResult.IsSuccess)
         return renewResult;
 
@@ -71,7 +70,7 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
       return IDomainResult.Success();
     }
 
-    private async Task<IDomainResult> RenewCertificatesForHostnames(Guid accountId, string[] contacts, string[] hostnames) {
+    private async Task<IDomainResult> RenewCertificatesForHostnames(Guid accountId, string description, string[] contacts, string[] hostnames) {
       var (sessionId, configureClientResult) = await _certsFlowService.ConfigureClientAsync();
       if (!configureClientResult.IsSuccess || sessionId == null) {
         LogErrors(configureClientResult.Errors);
@@ -81,6 +80,7 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
       var sessionIdValue = sessionId.Value;
 
       var (_, initResult) = await _certsFlowService.InitAsync(sessionIdValue, accountId, new InitRequest {
+        Description = description,
         Contacts = contacts
       });
       if (!initResult.IsSuccess) {

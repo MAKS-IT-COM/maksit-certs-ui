@@ -2,7 +2,7 @@ enum ApiRoutes {
   CACHE_ACCOUNTS = 'api/cache/accounts',
   CACHE_ACCOUNT = 'api/cache/account/{accountId}',
   CACHE_ACCOUNT_CONTACTS = 'api/cache/account/{accountId}/contacts',
-  CACHE_ACCOUNT_CONTACT = 'api/cache/account/{accountId}/contacts/{index}',
+  CACHE_ACCOUNT_CONTACT = 'api/cache/account/{accountId}/contact/{index}',
   CACHE_ACCOUNT_HOSTNAMES = 'api/cache/account/{accountId}/hostnames'
 
   // CERTS_FLOW_CONFIGURE_CLIENT =  `api/CertsFlow/ConfigureClient`,
