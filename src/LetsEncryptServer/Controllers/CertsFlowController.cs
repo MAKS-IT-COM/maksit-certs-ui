@@ -1,21 +1,24 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
+
 using DomainResults.Mvc;
+
 using MaksIT.LetsEncryptServer.Services;
 using MaksIT.Models.LetsEncryptServer.CertsFlow.Requests;
 
 namespace MaksIT.LetsEncryptServer.Controllers {
+
+  /// <summary>
+  /// Certificates flow controller, used for granular testing purposes
+  /// </summary>
   [ApiController]
   [Route("api/certs")]
   public class CertsFlowController : ControllerBase {
-    private readonly Configuration _appSettings;
+
     private readonly ICertsFlowService _certsFlowService;
 
     public CertsFlowController(
-        IOptions<Configuration> appSettings,
         ICertsFlowService certsFlowService
     ) {
-      _appSettings = appSettings.Value;
       _certsFlowService = certsFlowService;
     }
 

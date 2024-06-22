@@ -10,7 +10,7 @@ using MaksIT.Models.LetsEncryptServer.Cache.Responses;
 
 namespace MaksIT.LetsEncryptServer.Services;
 
-public interface ICacheInternalsService {
+public interface ICacheInternalService {
   Task<(RegistrationCache[]?, IDomainResult)> LoadAccountsFromCacheAsync();
   Task<(RegistrationCache?, IDomainResult)> LoadAccountFromCacheAsync(Guid accountId);
   Task<IDomainResult> SaveToCacheAsync(Guid accountId, RegistrationCache cache);
@@ -22,6 +22,7 @@ public interface ICacheRestService {
   Task<(GetAccountResponse?, IDomainResult)> GetAccountAsync(Guid accountId);
   Task<(GetAccountResponse?, IDomainResult)> PutAccountAsync(Guid accountId, PutAccountRequest requestData);
   Task<(GetAccountResponse?, IDomainResult)> PatchAccountAsync(Guid accountId, PatchAccountRequest requestData);
+  Task<IDomainResult> DeleteAccountAsync(Guid accountId);
   Task<(GetContactsResponse?, IDomainResult)> GetContactsAsync(Guid accountId);
   Task<(GetAccountResponse?, IDomainResult)> PutContactsAsync(Guid accountId, PutContactsRequest requestData);
   Task<(GetAccountResponse?, IDomainResult)> PatchContactsAsync(Guid accountId, PatchContactsRequest requestData);
@@ -29,7 +30,7 @@ public interface ICacheRestService {
   Task<(GetHostnamesResponse?, IDomainResult)> GetHostnames(Guid accountId);
 }
 
-public interface ICacheService : ICacheInternalsService, ICacheRestService {}
+public interface ICacheService : ICacheInternalService, ICacheRestService {}
 
 public class CacheService : ICacheService, IDisposable {
   private readonly ILogger<CacheService> _logger;
@@ -237,6 +238,9 @@ public class CacheService : ICacheService, IDisposable {
     return CreateGetAccountResponse(accountId, cache);
   }
 
+  public async Task<IDomainResult> DeleteAccountAsync(Guid accountId) {
+    return await DeleteFromCacheAsync(accountId);
+  }
   #endregion
 
   #region Contacts Operations

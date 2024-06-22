@@ -12,8 +12,8 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
 
     private readonly IOptions<Configuration> _appSettings;
     private readonly ILogger<AutoRenewal> _logger;
-    private readonly ICacheService _cacheService;
-    private readonly ICertsFlowService _certsFlowService;
+    private readonly ICacheInternalService _cacheService;
+    private readonly ICertsInternalService _certsFlowService;
 
     public AutoRenewal(
         IOptions<Configuration> appSettings,
@@ -79,19 +79,13 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
 
       var sessionIdValue = sessionId.Value;
 
-      var (_, initResult) = await _certsFlowService.InitAsync(sessionIdValue, accountId, new InitRequest {
-        Description = description,
-        Contacts = contacts
-      });
+      var (_, initResult) = await _certsFlowService.InitAsync(sessionIdValue, accountId, description, contacts);
       if (!initResult.IsSuccess) {
         LogErrors(initResult.Errors);
         return initResult;
       }
 
-      var (_, newOrderResult) = await _certsFlowService.NewOrderAsync(sessionIdValue, new NewOrderRequest {
-        Hostnames = hostnames,
-        ChallengeType = "http-01"
-      });
+      var (_, newOrderResult) = await _certsFlowService.NewOrderAsync(sessionIdValue, hostnames, "http-01");
       if (!newOrderResult.IsSuccess) {
         LogErrors(newOrderResult.Errors);
         return newOrderResult;
@@ -103,25 +97,19 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
         return challengeResult;
       }
 
-      var getOrderResult = await _certsFlowService.GetOrderAsync(sessionIdValue, new GetOrderRequest {
-        Hostnames = hostnames
-      });
+      var getOrderResult = await _certsFlowService.GetOrderAsync(sessionIdValue, hostnames);
       if (!getOrderResult.IsSuccess) {
         LogErrors(getOrderResult.Errors);
         return getOrderResult;
       }
 
-      var certs = await _certsFlowService.GetCertificatesAsync(sessionIdValue, new GetCertificatesRequest {
-        Hostnames = hostnames
-      });
+      var certs = await _certsFlowService.GetCertificatesAsync(sessionIdValue, hostnames);
       if (!certs.IsSuccess) {
         LogErrors(certs.Errors);
         return certs;
       }
 
-      var (_, applyCertsResult) = await _certsFlowService.ApplyCertificatesAsync(sessionIdValue, new GetCertificatesRequest {
-        Hostnames = hostnames
-      });
+      var (_, applyCertsResult) = await _certsFlowService.ApplyCertificatesAsync(sessionIdValue, hostnames);
       if (!applyCertsResult.IsSuccess) {
         LogErrors(applyCertsResult.Errors);
         return applyCertsResult;

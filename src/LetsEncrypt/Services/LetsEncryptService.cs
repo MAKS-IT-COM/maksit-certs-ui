@@ -18,7 +18,7 @@ namespace MaksIT.LetsEncrypt.Services;
 
 public interface ILetsEncryptService {
   Task<IDomainResult> ConfigureClient(Guid sessionId, string url);
-  Task<IDomainResult> Init(Guid sessionId,Guid accountId, string[] contacts, RegistrationCache? registrationCache);
+  Task<IDomainResult> Init(Guid sessionId,Guid accountId, string description, string[] contacts, RegistrationCache? registrationCache);
   (RegistrationCache?, IDomainResult) GetRegistrationCache(Guid sessionId);
   (string?, IDomainResult) GetTermsOfServiceUri(Guid sessionId);
   Task<(Dictionary<string, string>?, IDomainResult)> NewOrder(Guid sessionId, string[] hostnames, string challengeType);
@@ -76,7 +76,7 @@ public class LetsEncryptService : ILetsEncryptService {
   #endregion
 
   #region Init
-  public async Task<IDomainResult> Init(Guid sessionId, Guid accountId, string[] contacts, RegistrationCache? cache) {
+  public async Task<IDomainResult> Init(Guid sessionId, Guid accountId, string description, string[] contacts, RegistrationCache? cache) {
     if (sessionId == Guid.Empty) {
       _logger.LogError("Invalid sessionId");
       return IDomainResult.Failed();
@@ -129,6 +129,7 @@ public class LetsEncryptService : ILetsEncryptService {
 
         state.Cache = new RegistrationCache {
           AccountId = accountId,
+          Description = description,
           Contacts = contacts,
 
           Location = account.Result.Location,
