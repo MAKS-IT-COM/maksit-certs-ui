@@ -10,7 +10,7 @@ import {
 } from '@/hooks/useValidation'
 import { CustomButton, CustomInput } from '@/controls'
 import { TrashIcon, PlusIcon } from '@heroicons/react/24/solid'
-import { GetAccountResponse } from '@/models/letsEncryptServer/cache/responses/GetAccountResponse'
+import { GetAccountResponse } from '@/models/letsEncryptServer/account/responses/GetAccountResponse'
 import { deepCopy } from './functions'
 import { CacheAccount } from '@/entities/CacheAccount'
 
@@ -50,18 +50,21 @@ export default function Page() {
     const fetchAccounts = async () => {
       const newAccounts: CacheAccount[] = []
       const accounts = await httpService.get<GetAccountResponse[]>(
-        GetApiRoute(ApiRoutes.CACHE_ACCOUNTS)
+        GetApiRoute(ApiRoutes.ACCOUNTS)
       )
 
       accounts?.forEach((account) => {
         newAccounts.push({
           accountId: account.accountId,
+          description: account.description,
           contacts: account.contacts,
-          hostnames: account.hostnames.map((h) => ({
-            hostname: h.hostname,
-            expires: new Date(h.expires),
-            isUpcomingExpire: h.isUpcomingExpire
-          })),
+          challengeType: account.challengeType,
+          hostnames:
+            account.hostnames?.map((h) => ({
+              hostname: h.hostname,
+              expires: new Date(h.expires),
+              isUpcomingExpire: h.isUpcomingExpire
+            })) ?? [],
           isEditMode: false
         })
       })
@@ -97,7 +100,7 @@ export default function Page() {
 
     // TODO: Remove from cache
     httpService.delete(
-      GetApiRoute(ApiRoutes.CACHE_ACCOUNT_CONTACT, accountId, contact)
+      GetApiRoute(ApiRoutes.ACCOUNT_CONTACT, accountId, contact)
     )
 
     setAccounts(
@@ -387,7 +390,9 @@ export default function Page() {
           ) : (
             <>
               <div className="mb-4">
-                <h3 className="text-xl font-medium mb-2">Description:</h3>
+                <h3 className="text-xl font-medium mb-2">
+                  Description: {account.description}
+                </h3>
               </div>
               <div className="mb-4">
                 <h3 className="text-xl font-medium mb-2">Contacts:</h3>
@@ -398,6 +403,11 @@ export default function Page() {
                     </li>
                   ))}
                 </ul>
+              </div>
+              <div className="mb-4">
+                <h3 className="text-xl font-medium mb-2">
+                  Challenge type: {account.challengeType}
+                </h3>
               </div>
               <div>
                 <h3 className="text-xl font-medium mb-2">Hostnames:</h3>

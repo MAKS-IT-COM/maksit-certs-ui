@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
 
-namespace MaksIT.Models.LetsEncryptServer.Cache.Requests {
+namespace MaksIT.Models.LetsEncryptServer.Account.Requests {
   public class PutContactsRequest : IValidatableObject {
 
     public required string[] Contacts { get; set; }

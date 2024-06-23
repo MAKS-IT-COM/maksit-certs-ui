@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MaksIT.Models.LetsEncryptServer.Cache.Requests {
+namespace MaksIT.Models.LetsEncryptServer.Account.Requests {
   public class PatchAccountRequest {
 
     public PatchAction<string>? Description { get; set; }

@@ -29,8 +29,9 @@ builder.Services.AddCors();
 builder.Services.AddMemoryCache();
 
 builder.Services.AddHttpClient<ILetsEncryptService, LetsEncryptService>();
-builder.Services.AddSingleton<ICertsFlowService, CertsFlowService>();
 builder.Services.AddSingleton<ICacheService, CacheService>();
+builder.Services.AddSingleton<ICertsFlowService, CertsFlowService>();
+builder.Services.AddSingleton<IAccountService, AccountService>();
 builder.Services.AddHttpClient<IAgentService, AgentService>();
 builder.Services.AddHostedService<AutoRenewal>();
 

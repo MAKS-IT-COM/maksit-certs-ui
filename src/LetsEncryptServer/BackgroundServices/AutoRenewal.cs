@@ -12,7 +12,7 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
 
     private readonly IOptions<Configuration> _appSettings;
     private readonly ILogger<AutoRenewal> _logger;
-    private readonly ICacheInternalService _cacheService;
+    private readonly ICacheService _cacheService;
     private readonly ICertsInternalService _certsFlowService;
 
     public AutoRenewal(
@@ -61,7 +61,7 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
         return IDomainResult.Success();
       }
 
-      var renewResult = await RenewCertificatesForHostnames(cache.AccountId, cache.Description, cache.Contacts, hostnames);
+      var renewResult = await RenewCertificatesForHostnames(cache.AccountId, cache.Description, cache.Contacts, hostnames, cache.ChallengeType);
       if (!renewResult.IsSuccess)
         return renewResult;
 
@@ -70,7 +70,7 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
       return IDomainResult.Success();
     }
 
-    private async Task<IDomainResult> RenewCertificatesForHostnames(Guid accountId, string description, string[] contacts, string[] hostnames) {
+    private async Task<IDomainResult> RenewCertificatesForHostnames(Guid accountId, string description, string[] contacts, string[] hostnames, string challengeType) {
       var (sessionId, configureClientResult) = await _certsFlowService.ConfigureClientAsync();
       if (!configureClientResult.IsSuccess || sessionId == null) {
         LogErrors(configureClientResult.Errors);
@@ -85,7 +85,7 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
         return initResult;
       }
 
-      var (_, newOrderResult) = await _certsFlowService.NewOrderAsync(sessionIdValue, hostnames, "http-01");
+      var (_, newOrderResult) = await _certsFlowService.NewOrderAsync(sessionIdValue, hostnames, challengeType);
       if (!newOrderResult.IsSuccess) {
         LogErrors(newOrderResult.Errors);
         return newOrderResult;

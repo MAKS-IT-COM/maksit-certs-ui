@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MaksIT.Models.LetsEncryptServer.Cache.Requests {
+namespace MaksIT.Models.LetsEncryptServer.Account.Requests {
   public class PostContactsRequest : IValidatableObject {
 
       public required string[] Contacts { get; set; }

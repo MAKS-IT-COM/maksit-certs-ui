@@ -29,9 +29,10 @@ public class RegistrationCache {
   /// <summary>
   /// Field used to identify cache by account id
   /// </summary>
-  public Guid AccountId { get; set; }
+  public required Guid AccountId { get; set; }
   public string? Description { get; set; }
-  public string[]? Contacts { get; set; }
+  public required string[] Contacts { get; set; }
+  public string? ChallengeType { get; set; }
   #endregion
 
 

@@ -3,89 +3,128 @@
 using DomainResults.Mvc;
 
 using MaksIT.LetsEncryptServer.Services;
-using MaksIT.Models.LetsEncryptServer.Cache.Requests;
+using MaksIT.Models.LetsEncryptServer.Account.Requests;
 
 namespace MaksIT.LetsEncryptServer.Controllers;
 
 [ApiController]
-[Route("api/account")]
+[Route("api")]
 public class AccountController : ControllerBase {
-  private readonly ICacheRestService _cacheService;
-  private readonly ICertsFlowService _certsFlowService;
+  private readonly IAccountRestService _accountService;
 
   public AccountController(
-      ICacheService cacheService,
-      ICertsFlowService certsFlowService
+      IAccountService accountService
   ) {
-    _cacheService = cacheService;
-    _certsFlowService = certsFlowService;
+    _accountService = accountService;
   }
 
+  #region Accounts
 
-  [HttpPost]
+  [HttpGet("accounts")]
+  public async Task<IActionResult> GetAccounts() {
+    var result = await _accountService.GetAccountsAsync();
+    return result.ToActionResult();
+  }
+
+  #endregion
+
+  #region Account
+
+  [HttpPost("account")]
   public async Task<IActionResult> PostAccount([FromBody] PostAccountRequest requestData) {
-    //var result = await _cacheService.PostAccountAsync(requestData);
+    var result = await _accountService.PostAccountAsync(requestData);
+    return result.ToActionResult();
+  }
+
+  [HttpPut("account/{accountId:guid}")]
+  public async Task<IActionResult> PutAccount(Guid accountId, [FromBody] PutAccountRequest requestData) {
+    var result = await _accountService.PutAccountAsync(accountId, requestData);
+    return result.ToActionResult();
+  }
+
+  [HttpPatch("account/{accountId:guid}")]
+  public async Task<IActionResult> PatchAccount(Guid accountId, [FromBody] PatchAccountRequest requestData) {
+    var result = await _accountService.PatchAccountAsync(accountId, requestData);
+    return result.ToActionResult();
+  }
+
+  [HttpDelete("account/{accountd:guid}")]
+  public async Task<IActionResult> DeleteAccount(Guid accountId) {
+    var result = await _accountService.DeleteAccountAsync(accountId);
+    return result.ToActionResult();
+  }
+
+  #endregion
+
+  #region Account Contacts
+
+  [HttpGet("account/{accountId:guid}/contacts")]
+  public async Task<IActionResult> GetContacts(Guid accountId) {
+    var result = await _accountService.GetContactsAsync(accountId);
+    return result.ToActionResult();
+  }
+
+  [HttpPost("account/{accountId:guid}/contacts")]
+  public async Task<IActionResult> PostContacts(Guid accountId, [FromBody] PostContactsRequest requestData) {
+    //var result = await _accountService.PostContactsAsync(accountId, requestData);
     //return result.ToActionResult();
 
     return BadRequest("Not implemented");
   }
 
-  [HttpPut("{accountId:guid}")]
-  public async Task<IActionResult> PutAccount(Guid accountId, [FromBody] PutAccountRequest requestData) {
-    var result = await _cacheService.PutAccountAsync(accountId, requestData);
-    return result.ToActionResult();
-  }
-
-  [HttpPatch("{accountId:guid}")]
-  public async Task<IActionResult> PatchAccount(Guid accountId, [FromBody] PatchAccountRequest requestData) {
-    var result = await _cacheService.PatchAccountAsync(accountId, requestData);
-    return result.ToActionResult();
-  }
-
-  [HttpDelete("{accountd:guid}")]
-  public async Task<IActionResult> DeleteAccount(Guid accountId) {
-    var result = await _cacheService.DeleteAccountAsync(accountId);
-    return result.ToActionResult();
-  }
-
-  #region Contacts
-
-  [HttpGet("{accountId:guid}/contacts")]
-  public async Task<IActionResult> GetContacts(Guid accountId) {
-    var result = await _cacheService.GetContactsAsync(accountId);
-    return result.ToActionResult();
-  }
-
-  [HttpPut("{accountId:guid}/contacts")]
+  [HttpPut("account/{accountId:guid}/contacts")]
   public async Task<IActionResult> PutContacts(Guid accountId, [FromBody] PutContactsRequest requestData) {
-    var result = await _cacheService.PutContactsAsync(accountId, requestData);
+    var result = await _accountService.PutContactsAsync(accountId, requestData);
     return result.ToActionResult();
   }
 
-  [HttpPatch("{accountId:guid}/contacts")]
+  [HttpPatch("account/{accountId:guid}/contacts")]
   public async Task<IActionResult> PatchContacts(Guid accountId, [FromBody] PatchContactsRequest requestData) {
-    var result = await _cacheService.PatchContactsAsync(accountId, requestData);
+    var result = await _accountService.PatchContactsAsync(accountId, requestData);
     return result.ToActionResult();
   }
 
-  [HttpDelete("{accountId:guid}/contact/{index:int}")]
+  [HttpDelete("account/{accountId:guid}/contact/{index:int}")]
   public async Task<IActionResult> DeleteContact(Guid accountId, int index) {
-    var result = await _cacheService.DeleteContactAsync(accountId, index);
+    var result = await _accountService.DeleteContactAsync(accountId, index);
     return result.ToActionResult();
   }
   #endregion
 
-  #region Hostnames
+  #region Account Hostnames
 
   [HttpGet("{accountId:guid}/hostnames")]
   public async Task<IActionResult> GetHostnames(Guid accountId) {
-    var result = await _cacheService.GetHostnames(accountId);
+    var result = await _accountService.GetHostnames(accountId);
     return result.ToActionResult();
   }
 
-  [HttpPost("{accountId:guid}")]
+  [HttpPost("account/{accountId:guid}/hostnames")]
+  public async Task<IActionResult> PostHostname(Guid accountId, [FromBody] PostHostnamesRequest requestData) {
+    //var result = await _cacheService.PostHostnameAsync(accountId, requestData);
+    //return result.ToActionResult();
 
-  [HttpDelete("{accountId:guid}/hostname/{index:int}")]
+    return BadRequest("Not implemented");
+  }
+
+  [HttpPut("account/{accountId:guid}/hostnames")]
+  public async Task<IActionResult> PutHostname(Guid accountId, [FromBody] PutHostnamesRequest requestData) {
+    //var result = await _cacheService.PutHostnameAsync(accountId, requestData);
+    //return result.ToActionResult();
+
+    return BadRequest("Not implemented");
+  }
+
+  [HttpPatch("account/{accountId:guid}/hostnames")]
+  public async Task<IActionResult> PatchHostname(Guid accountId, [FromBody] PatchHostnamesRequest requestData) {
+    //var result = await _cacheService.PatchHostnameAsync(accountId, requestData);
+    //return result.ToActionResult();
+
+    return BadRequest("Not implemented");
+  }
+
+
+  [HttpDelete("account/{accountId:guid}/hostname/{index:int}")]
   public async Task<IActionResult> DeleteHostname(Guid accountId, int index) {
     //var result = await _cacheService.DeleteHostnameAsync(accountId, index);
     //return result.ToActionResult();

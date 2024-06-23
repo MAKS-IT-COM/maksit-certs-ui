@@ -2,6 +2,8 @@ import { HostnameResponse } from './HostnameResponse'
 
 export interface GetAccountResponse {
   accountId: string
+  description?: string
   contacts: string[]
-  hostnames: HostnameResponse[]
+  challengeType?: string
+  hostnames?: HostnameResponse[]
 }

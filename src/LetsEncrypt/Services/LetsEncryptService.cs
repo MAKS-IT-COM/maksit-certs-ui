@@ -1,8 +1,13 @@
 using System.Text;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Net.Http.Headers;
+
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+
+using DomainResults.Common;
+
 using MaksIT.LetsEncrypt.Entities;
 using MaksIT.LetsEncrypt.Exceptions;
 using MaksIT.Core.Extensions;
@@ -10,9 +15,6 @@ using MaksIT.LetsEncrypt.Models.Responses;
 using MaksIT.LetsEncrypt.Models.Interfaces;
 using MaksIT.LetsEncrypt.Models.Requests;
 using MaksIT.LetsEncrypt.Entities.Jws;
-using DomainResults.Common;
-using System.Net.Http.Headers;
-using System.Security.Principal;
 
 namespace MaksIT.LetsEncrypt.Services;
 
@@ -230,6 +232,7 @@ public class LetsEncryptService : ILetsEncryptService {
 
         var challenge = challengeResponse.Result.Challenges.First(x => x.Type == challengeType);
         state.Challenges.Add(challenge);
+        state.Cache.ChallengeType = challengeType;
 
         var keyToken = state.JwsService.GetKeyAuthorization(challenge.Token);
 
