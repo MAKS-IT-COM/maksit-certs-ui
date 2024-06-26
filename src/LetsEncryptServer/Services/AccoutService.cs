@@ -1,10 +1,6 @@
-﻿using System.Text.Json;
+﻿using DomainResults.Common;
 
-using DomainResults.Common;
-
-using MaksIT.Core.Extensions;
 using MaksIT.LetsEncrypt.Entities;
-using MaksIT.LetsEncrypt.Models.Responses;
 using MaksIT.Models;
 using MaksIT.Models.LetsEncryptServer.Account.Requests;
 using MaksIT.Models.LetsEncryptServer.Account.Responses;
@@ -53,41 +49,30 @@ public class AccountService : IAccountService {
   #region Accounts
 
   public async Task<(GetAccountResponse[]?, IDomainResult)> GetAccountsAsync() {
-   
+
     var (caches, result) = await _cacheService.LoadAccountsFromCacheAsync();
     if (!result.IsSuccess || caches == null) {
       return (null, result);
     }
 
-    var accounts = caches.Select(cache => new GetAccountResponse {
-      AccountId = cache.AccountId,
-      Description = cache.Description,
-      Contacts = cache.Contacts,
-      ChallengeType = cache.ChallengeType,
-      Hostnames = GetHostnamesFromCache(cache).ToArray()
-    });
+    var accounts = caches
+      .Select(x => CreateGetAccountResponse(x.AccountId, x))
+      .ToArray();
 
-    return IDomainResult.Success(accounts.ToArray());
+    return IDomainResult.Success(accounts);
   }
 
   public async Task<(GetAccountResponse?, IDomainResult)> GetAccountAsync(Guid accountId) {
-      var (cache, result) = await _cacheService.LoadAccountFromCacheAsync(accountId);
-      if (!result.IsSuccess || cache == null) {
-        return (null, result);
-      }
+    var (cache, result) = await _cacheService.LoadAccountFromCacheAsync(accountId);
+    if (!result.IsSuccess || cache == null) {
+      return (null, result);
+    }
 
-      var response = new GetAccountResponse {
-        AccountId = accountId,
-        Description = cache.Description,
-        Contacts = cache.Contacts,
-        Hostnames = GetHostnamesFromCache(cache).ToArray()
-      };
-
-      return IDomainResult.Success(response);
+    return IDomainResult.Success(CreateGetAccountResponse(accountId, cache));
   }
 
   public async Task<(GetAccountResponse?, IDomainResult)> PostAccountAsync(PostAccountRequest requestData) {
-    var (sessionId, configureClientResult) = await _certsFlowService.ConfigureClientAsync();
+    var (sessionId, configureClientResult) = await _certsFlowService.ConfigureClientAsync(requestData.IsStaging);
     if (!configureClientResult.IsSuccess || sessionId == null) {
       //LogErrors(configureClientResult.Errors);
       return (null, configureClientResult);
@@ -147,7 +132,7 @@ public class AccountService : IAccountService {
       return (null, saveResult);
     }
 
-    return CreateGetAccountResponse(accountId, cache);
+    return IDomainResult.Success(CreateGetAccountResponse(accountId, cache));
   }
 
   public async Task<(GetAccountResponse?, IDomainResult)> PatchAccountAsync(Guid accountId, PatchAccountRequest requestData) {
@@ -190,7 +175,7 @@ public class AccountService : IAccountService {
       return (null, saveResult);
     }
 
-    return CreateGetAccountResponse(accountId, cache);
+    return IDomainResult.Success(CreateGetAccountResponse(accountId, cache));
   }
 
   public async Task<IDomainResult> DeleteAccountAsync(Guid accountId) {
@@ -227,7 +212,7 @@ public class AccountService : IAccountService {
       return (null, saveResult);
     }
 
-    return CreateGetAccountResponse(accountId, cache);
+    return IDomainResult.Success(CreateGetAccountResponse(accountId, cache));
   }
 
   public async Task<(GetAccountResponse?, IDomainResult)> PatchContactsAsync(Guid accountId, PatchContactsRequest requestData) {
@@ -266,7 +251,7 @@ public class AccountService : IAccountService {
       return (null, saveResult);
     }
 
-    return CreateGetAccountResponse(accountId, cache);
+    return IDomainResult.Success(CreateGetAccountResponse(accountId, cache));
   }
 
   public async Task<IDomainResult> DeleteContactAsync(Guid accountId, int index) {
@@ -311,7 +296,8 @@ public class AccountService : IAccountService {
     var hosts = cache.GetHosts().Select(x => new HostnameResponse {
       Hostname = x.Hostname,
       Expires = x.Expires,
-      IsUpcomingExpire = x.IsUpcomingExpire
+      IsUpcomingExpire = x.IsUpcomingExpire,
+      IsDisabled = x.IsDisabled
     }).ToList();
 
     return hosts;
@@ -321,15 +307,18 @@ public class AccountService : IAccountService {
 
   #region Helper Methods
 
-  private (GetAccountResponse?, IDomainResult) CreateGetAccountResponse(Guid accountId, RegistrationCache cache) {
-    var hostnames = GetHostnamesFromCache(cache) ?? new List<HostnameResponse>();
+  private GetAccountResponse CreateGetAccountResponse(Guid accountId, RegistrationCache cache) {
+    var hostnames = GetHostnamesFromCache(cache) ?? [];
 
-    return (new GetAccountResponse {
+    return new GetAccountResponse {
       AccountId = accountId,
+      IsDisabled = cache.IsDisabled,
       Description = cache.Description,
       Contacts = cache.Contacts,
-      Hostnames = hostnames.ToArray()
-    }, IDomainResult.Success());
+      ChallengeType = cache.ChallengeType,
+      Hostnames = [.. hostnames],
+      IsStaging = cache.IsStaging
+    };
   }
 
 

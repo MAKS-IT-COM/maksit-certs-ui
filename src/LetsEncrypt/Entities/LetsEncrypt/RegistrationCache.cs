@@ -6,22 +6,6 @@ using System.Security.Cryptography.X509Certificates;
 using MaksIT.LetsEncrypt.Entities.Jws;
 
 namespace MaksIT.LetsEncrypt.Entities;
-public class CertificateCache {
-  public string? Cert { get; set; }
-  public byte[]? Private { get; set; }
-}
-
-public class CachedHostname {
-  public string Hostname { get; set; }
-  public DateTime Expires { get; set; }
-  public bool IsUpcomingExpire { get; set; }
-
-  public CachedHostname(string hostname, DateTime expires, bool isUpcomingExpire) {
-    Hostname = hostname;
-    Expires = expires;
-    IsUpcomingExpire = isUpcomingExpire;
-  }
-}
 
 public class RegistrationCache {
 
@@ -30,9 +14,12 @@ public class RegistrationCache {
   /// Field used to identify cache by account id
   /// </summary>
   public required Guid AccountId { get; set; }
+  public bool IsDisabled { get; set; }
   public string? Description { get; set; }
   public required string[] Contacts { get; set; }
   public string? ChallengeType { get; set; }
+
+  public required bool IsStaging { get; set; }
   #endregion
 
 
@@ -54,7 +41,7 @@ public class RegistrationCache {
     foreach (var result in CachedCerts) {
       var (subject, cachedChert) = result;
 
-      if (cachedChert.Cert != null) {
+      if (cachedChert.Cert != null && !cachedChert.IsDisabled) {
         var cert = new X509Certificate2(Encoding.ASCII.GetBytes(cachedChert.Cert));
 
         // if it is about to expire, we need to refresh
@@ -79,7 +66,12 @@ public class RegistrationCache {
       if (cachedChert.Cert != null) {
         var cert = new X509Certificate2(Encoding.ASCII.GetBytes(cachedChert.Cert));
 
-        hosts.Add(new CachedHostname(subject, cert.NotAfter, (cert.NotAfter - DateTime.UtcNow).TotalDays < 30));
+        hosts.Add(new CachedHostname(
+          subject,
+          cert.NotAfter,
+          (cert.NotAfter - DateTime.UtcNow).TotalDays < 30,
+          cachedChert.IsDisabled
+        ));
       }
     }
 
@@ -92,7 +84,7 @@ public class RegistrationCache {
   /// <param name="subject"></param>
   /// <param name="value"></param>
   /// <returns></returns>
-  public bool TryGetCachedCertificate(string subject, out CachedCertificateResult? value) {
+  public bool TryGetCachedCertificate(string subject, out CertificateCache? value) {
     value = null;
 
     if (CachedCerts == null)
@@ -110,9 +102,10 @@ public class RegistrationCache {
     var rsa = new RSACryptoServiceProvider(4096);
     rsa.ImportCspBlob(cache.Private);
 
-    value = new CachedCertificateResult {
-      Certificate = cache.Cert,
-      PrivateKey = rsa
+    value = new CertificateCache {
+      Cert = cache.Cert,
+      Private = rsa.ExportCspBlob(true),
+      PrivatePem = rsa.ExportRSAPrivateKeyPem()
     };
     return true;
   }

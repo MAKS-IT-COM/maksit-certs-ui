@@ -4,33 +4,34 @@ import { ToastContainer, toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '@/redux/store'
-import { clearToast } from '@/redux/slices/toastSlice'
+import { clearToast, removeToast } from '@/redux/slices/toastSlice'
 
 const Toast = () => {
   const dispatch = useDispatch()
   const toastState = useSelector((state: RootState) => state.toast)
 
   useEffect(() => {
-    if (toastState.message) {
-      switch (toastState.type) {
+    toastState.messages.forEach((toastMessage) => {
+      switch (toastMessage.type) {
         case 'success':
-          toast.success(toastState.message)
+          toast.success(toastMessage.message)
           break
         case 'error':
-          toast.error(toastState.message)
+          toast.error(toastMessage.message)
           break
         case 'info':
-          toast.info(toastState.message)
+          toast.info(toastMessage.message)
           break
         case 'warning':
-          toast.warn(toastState.message)
+          toast.warn(toastMessage.message)
           break
         default:
-          toast(toastState.message)
+          toast(toastMessage.message)
           break
       }
-      dispatch(clearToast())
-    }
+
+      dispatch(removeToast(toastMessage.id))
+    })
   }, [toastState, dispatch])
 
   return (

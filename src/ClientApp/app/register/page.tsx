@@ -1,31 +1,56 @@
 'use client'
 
-import { ApiRoutes, GetApiRoute } from '@/ApiRoutes'
-import { httpService } from '@/services/httpService'
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import {
   useValidation,
+  isBypass,
   isValidContact,
   isValidHostname
 } from '@/hooks/useValidation'
-import { CustomButton, CustomInput } from '@/controls'
+import {
+  CustomButton,
+  CustomEnumSelect,
+  CustomInput,
+  CustomRadioGroup
+} from '@/controls'
 import { FaTrash, FaPlus } from 'react-icons/fa'
 import { deepCopy } from '../functions'
 import {
   PostAccountRequest,
   validatePostAccountRequest
 } from '@/models/letsEncryptServer/certsFlow/PostAccountRequest'
-import App from 'next/app'
 import { useAppDispatch } from '@/redux/store'
 import { showToast } from '@/redux/slices/toastSlice'
+import { ChallengeTypes } from '@/entities/ChallengeTypes'
+import { GetAccountResponse } from '@/models/letsEncryptServer/account/responses/GetAccountResponse'
+import { httpService } from '@/services/httpService'
+import { ApiRoutes, GetApiRoute } from '@/ApiRoutes'
+import { PageContainer } from '@/components/pageContainer'
 
 const RegisterPage = () => {
-  const [account, setAccount] = useState<PostAccountRequest | null>(null)
+  const [account, setAccount] = useState<PostAccountRequest>({
+    description: '',
+    contacts: [],
+    challengeType: '',
+    hostnames: [],
+    isStaging: true
+  })
 
   const dispatch = useAppDispatch()
 
   const {
-    value: newContact,
+    value: description,
+    error: descriptionError,
+    handleChange: handleDescriptionChange,
+    reset: resetDescription
+  } = useValidation<string>({
+    initialValue: '',
+    validateFn: isBypass,
+    errorMessage: ''
+  })
+
+  const {
+    value: contact,
     error: contactError,
     handleChange: handleContactChange,
     reset: resetContact
@@ -36,7 +61,18 @@ const RegisterPage = () => {
   })
 
   const {
-    value: newHostname,
+    value: challengeType,
+    error: challengeTypeError,
+    handleChange: handleChallengeTypeChange,
+    reset: resetChallengeType
+  } = useValidation<string>({
+    initialValue: ChallengeTypes.http01,
+    validateFn: isBypass,
+    errorMessage: ''
+  })
+
+  const {
+    value: hostname,
     error: hostnameError,
     handleChange: handleHostnameChange,
     reset: resetHostname
@@ -47,19 +83,25 @@ const RegisterPage = () => {
   })
 
   const init = useRef(false)
-
   useEffect(() => {
     if (init.current) return
 
     init.current = true
   }, [])
 
-  const handleDescription = (description: string) => {}
+  useEffect(() => {
+    setAccount((prev) => {
+      const newAccount = deepCopy(prev)
+      newAccount.description = description
+      newAccount.challengeType = challengeType
+      return newAccount
+    })
+  }, [description, challengeType])
 
   const handleAddContact = () => {
     if (
-      newContact === '' ||
-      account?.contacts.includes(newContact) ||
+      contact === '' ||
+      account?.contacts.includes(contact) ||
       contactError !== ''
     ) {
       resetContact()
@@ -67,26 +109,26 @@ const RegisterPage = () => {
     }
 
     setAccount((prev) => {
-      const newAccount: PostAccountRequest =
-        prev !== null
-          ? deepCopy(prev)
-          : {
-              contacts: [],
-              hostnames: []
-            }
-
-      newAccount.contacts.push(newContact)
-
+      const newAccount = deepCopy(prev)
+      newAccount.contacts.push(contact)
       return newAccount
     })
 
     resetContact()
   }
 
+  const handleDeleteContact = (contact: string) => {
+    setAccount((prev) => {
+      const newAccount = deepCopy(prev)
+      newAccount.contacts = newAccount.contacts.filter((c) => c !== contact)
+      return newAccount
+    })
+  }
+
   const handleAddHostname = () => {
     if (
-      newHostname === '' ||
-      account?.hostnames.includes(newHostname) ||
+      hostname === '' ||
+      account?.hostnames.includes(hostname) ||
       hostnameError !== ''
     ) {
       resetHostname()
@@ -94,40 +136,18 @@ const RegisterPage = () => {
     }
 
     setAccount((prev) => {
-      const newAccount: PostAccountRequest =
-        prev !== null
-          ? deepCopy(prev)
-          : {
-              contacts: [],
-              hostnames: []
-            }
-
-      newAccount.hostnames.push(newHostname)
-
+      const newAccount = deepCopy(prev)
+      newAccount.hostnames.push(hostname)
       return newAccount
     })
 
     resetHostname()
   }
 
-  const handleDeleteContact = (contact: string) => {
-    setAccount((prev) => {
-      if (prev === null) return null
-
-      const newAccount = deepCopy(prev)
-      newAccount.contacts = newAccount.contacts.filter((c) => c !== contact)
-
-      return newAccount
-    })
-  }
-
   const handleDeleteHostname = (hostname: string) => {
     setAccount((prev) => {
-      if (prev === null) return null
-
       const newAccount = deepCopy(prev)
       newAccount.hostnames = newAccount.hostnames.filter((h) => h !== hostname)
-
       return newAccount
     })
   }
@@ -135,41 +155,49 @@ const RegisterPage = () => {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
-    const error = validatePostAccountRequest(account)
-    if (error) {
-      console.error(`Validation failed: ${error}`)
-      // dipatch toasterror
-      dispatch(showToast({ message: error, type: 'error' }))
+    const errors = validatePostAccountRequest(account)
 
-      return
+    if (errors.length > 0) {
+      errors.forEach((error) => {
+        dispatch(showToast({ message: error, type: 'error' }))
+      })
+    } else {
+      dispatch(
+        showToast({ message: 'Request model is valid', type: 'success' })
+      )
+
+      httpService
+        .post<
+          PostAccountRequest,
+          GetAccountResponse
+        >(GetApiRoute(ApiRoutes.ACCOUNT), account)
+        .then((response) => {
+          console.log(response)
+          dispatch(showToast({ message: 'Account created', type: 'success' }))
+        })
     }
-
-    // httpService.post<PostAccountRequest, GetAccountResponse>('', account)
-
-    console.log(account)
   }
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-4xl font-bold text-center mb-8">
-        Register LetsEncrypt Account
-      </h1>
+    <PageContainer title="Register LetsEncrypt Account">
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
           <CustomInput
-            type="text"
-            value={account?.description ?? ''}
-            onChange={handleDescription}
+            value={account.description}
+            onChange={handleDescriptionChange}
             placeholder="Account Description"
+            type="text"
+            error={descriptionError}
             title="Description"
             inputClassName="border p-2 rounded w-full"
-            className="mb-4"
+            errorClassName="text-red-500 text-sm mt-1"
+            className="mr-2 flex-grow"
           />
         </div>
         <div className="mb-4">
           <h3 className="text-xl font-medium mb-2">Contacts:</h3>
           <ul className="list-disc list-inside pl-4 mb-2">
-            {account?.contacts.map((contact) => (
+            {account.contacts.map((contact) => (
               <li
                 key={contact}
                 className="text-gray-700 flex justify-between items-center mb-2"
@@ -187,7 +215,7 @@ const RegisterPage = () => {
           </ul>
           <div className="flex items-center mb-4">
             <CustomInput
-              value={newContact}
+              value={contact}
               onChange={handleContactChange}
               placeholder="Add contact"
               type="text"
@@ -208,9 +236,22 @@ const RegisterPage = () => {
           </div>
         </div>
         <div className="mb-4">
+          <CustomEnumSelect
+            error={challengeTypeError}
+            title="Challenge Type"
+            enumType={ChallengeTypes}
+            selectedValue={account.challengeType}
+            onChange={handleChallengeTypeChange}
+            selectBoxClassName="border p-2 rounded w-full"
+            errorClassName="text-red-500 text-sm mt-1"
+            className="mr-2 flex-grow"
+          />
+        </div>
+
+        <div className="mb-4">
           <h3 className="text-xl font-medium mb-2">Hostnames:</h3>
           <ul className="list-disc list-inside pl-4 mb-2">
-            {account?.hostnames.map((hostname) => (
+            {account.hostnames.map((hostname) => (
               <li
                 key={hostname}
                 className="text-gray-700 flex justify-between items-center mb-2"
@@ -228,7 +269,7 @@ const RegisterPage = () => {
           </ul>
           <div className="flex items-center">
             <CustomInput
-              value={newHostname}
+              value={hostname}
               onChange={handleHostnameChange}
               placeholder="Add hostname"
               type="text"
@@ -248,6 +289,28 @@ const RegisterPage = () => {
             </CustomInput>
           </div>
         </div>
+
+        <div className="mb-4">
+          <CustomRadioGroup
+            options={[
+              { value: 'staging', label: 'Staging' },
+              { value: 'production', label: 'Production' }
+            ]}
+            initialValue={account.isStaging ? 'staging' : 'production'}
+            onChange={(value) => {
+              setAccount((prev) => {
+                const newAccount = deepCopy(prev)
+                newAccount.isStaging = value === 'staging'
+                return newAccount
+              })
+            }}
+            title="LetsEncrypt Environment"
+            className=""
+            radioClassName=""
+            errorClassName="text-red-500 text-sm mt-1"
+          />
+        </div>
+
         <CustomButton
           type="submit"
           className="bg-green-500 text-white px-3 py-1 rounded"
@@ -255,7 +318,7 @@ const RegisterPage = () => {
           Create Account
         </CustomButton>
       </form>
-    </div>
+    </PageContainer>
   )
 }
 

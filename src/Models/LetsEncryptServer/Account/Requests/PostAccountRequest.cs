@@ -4,9 +4,9 @@ namespace MaksIT.Models.LetsEncryptServer.Account.Requests {
   public class PostAccountRequest : IValidatableObject {
     public required string Description { get; set; }
     public required string[] Contacts { get; set; }
-    public required string[] Hostnames { get; set; }
-
     public required string ChallengeType { get; set; }
+    public required string[] Hostnames { get; set; }
+    public required bool IsStaging { get; set; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext) {
       if (string.IsNullOrWhiteSpace(Description))

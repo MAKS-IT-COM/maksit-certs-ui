@@ -1,3 +1,4 @@
 import { deepCopy } from './deepCopy'
+import { enumToArray, enumToObject } from './enums'
 
-export { deepCopy }
+export { deepCopy, enumToArray, enumToObject }

@@ -11,7 +11,6 @@
   public class Configuration {    
     public required string Production { get; set; }
     public required string Staging { get; set; }
-    public required bool DevMode { get; set; }
     public required Agent Agent { get; set; }
   }
 }

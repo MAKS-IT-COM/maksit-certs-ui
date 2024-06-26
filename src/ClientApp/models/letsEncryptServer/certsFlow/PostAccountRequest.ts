@@ -1,32 +1,57 @@
 import { isValidContact, isValidHostname } from '@/hooks/useValidation'
 
 export interface PostAccountRequest {
-  description?: string
+  description: string
   contacts: string[]
+  challengeType: string
   hostnames: string[]
+  isStaging: boolean
 }
 
 const validatePostAccountRequest = (
   request: PostAccountRequest | null
-): string | null => {
-  if (request === null) return 'Request is null'
+): string[] => {
+  const errors: string[] = []
+
+  if (request === null) {
+    errors.push('Request is null')
+    return errors
+  }
+
+  // Validate description
+  if (request.description === '') {
+    errors.push('Description cannot be empty')
+  }
 
   // Validate contacts
-  for (const contact of request.contacts) {
+  if (request.contacts.length === 0) {
+    errors.push('Contacts cannot be empty')
+  }
+
+  request.contacts.forEach((contact) => {
     if (!isValidContact(contact)) {
-      return `Invalid contact: ${contact}`
+      errors.push(`Invalid contact: ${contact}`)
     }
+  })
+
+  // Validate challenge type
+  if (request.challengeType === '') {
+    errors.push('Challenge type cannot be empty')
   }
 
   // Validate hostnames
-  for (const hostname of request.hostnames) {
-    if (!isValidHostname(hostname)) {
-      return `Invalid hostname: ${hostname}`
-    }
+  if (request.hostnames.length === 0) {
+    errors.push('Hostnames cannot be empty')
   }
 
-  // If all validations pass, return null
-  return null
+  request.hostnames.forEach((hostname) => {
+    if (!isValidHostname(hostname)) {
+      errors.push(`Invalid hostname: ${hostname}`)
+    }
+  })
+
+  // Return the array of errors
+  return errors
 }
 
 export { validatePostAccountRequest }

@@ -15,11 +15,12 @@ using MaksIT.LetsEncrypt.Models.Responses;
 using MaksIT.LetsEncrypt.Models.Interfaces;
 using MaksIT.LetsEncrypt.Models.Requests;
 using MaksIT.LetsEncrypt.Entities.Jws;
+using MaksIT.LetsEncrypt.Entities.LetsEncrypt;
 
 namespace MaksIT.LetsEncrypt.Services;
 
 public interface ILetsEncryptService {
-  Task<IDomainResult> ConfigureClient(Guid sessionId, string url);
+  Task<IDomainResult> ConfigureClient(Guid sessionId, bool isStaging);
   Task<IDomainResult> Init(Guid sessionId,Guid accountId, string description, string[] contacts, RegistrationCache? registrationCache);
   (RegistrationCache?, IDomainResult) GetRegistrationCache(Guid sessionId);
   (string?, IDomainResult) GetTermsOfServiceUri(Guid sessionId);
@@ -27,8 +28,6 @@ public interface ILetsEncryptService {
   Task<IDomainResult> CompleteChallenges(Guid sessionId);
   Task<IDomainResult> GetOrder(Guid sessionId, string[] hostnames);
   Task<IDomainResult> GetCertificate(Guid sessionId, string subject);
-  (string[]?, IDomainResult) HostsWithUpcomingSslExpiry(Guid sessionId);
-  (CachedCertificateResult?, IDomainResult) TryGetCachedCertificate(Guid sessionId, string subject);
 }
 
 public class LetsEncryptService : ILetsEncryptService {
@@ -54,11 +53,17 @@ public class LetsEncryptService : ILetsEncryptService {
   }
 
   #region ConfigureClient
-  public async Task<IDomainResult> ConfigureClient(Guid sessionId, string url) {
+  public async Task<IDomainResult> ConfigureClient(Guid sessionId, bool isStaging) {
     try {
       var state = GetOrCreateState(sessionId);
 
-      _httpClient.BaseAddress ??= new Uri(url);
+      state.IsStaging = isStaging;
+      // TODO: need to propagate from Configuration
+      _httpClient.BaseAddress ??= new Uri(isStaging
+        ? "https://acme-staging-v02.api.letsencrypt.org/directory"
+        : "https://acme-v02.api.letsencrypt.org/directory");
+
+      
 
       if (state.Directory == null) {
         var (directory, getAcmeDirectoryResult) = await SendAsync<AcmeDirectory>(sessionId, HttpMethod.Get, new Uri("directory", UriKind.Relative), false, null);
@@ -133,6 +138,7 @@ public class LetsEncryptService : ILetsEncryptService {
           AccountId = accountId,
           Description = description,
           Contacts = contacts,
+          IsStaging = state.IsStaging,
 
           Location = account.Result.Location,
           AccountKey = accountKey.ExportCspBlob(true),
@@ -307,7 +313,7 @@ public class LetsEncryptService : ILetsEncryptService {
           await Task.Delay(1000);
 
           if ((DateTime.UtcNow - start).Seconds > 120)
-            throw new TimeoutException();
+            return IDomainResult.Failed("Timeout");
         }
       }
 
@@ -421,7 +427,8 @@ public class LetsEncryptService : ILetsEncryptService {
       state.Cache.CachedCerts ??= new Dictionary<string, CertificateCache>();
       state.Cache.CachedCerts[subject] = new CertificateCache {
         Cert = pem.Result,
-        Private = key.ExportCspBlob(true)
+        Private = key.ExportCspBlob(true),
+        PrivatePem = key.ExportRSAPrivateKeyPem()
       };
 
       var cert = new X509Certificate2(Encoding.UTF8.GetBytes(pem.Result));
@@ -434,29 +441,6 @@ public class LetsEncryptService : ILetsEncryptService {
       _logger.LogError(ex, message);
       return IDomainResult.CriticalDependencyError(message);
     }
-  }
-  #endregion
-
-  #region TryGetCachedCertificate
-  public (string[]?, IDomainResult) HostsWithUpcomingSslExpiry(Guid sessionId) {
-
-    var state = GetOrCreateState(sessionId);
-    if (state.Cache == null)
-      return IDomainResult.Failed<string[]?>();
-
-    return IDomainResult.Success(state.Cache.GetHostsWithUpcomingSslExpiry());
-  }
-
-  public (CachedCertificateResult?, IDomainResult) TryGetCachedCertificate(Guid sessionId, string subject) {
-
-    var state = GetOrCreateState(sessionId);
-    
-    var certRes = new CachedCertificateResult();
-    if (state.Cache != null && state.Cache.TryGetCachedCertificate(subject, out certRes)) {
-      return IDomainResult.Success(certRes);
-    }
-
-    return IDomainResult.Failed<CachedCertificateResult?>();
   }
   #endregion
 
@@ -679,13 +663,4 @@ public class LetsEncryptService : ILetsEncryptService {
     };
   }
   #endregion
-
-  private class State {
-    public AcmeDirectory? Directory { get; set; }
-    public JwsService? JwsService { get; set; }
-    public Order? CurrentOrder { get; set; }
-    public List<AuthorizationChallenge> Challenges { get; } = new List<AuthorizationChallenge>();
-    public string? Nonce { get; set; }
-    public RegistrationCache? Cache { get; set; }
-  }
 }

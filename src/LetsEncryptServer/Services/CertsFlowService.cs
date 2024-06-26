@@ -5,17 +5,19 @@ using DomainResults.Common;
 using MaksIT.LetsEncrypt.Entities;
 using MaksIT.LetsEncrypt.Services;
 using MaksIT.Models.LetsEncryptServer.CertsFlow.Requests;
+using System.Security.Cryptography;
 
 
 namespace MaksIT.LetsEncryptServer.Services;
 
 public interface ICertsCommonService {
-  Task<(Guid?, IDomainResult)> ConfigureClientAsync();
+
   (string?, IDomainResult) GetTermsOfService(Guid sessionId);
   Task<IDomainResult> CompleteChallengesAsync(Guid sessionId);
 }
 
 public interface ICertsInternalService : ICertsCommonService {
+  Task<(Guid?, IDomainResult)> ConfigureClientAsync(bool isStaging);
   Task<(Guid?, IDomainResult)> InitAsync(Guid sessionId, Guid? accountId, string description, string[] contacts);
   Task<(List<string>?, IDomainResult)> NewOrderAsync(Guid sessionId, string[] hostnames, string challengeType);
   Task<IDomainResult> GetOrderAsync(Guid sessionId, string[] hostnames);
@@ -24,6 +26,7 @@ public interface ICertsInternalService : ICertsCommonService {
 }
 
 public interface ICertsRestService : ICertsCommonService {
+  Task<(Guid?, IDomainResult)> ConfigureClientAsync(ConfigureClientRequest requestData);
   Task<(Guid?, IDomainResult)> InitAsync(Guid sessionId, Guid? accountId, InitRequest requestData);
   Task<(List<string>?, IDomainResult)> NewOrderAsync(Guid sessionId, NewOrderRequest requestData);
   Task<IDomainResult> GetOrderAsync(Guid sessionId, GetOrderRequest requestData);
@@ -38,7 +41,7 @@ public interface ICertsRestChallengeService {
 public interface ICertsFlowService
   : ICertsInternalService,
     ICertsRestService,
-    ICertsRestChallengeService {}
+    ICertsRestChallengeService { }
 
 public class CertsFlowService : ICertsFlowService {
 
@@ -69,20 +72,8 @@ public class CertsFlowService : ICertsFlowService {
   }
 
   #region Common methods
-  
-  public async Task<(Guid?, IDomainResult)> ConfigureClientAsync() {
-    var sessionId = Guid.NewGuid();
 
-    var url = _appSettings.DevMode
-      ? _appSettings.Staging
-      : _appSettings.Production;
 
-    var result = await _letsEncryptService.ConfigureClient(sessionId, url);
-    if (!result.IsSuccess)
-      return (null, result);
-
-    return IDomainResult.Success(sessionId);
-  }
 
   public (string?, IDomainResult) GetTermsOfService(Guid sessionId) {
     var (terms, getTermsResult) = _letsEncryptService.GetTermsOfServiceUri(sessionId);
@@ -95,11 +86,20 @@ public class CertsFlowService : ICertsFlowService {
   public async Task<IDomainResult> CompleteChallengesAsync(Guid sessionId) {
     return await _letsEncryptService.CompleteChallenges(sessionId);
   }
-  
+
   #endregion
 
   #region Internal methods
-  
+  public async Task<(Guid?, IDomainResult)> ConfigureClientAsync(bool isStaging) {
+    var sessionId = Guid.NewGuid();
+
+    var result = await _letsEncryptService.ConfigureClient(sessionId, isStaging);
+    if (!result.IsSuccess)
+      return (null, result);
+
+    return IDomainResult.Success(sessionId);
+  }
+
   public async Task<(Guid?, IDomainResult)> InitAsync(Guid sessionId, Guid? accountId, string description, string[] contacts) {
     RegistrationCache? cache = null;
 
@@ -161,18 +161,22 @@ public class CertsFlowService : ICertsFlowService {
   }
 
   public async Task<(Dictionary<string, string>?, IDomainResult)> ApplyCertificatesAsync(Guid sessionId, string[] hostnames) {
+
+    var (cache, getCacheResult) = _letsEncryptService.GetRegistrationCache(sessionId);
+    if (!getCacheResult.IsSuccess || cache?.CachedCerts == null)
+      return (null, getCacheResult);
+
+
     var results = new Dictionary<string, string>();
-
-    foreach (var subject in hostnames) {
-      var (cert, getCertResult) = _letsEncryptService.TryGetCachedCertificate(sessionId, subject);
-      if (!getCertResult.IsSuccess || cert == null)
-        return (null, getCertResult);
-
-      var content = $"{cert.Certificate}\n{cert.PrivateKeyPem}";
-      results.Add(subject, content);
+    foreach (var hostname in hostnames) {
+      CertificateCache? cert;
+      if (cache.TryGetCachedCertificate(hostname, out cert)) {
+        var content = $"{cert.Cert}\n{cert.PrivatePem}";
+        results.Add(hostname, content);
+      }
     }
 
-    // TODO: send the certificates to the server
+    // Send the certificates to the  via agent
     var uploadResult = await _agentService.UploadCerts(results);
     if (!uploadResult.IsSuccess)
       return (null, uploadResult);
@@ -183,10 +187,12 @@ public class CertsFlowService : ICertsFlowService {
 
     return IDomainResult.Success(results);
   }
-  
+
   #endregion
 
-  #region Webapi specific methods
+  #region REST methods
+  public Task<(Guid?, IDomainResult)> ConfigureClientAsync(ConfigureClientRequest requestData) =>
+    ConfigureClientAsync(requestData.IsStaging);
 
   public Task<(Guid?, IDomainResult)> InitAsync(Guid sessionId, Guid? accountId, InitRequest requestData) =>
     InitAsync(sessionId, accountId, requestData.Description, requestData.Contacts);
@@ -202,10 +208,10 @@ public class CertsFlowService : ICertsFlowService {
 
   public Task<(Dictionary<string, string>?, IDomainResult)> ApplyCertificatesAsync(Guid sessionId, GetCertificatesRequest requestData) =>
     ApplyCertificatesAsync(sessionId, requestData.Hostnames);
-  
+
   #endregion
 
-  #region Acme Challenge Webapi specific methods
+  #region Acme Challenge REST methods
 
   public (string?, IDomainResult) AcmeChallenge(string fileName) {
     DeleteExporedChallenges();

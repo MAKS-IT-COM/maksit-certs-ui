@@ -27,8 +27,8 @@ namespace MaksIT.LetsEncryptServer.Controllers {
     /// </summary>
     /// <returns>sessionId</returns>
     [HttpPost("configure-client")]
-    public async Task<IActionResult> ConfigureClient() {
-      var result = await _certsFlowService.ConfigureClientAsync();
+    public async Task<IActionResult> ConfigureClient([FromBody] ConfigureClientRequest requestData) {
+      var result = await _certsFlowService.ConfigureClientAsync(requestData);
       return result.ToActionResult();
     }
 

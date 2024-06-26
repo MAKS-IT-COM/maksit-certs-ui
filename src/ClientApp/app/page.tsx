@@ -8,11 +8,19 @@ import {
   isValidEmail,
   isValidHostname
 } from '@/hooks/useValidation'
-import { CustomButton, CustomInput } from '@/controls'
-import { TrashIcon, PlusIcon } from '@heroicons/react/24/solid'
+import {
+  CustomButton,
+  CustomCheckbox,
+  CustomEnumSelect,
+  CustomInput,
+  CustomRadioGroup
+} from '@/controls'
 import { GetAccountResponse } from '@/models/letsEncryptServer/account/responses/GetAccountResponse'
-import { deepCopy } from './functions'
+import { deepCopy, enumToArray } from './functions'
 import { CacheAccount } from '@/entities/CacheAccount'
+import { ChallengeTypes } from '@/entities/ChallengeTypes'
+import { FaPlus, FaTrash } from 'react-icons/fa'
+import { PageContainer } from '@/components/pageContainer'
 
 export default function Page() {
   const [accounts, setAccounts] = useState<CacheAccount[]>([])
@@ -56,6 +64,7 @@ export default function Page() {
       accounts?.forEach((account) => {
         newAccounts.push({
           accountId: account.accountId,
+          isDisabled: account.isDisabled,
           description: account.description,
           contacts: account.contacts,
           challengeType: account.challengeType,
@@ -63,9 +72,11 @@ export default function Page() {
             account.hostnames?.map((h) => ({
               hostname: h.hostname,
               expires: new Date(h.expires),
-              isUpcomingExpire: h.isUpcomingExpire
+              isUpcomingExpire: h.isUpcomingExpire,
+              isDisabled: h.isDisabled
             })) ?? [],
-          isEditMode: false
+          isEditMode: false,
+          isStaging: account.isStaging
         })
       })
 
@@ -87,6 +98,40 @@ export default function Page() {
     )
   }
 
+  const handleDescriptionChange = (accountId: string, value: string) => {
+    setAccounts(
+      accounts.map((account) =>
+        account.accountId === accountId
+          ? { ...account, description: value }
+          : account
+      )
+    )
+  }
+
+  const validateDescription = (description: string) => {
+    return description.length > 0 ? '' : 'Description is required.'
+  }
+
+  const handleIsDisabledChange = (accountId: string, value: boolean) => {
+    setAccounts(
+      accounts.map((account) =>
+        account.accountId === accountId
+          ? { ...account, isDisabled: value }
+          : account
+      )
+    )
+  }
+
+  const handleChallengeTypeChange = (accountId: string, option: any) => {
+    setAccounts(
+      accounts.map((account) =>
+        account.accountId === accountId
+          ? { ...account, challengeType: option.value }
+          : account
+      )
+    )
+  }
+
   const deleteAccount = (accountId: string) => {
     setAccounts(accounts.filter((account) => account.accountId !== accountId))
 
@@ -99,20 +144,20 @@ export default function Page() {
     if (account?.contacts.length ?? 0 < 1) return
 
     // TODO: Remove from cache
-    httpService.delete(
-      GetApiRoute(ApiRoutes.ACCOUNT_CONTACT, accountId, contact)
-    )
+    // httpService.delete(
+    //   GetApiRoute(ApiRoutes.ACCOUNT_CONTACT, accountId, contact)
+    // )
 
-    setAccounts(
-      accounts.map((account) =>
-        account.accountId === accountId
-          ? {
-              ...account,
-              contacts: account.contacts.filter((c) => c !== contact)
-            }
-          : account
-      )
-    )
+    // setAccounts(
+    //   accounts.map((account) =>
+    //     account.accountId === accountId
+    //       ? {
+    //           ...account,
+    //           contacts: account.contacts.filter((c) => c !== contact)
+    //         }
+    //       : account
+    //   )
+    // )
   }
 
   const addContact = (accountId: string) => {
@@ -180,7 +225,8 @@ export default function Page() {
                 {
                   hostname: newHostname,
                   expires: new Date(),
-                  isUpcomingExpire: false
+                  isUpcomingExpire: false,
+                  isDisabled: false
                 }
               ]
             }
@@ -251,10 +297,7 @@ export default function Page() {
   }
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-4xl font-bold text-center mb-8">
-        LetsEncrypt Auto Renew
-      </h1>
+    <PageContainer title="LetsEncrypt Auto Renew">
       {accounts.map((account) => (
         <div
           key={account.accountId}
@@ -274,8 +317,31 @@ export default function Page() {
           {account.isEditMode ? (
             <form onSubmit={(e) => handleSubmit(e, account.accountId)}>
               <div className="mb-4">
-                <h3 className="text-xl font-medium mb-2">Description:</h3>
+                <CustomInput
+                  value={account.description ?? ''}
+                  onChange={(value) =>
+                    handleDescriptionChange(account.accountId, value)
+                  }
+                  placeholder="Add new description"
+                  type="text"
+                  error={validateDescription(account.description ?? '')}
+                  title="Description"
+                  inputClassName="border p-2 rounded w-full"
+                  errorClassName="text-red-500 text-sm mt-1"
+                  className="mr-2 flex-grow"
+                />
               </div>
+
+              <div className="mb-4">
+                <CustomCheckbox
+                  checked={account.isDisabled}
+                  label="Disabled"
+                  onChange={(value) =>
+                    handleIsDisabledChange(account.accountId, value)
+                  }
+                />
+              </div>
+
               <div className="mb-4">
                 <h3 className="text-xl font-medium mb-2">Contacts:</h3>
                 <ul className="list-disc list-inside pl-4 mb-2">
@@ -292,7 +358,7 @@ export default function Page() {
                         }
                         className="bg-red-500 text-white p-2 rounded ml-2"
                       >
-                        <TrashIcon className="h-5 w-5 text-white" />
+                        <FaTrash />
                       </CustomButton>
                     </li>
                   ))}
@@ -314,7 +380,7 @@ export default function Page() {
                       onClick={() => addContact(account.accountId)}
                       className="bg-green-500 text-white p-2 rounded ml-2"
                     >
-                      <PlusIcon className="h-5 w-5 text-white" />
+                      <FaPlus />
                     </CustomButton>
                   </CustomInput>
                 </div>
@@ -345,7 +411,7 @@ export default function Page() {
                         }
                         className="bg-red-500 text-white p-2 rounded ml-2"
                       >
-                        <TrashIcon className="h-5 w-5 text-white" />
+                        <FaTrash />
                       </CustomButton>
                     </li>
                   ))}
@@ -367,7 +433,7 @@ export default function Page() {
                       onClick={() => addHostname(account.accountId)}
                       className="bg-green-500 text-white p-2 rounded ml-2"
                     >
-                      <PlusIcon className="h-5 w-5 text-white" />
+                      <FaPlus />
                     </CustomButton>
                   </CustomInput>
                 </div>
@@ -377,7 +443,7 @@ export default function Page() {
                   onClick={() => deleteAccount(account.accountId)}
                   className="bg-red-500 text-white p-2 rounded ml-2"
                 >
-                  <TrashIcon className="h-5 w-5 text-white" />
+                  <FaTrash />
                 </CustomButton>
                 <CustomButton
                   type="submit"
@@ -394,6 +460,15 @@ export default function Page() {
                   Description: {account.description}
                 </h3>
               </div>
+
+              <div className="mb-4">
+                <CustomCheckbox
+                  checked={account.isDisabled}
+                  label="Disabled"
+                  disabled={true}
+                />
+              </div>
+
               <div className="mb-4">
                 <h3 className="text-xl font-medium mb-2">Contacts:</h3>
                 <ul className="list-disc list-inside pl-4 mb-2">
@@ -405,31 +480,61 @@ export default function Page() {
                 </ul>
               </div>
               <div className="mb-4">
-                <h3 className="text-xl font-medium mb-2">
-                  Challenge type: {account.challengeType}
-                </h3>
+                <CustomEnumSelect
+                  title="Challenge Type"
+                  enumType={ChallengeTypes}
+                  selectedValue={account.challengeType}
+                  onChange={(option) =>
+                    handleChallengeTypeChange(account.accountId, option)
+                  }
+                  disabled={true}
+                />
               </div>
-              <div>
+              <div className="mb-4">
                 <h3 className="text-xl font-medium mb-2">Hostnames:</h3>
                 <ul className="list-disc list-inside pl-4 mb-2">
                   {account.hostnames.map((hostname) => (
                     <li key={hostname.hostname} className="text-gray-700 mb-2">
                       {hostname.hostname} - {hostname.expires.toDateString()} -
                       <span
-                        className={`ml-2 px-2 py-1 rounded ${hostname.isUpcomingExpire ? 'bg-yellow-200 text-yellow-800' : 'bg-green-200 text-green-800'}`}
+                        className={`ml-2 px-2 py-1 rounded ${
+                          hostname.isUpcomingExpire
+                            ? 'bg-yellow-200 text-yellow-800'
+                            : 'bg-green-200 text-green-800'
+                        }`}
                       >
                         {hostname.isUpcomingExpire
                           ? 'Upcoming'
                           : 'Not Upcoming'}
                       </span>
+                      <CustomCheckbox
+                        checked={hostname.isDisabled}
+                        label="Disabled"
+                        disabled={true}
+                      />
                     </li>
                   ))}
                 </ul>
+              </div>
+
+              <div className="mb-4">
+                <CustomRadioGroup
+                  options={[
+                    { value: 'staging', label: 'Staging' },
+                    { value: 'production', label: 'Production' }
+                  ]}
+                  initialValue={account.isStaging ? 'staging' : 'production'}
+                  title="LetsEncrypt Environment"
+                  className=""
+                  radioClassName=""
+                  errorClassName="text-red-500 text-sm mt-1"
+                  disabled={true}
+                />
               </div>
             </>
           )}
         </div>
       ))}
-    </div>
+    </PageContainer>
   )
 }

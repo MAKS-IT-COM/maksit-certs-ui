@@ -37,7 +37,7 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
           continue;
         }
 
-        foreach (var account in accountsResponse) {
+        foreach (var account in accountsResponse.Where(x => !x.IsDisabled)) {
           await ProcessAccountAsync(account);
         }
 
@@ -61,7 +61,7 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
         return IDomainResult.Success();
       }
 
-      var renewResult = await RenewCertificatesForHostnames(cache.AccountId, cache.Description, cache.Contacts, hostnames, cache.ChallengeType);
+      var renewResult = await RenewCertificatesForHostnames(cache.AccountId, cache.Description, cache.Contacts, hostnames, cache.ChallengeType, cache.IsStaging);
       if (!renewResult.IsSuccess)
         return renewResult;
 
@@ -70,8 +70,8 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
       return IDomainResult.Success();
     }
 
-    private async Task<IDomainResult> RenewCertificatesForHostnames(Guid accountId, string description, string[] contacts, string[] hostnames, string challengeType) {
-      var (sessionId, configureClientResult) = await _certsFlowService.ConfigureClientAsync();
+    private async Task<IDomainResult> RenewCertificatesForHostnames(Guid accountId, string description, string[] contacts, string[] hostnames, string challengeType, bool isStaging) {
+      var (sessionId, configureClientResult) = await _certsFlowService.ConfigureClientAsync(isStaging);
       if (!configureClientResult.IsSuccess || sessionId == null) {
         LogErrors(configureClientResult.Errors);
         return configureClientResult;

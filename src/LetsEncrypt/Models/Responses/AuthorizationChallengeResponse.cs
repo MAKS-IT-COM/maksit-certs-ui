@@ -1,7 +1,4 @@
-﻿
-using MaksIT.LetsEncrypt.Entities;
-
-namespace MaksIT.LetsEncrypt.Models.Responses;
+﻿namespace MaksIT.LetsEncrypt.Models.Responses;
 
 public class AuthorizationChallengeResponse {
   public OrderIdentifier? Identifier { get; set; }
@@ -12,7 +9,7 @@ public class AuthorizationChallengeResponse {
 
   public bool Wildcard { get; set; }
 
-  public AuthorizationChallenge[]? Challenges { get; set; }
+  public AuthorizationChallengeChallenge[]? Challenges { get; set; }
 }
 
 public class AuthorizeChallenge {

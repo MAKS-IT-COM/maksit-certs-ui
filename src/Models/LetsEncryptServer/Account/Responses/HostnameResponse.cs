@@ -6,9 +6,10 @@ using System.Threading.Tasks;
 
 namespace MaksIT.Models.LetsEncryptServer.Account.Responses {
   public class HostnameResponse {
-    public string Hostname { get; set; }
+    public required string Hostname { get; set; }
     public DateTime Expires { get; set; }
     public bool IsUpcomingExpire { get; set; }
+    public bool IsDisabled { get; set; }
   }
 
 }

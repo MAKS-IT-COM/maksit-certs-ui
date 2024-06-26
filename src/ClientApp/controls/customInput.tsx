@@ -12,6 +12,8 @@ interface CustomInputProps {
   inputClassName?: string
   errorClassName?: string
   className?: string
+  readOnly?: boolean
+  disabled?: boolean
   children?: React.ReactNode // Added for additional elements
 }
 
@@ -25,6 +27,8 @@ const CustomInput: FC<CustomInputProps> = ({
   inputClassName = '',
   errorClassName = '',
   className = '',
+  readOnly = false,
+  disabled = false,
   children // Added for additional elements
 }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -41,6 +45,8 @@ const CustomInput: FC<CustomInputProps> = ({
           onChange={handleChange}
           placeholder={placeholder}
           className={`flex-grow ${inputClassName}`}
+          readOnly={readOnly}
+          disabled={disabled}
         />
         {children && <div className="ml-2">{children}</div>}
       </div>

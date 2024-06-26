@@ -1,9 +1,14 @@
 enum ApiRoutes {
   ACCOUNTS = 'api/accounts',
-  ACCOUNT = 'api/account/{accountId}',
-  ACCOUNT_CONTACTS = 'api/account/{accountId}/contacts',
-  ACCOUNT_CONTACT = 'api/account/{accountId}/contact/{index}',
-  ACCOUNT_HOSTNAMES = 'api/account/{accountId}/hostnames'
+
+  ACCOUNT = 'api/account',
+  ACCOUNT_ID = 'api/account/{accountId}',
+
+  ACCOUNT_ID_CONTACTS = 'api/account/{accountId}/contacts',
+  ACCOUNT_ID_CONTACT_ID = 'api/account/{accountId}/contact/{index}',
+
+  ACCOUNT_ID_HOSTNAMES = 'api/account/{accountId}/hostnames',
+  ACCOUNT_ID_HOSTNAME_ID = 'api/account/{accountId}/hostname/{index}'
 
   // CERTS_FLOW_CONFIGURE_CLIENT =  `api/CertsFlow/ConfigureClient`,
   // CERTS_FLOW_TERMS_OF_SERVICE = `api/CertsFlow/TermsOfService/{sessionId}`,

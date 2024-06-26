@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 
 // Helper functions for validation
+const isBypass = (value: any) => {
+  return true
+}
+
 const isValidEmail = (email: string) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   return emailRegex.test(email)
@@ -87,6 +91,7 @@ const useValidation = <T extends string | number | Date>(
 
 export {
   useValidation,
+  isBypass,
   isValidEmail,
   isValidPhoneNumber,
   isValidContact,
