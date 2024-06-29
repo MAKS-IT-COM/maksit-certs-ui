@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useEffect, useRef, useState } from 'react'
+import { FormEvent, useCallback, useState } from 'react'
 import {
   useValidation,
   isBypass,
@@ -14,7 +14,7 @@ import {
   CustomRadioGroup
 } from '@/controls'
 import { FaTrash, FaPlus } from 'react-icons/fa'
-import { deepCopy } from '../functions'
+import { deepCopy } from '../../functions'
 import {
   PostAccountRequest,
   validatePostAccountRequest
@@ -31,10 +31,13 @@ const RegisterPage = () => {
   const [account, setAccount] = useState<PostAccountRequest>({
     description: '',
     contacts: [],
-    challengeType: '',
+    challengeType: ChallengeTypes.http01,
     hostnames: [],
     isStaging: true
   })
+
+  const [newHostname, setNewHostname] = useState('')
+  const [newContact, setNewContact] = useState('')
 
   const dispatch = useAppDispatch()
 
@@ -44,7 +47,15 @@ const RegisterPage = () => {
     handleChange: handleDescriptionChange,
     reset: resetDescription
   } = useValidation<string>({
-    initialValue: '',
+    defaultValue: '',
+    externalValue: account.description,
+    setExternalValue: (newDescription) => {
+      setAccount((prev) => {
+        const newAccount = deepCopy(prev)
+        newAccount.description = newDescription
+        return newAccount
+      })
+    },
     validateFn: isBypass,
     errorMessage: ''
   })
@@ -55,20 +66,11 @@ const RegisterPage = () => {
     handleChange: handleContactChange,
     reset: resetContact
   } = useValidation<string>({
-    initialValue: '',
+    defaultValue: '',
+    externalValue: newContact,
+    setExternalValue: setNewContact,
     validateFn: isValidContact,
     errorMessage: 'Invalid contact. Must be a valid email or phone number.'
-  })
-
-  const {
-    value: challengeType,
-    error: challengeTypeError,
-    handleChange: handleChallengeTypeChange,
-    reset: resetChallengeType
-  } = useValidation<string>({
-    initialValue: ChallengeTypes.http01,
-    validateFn: isBypass,
-    errorMessage: ''
   })
 
   const {
@@ -77,40 +79,43 @@ const RegisterPage = () => {
     handleChange: handleHostnameChange,
     reset: resetHostname
   } = useValidation<string>({
-    initialValue: '',
+    defaultValue: '',
+    externalValue: newHostname,
+    setExternalValue: setNewHostname,
     validateFn: isValidHostname,
     errorMessage: 'Invalid hostname format.'
   })
 
-  const init = useRef(false)
-  useEffect(() => {
-    if (init.current) return
-
-    init.current = true
-  }, [])
-
-  useEffect(() => {
-    setAccount((prev) => {
-      const newAccount = deepCopy(prev)
-      newAccount.description = description
-      newAccount.challengeType = challengeType
-      return newAccount
-    })
-  }, [description, challengeType])
+  const {
+    value: challengeType,
+    error: challengeTypeError,
+    handleChange: handleChallengeTypeChange,
+    reset: resetChallengeType
+  } = useValidation<string>({
+    defaultValue: ChallengeTypes.http01,
+    externalValue: account.challengeType,
+    setExternalValue: (newChallengeType) => {
+      setAccount((prev) => {
+        const newAccount = deepCopy(prev)
+        newAccount.challengeType = newChallengeType
+        return newAccount
+      })
+    },
+    validateFn: isBypass,
+    errorMessage: ''
+  })
 
   const handleAddContact = () => {
-    if (
-      contact === '' ||
-      account?.contacts.includes(contact) ||
-      contactError !== ''
-    ) {
+    if (contactError !== '') {
       resetContact()
       return
     }
 
     setAccount((prev) => {
       const newAccount = deepCopy(prev)
-      newAccount.contacts.push(contact)
+      if (!newAccount.contacts.includes(contact)) {
+        newAccount.contacts.push(contact)
+      }
       return newAccount
     })
 
@@ -126,18 +131,16 @@ const RegisterPage = () => {
   }
 
   const handleAddHostname = () => {
-    if (
-      hostname === '' ||
-      account?.hostnames.includes(hostname) ||
-      hostnameError !== ''
-    ) {
+    if (hostnameError !== '') {
       resetHostname()
       return
     }
 
     setAccount((prev) => {
       const newAccount = deepCopy(prev)
-      newAccount.hostnames.push(hostname)
+      if (!newAccount.hostnames.includes(hostname)) {
+        newAccount.hostnames.push(hostname)
+      }
       return newAccount
     })
 
@@ -183,7 +186,7 @@ const RegisterPage = () => {
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
           <CustomInput
-            value={account.description}
+            value={description}
             onChange={handleDescriptionChange}
             placeholder="Account Description"
             type="text"
@@ -224,15 +227,14 @@ const RegisterPage = () => {
               inputClassName="border p-2 rounded w-full"
               errorClassName="text-red-500 text-sm mt-1"
               className="mr-2 flex-grow"
+            />
+            <CustomButton
+              type="button"
+              onClick={handleAddContact}
+              className="bg-green-500 text-white p-2 rounded ml-2"
             >
-              <CustomButton
-                type="button"
-                onClick={handleAddContact}
-                className="bg-green-500 text-white p-2 rounded ml-2"
-              >
-                <FaPlus />
-              </CustomButton>
-            </CustomInput>
+              <FaPlus />
+            </CustomButton>
           </div>
         </div>
         <div className="mb-4">
@@ -240,7 +242,7 @@ const RegisterPage = () => {
             error={challengeTypeError}
             title="Challenge Type"
             enumType={ChallengeTypes}
-            selectedValue={account.challengeType}
+            selectedValue={challengeType}
             onChange={handleChallengeTypeChange}
             selectBoxClassName="border p-2 rounded w-full"
             errorClassName="text-red-500 text-sm mt-1"
@@ -278,15 +280,14 @@ const RegisterPage = () => {
               inputClassName="border p-2 rounded w-full"
               errorClassName="text-red-500 text-sm mt-1"
               className="mr-2 flex-grow"
+            />
+            <CustomButton
+              type="button"
+              onClick={handleAddHostname}
+              className="bg-green-500 text-white p-2 rounded ml-2"
             >
-              <CustomButton
-                type="button"
-                onClick={handleAddHostname}
-                className="bg-green-500 text-white p-2 rounded ml-2"
-              >
-                <FaPlus />
-              </CustomButton>
-            </CustomInput>
+              <FaPlus />
+            </CustomButton>
           </div>
         </div>
 

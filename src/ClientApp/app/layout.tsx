@@ -81,13 +81,12 @@ const Layout: FC<{ children: React.ReactNode }> = ({ children }) => {
             />
 
             <div className="flex flex-col flex-1 overflow-hidden">
-              <TopMenu onToggleOffCanvas={toggleOffCanvas} />
+              <TopMenu />
               <main className="flex-1 p-4 overflow-y-auto">{children}</main>
               <Footer className="flex-shrink-0" />
             </div>
           </div>
 
-          <OffCanvas isOpen={isOffCanvasOpen} onClose={toggleOffCanvas} />
           <Toast />
         </Provider>
       </body>

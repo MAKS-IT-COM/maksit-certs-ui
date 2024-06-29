@@ -16,7 +16,7 @@ const Loader: React.FC = () => {
     if (activeRequests > 0) {
       timeout = setTimeout(() => {
         dispatch(reset())
-      }, 10000) // Adjust the timeout as necessary
+      }, 120000) // Adjust the timeout as necessary
     }
 
     return () => {

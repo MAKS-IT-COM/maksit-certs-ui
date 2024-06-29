@@ -4,7 +4,7 @@ import {
   CustomSelectOption,
   CustomSelectPropsBase
 } from './customSelect'
-import { enumToArray } from '@/app/functions'
+import { enumToArray } from '@/functions'
 
 interface CustomEnumSelectProps extends CustomSelectPropsBase {
   enumType: any

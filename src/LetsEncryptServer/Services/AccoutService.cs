@@ -72,6 +72,9 @@ public class AccountService : IAccountService {
   }
 
   public async Task<(GetAccountResponse?, IDomainResult)> PostAccountAsync(PostAccountRequest requestData) {
+
+    // TODO: check for overlapping hostnames in already existing accounts
+
     var (sessionId, configureClientResult) = await _certsFlowService.ConfigureClientAsync(requestData.IsStaging);
     if (!configureClientResult.IsSuccess || sessionId == null) {
       //LogErrors(configureClientResult.Errors);

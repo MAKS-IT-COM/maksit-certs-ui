@@ -4,11 +4,6 @@ import { ApiRoutes, GetApiRoute } from '@/ApiRoutes'
 import { httpService } from '@/services/httpService'
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import {
-  useValidation,
-  isValidEmail,
-  isValidHostname
-} from '@/hooks/useValidation'
-import {
   CustomButton,
   CustomCheckbox,
   CustomEnumSelect,
@@ -16,37 +11,19 @@ import {
   CustomRadioGroup
 } from '@/controls'
 import { GetAccountResponse } from '@/models/letsEncryptServer/account/responses/GetAccountResponse'
-import { deepCopy, enumToArray } from './functions'
+import { deepCopy, enumToArray } from '../functions'
 import { CacheAccount } from '@/entities/CacheAccount'
 import { ChallengeTypes } from '@/entities/ChallengeTypes'
 import { FaPlus, FaTrash } from 'react-icons/fa'
 import { PageContainer } from '@/components/pageContainer'
+import { OffCanvas } from '@/components/offcanvas'
+import { AccountEdit } from '@/partials/accoutEdit'
 
 export default function Page() {
   const [accounts, setAccounts] = useState<CacheAccount[]>([])
-  const [initialAccounts, setInitialAccounts] = useState<CacheAccount[]>([])
-
-  const {
-    value: newContact,
-    error: contactError,
-    handleChange: handleContactChange,
-    reset: resetContact
-  } = useValidation<string>({
-    initialValue: '',
-    validateFn: isValidEmail,
-    errorMessage: 'Invalid email format.'
-  })
-
-  const {
-    value: newHostname,
-    error: hostnameError,
-    handleChange: handleHostnameChange,
-    reset: resetHostname
-  } = useValidation<string>({
-    initialValue: '',
-    validateFn: isValidHostname,
-    errorMessage: 'Invalid hostname format.'
-  })
+  const [editingAccount, setEditingAccount] = useState<CacheAccount | null>(
+    null
+  )
 
   const init = useRef(false)
 
@@ -66,67 +43,36 @@ export default function Page() {
           accountId: account.accountId,
           isDisabled: account.isDisabled,
           description: account.description,
-          contacts: account.contacts,
+          contacts: account.contacts.map((contact) => contact),
           challengeType: account.challengeType,
           hostnames:
-            account.hostnames?.map((h) => ({
-              hostname: h.hostname,
-              expires: new Date(h.expires),
-              isUpcomingExpire: h.isUpcomingExpire,
-              isDisabled: h.isDisabled
+            account.hostnames?.map((hostname) => ({
+              hostname: hostname.hostname,
+              expires: new Date(hostname.expires),
+              isUpcomingExpire: hostname.isUpcomingExpire,
+              isDisabled: hostname.isDisabled
             })) ?? [],
-          isEditMode: false,
-          isStaging: account.isStaging
+          isStaging: account.isStaging,
+          isEditMode: false
         })
       })
 
       setAccounts(newAccounts)
-      setInitialAccounts(deepCopy(newAccounts)) // Clone initial state
     }
 
     fetchAccounts()
     init.current = true
   }, [])
 
-  const toggleEditMode = (accountId: string) => {
+  useEffect(() => {
+    console.log(editingAccount)
+  }, [editingAccount])
+
+  const handleAccountUpdate = (updatedAccount: CacheAccount) => {
     setAccounts(
       accounts.map((account) =>
-        account.accountId === accountId
-          ? { ...account, isEditMode: !account.isEditMode }
-          : account
-      )
-    )
-  }
-
-  const handleDescriptionChange = (accountId: string, value: string) => {
-    setAccounts(
-      accounts.map((account) =>
-        account.accountId === accountId
-          ? { ...account, description: value }
-          : account
-      )
-    )
-  }
-
-  const validateDescription = (description: string) => {
-    return description.length > 0 ? '' : 'Description is required.'
-  }
-
-  const handleIsDisabledChange = (accountId: string, value: boolean) => {
-    setAccounts(
-      accounts.map((account) =>
-        account.accountId === accountId
-          ? { ...account, isDisabled: value }
-          : account
-      )
-    )
-  }
-
-  const handleChallengeTypeChange = (accountId: string, option: any) => {
-    setAccounts(
-      accounts.map((account) =>
-        account.accountId === accountId
-          ? { ...account, challengeType: option.value }
+        account.accountId === updatedAccount.accountId
+          ? updatedAccount
           : account
       )
     )
@@ -139,362 +85,70 @@ export default function Page() {
     // TODO: Remove from cache
   }
 
-  const deleteContact = (accountId: string, contact: string) => {
-    const account = accounts.find((account) => account.accountId === accountId)
-    if (account?.contacts.length ?? 0 < 1) return
-
-    // TODO: Remove from cache
-    // httpService.delete(
-    //   GetApiRoute(ApiRoutes.ACCOUNT_CONTACT, accountId, contact)
-    // )
-
-    // setAccounts(
-    //   accounts.map((account) =>
-    //     account.accountId === accountId
-    //       ? {
-    //           ...account,
-    //           contacts: account.contacts.filter((c) => c !== contact)
-    //         }
-    //       : account
-    //   )
-    // )
-  }
-
-  const addContact = (accountId: string) => {
-    if (newContact === '' || contactError) {
-      return
-    }
-
-    if (
-      accounts
-        .find((account) => account.accountId === accountId)
-        ?.contacts.includes(newContact)
-    )
-      return
-
-    setAccounts(
-      accounts.map((account) =>
-        account.accountId === accountId
-          ? { ...account, contacts: [...account.contacts, newContact] }
-          : account
-      )
-    )
-    resetContact()
-  }
-
-  const deleteHostname = (accountId: string, hostname: string) => {
-    const account = accounts.find((account) => account.accountId === accountId)
-    if (account?.hostnames.length ?? 0 < 1) return
-
-    // TODO: Revoke certificate
-    // TODO: Remove from cache
-
-    setAccounts(
-      accounts.map((account) =>
-        account.accountId === accountId
-          ? {
-              ...account,
-              hostnames: account.hostnames.filter(
-                (h) => h.hostname !== hostname
-              )
-            }
-          : account
-      )
-    )
-  }
-
-  const addHostname = (accountId: string) => {
-    if (newHostname === '' || hostnameError) {
-      return
-    }
-
-    if (
-      accounts
-        .find((account) => account.accountId === accountId)
-        ?.hostnames.some((h) => h.hostname === newHostname)
-    )
-      return
-
-    setAccounts(
-      accounts.map((account) =>
-        account.accountId === accountId
-          ? {
-              ...account,
-              hostnames: [
-                ...account.hostnames,
-                {
-                  hostname: newHostname,
-                  expires: new Date(),
-                  isUpcomingExpire: false,
-                  isDisabled: false
-                }
-              ]
-            }
-          : account
-      )
-    )
-    resetHostname()
-  }
-
-  const handleSubmit = async (
-    e: FormEvent<HTMLFormElement>,
-    accountId: string
-  ) => {
-    e.preventDefault()
-
-    const account = accounts.find((acc) => acc.accountId === accountId)
-    const initialAccount = initialAccounts.find(
-      (acc) => acc.accountId === accountId
-    )
-
-    if (!account || !initialAccount) return
-
-    const contactChanges = {
-      added: account.contacts.filter(
-        (contact) => !initialAccount.contacts.includes(contact)
-      ),
-      removed: initialAccount.contacts.filter(
-        (contact) => !account.contacts.includes(contact)
-      )
-    }
-
-    const hostnameChanges = {
-      added: account.hostnames.filter(
-        (hostname) =>
-          !initialAccount.hostnames.some(
-            (h) => h.hostname === hostname.hostname
-          )
-      ),
-      removed: initialAccount.hostnames.filter(
-        (hostname) =>
-          !account.hostnames.some((h) => h.hostname === hostname.hostname)
-      )
-    }
-
-    // Handle contact changes
-    if (contactChanges.added.length > 0) {
-      // TODO: POST new contacts
-      console.log('Added contacts:', contactChanges.added)
-    }
-    if (contactChanges.removed.length > 0) {
-      // TODO: DELETE removed contacts
-      console.log('Removed contacts:', contactChanges.removed)
-    }
-
-    // Handle hostname changes
-    if (hostnameChanges.added.length > 0) {
-      // TODO: POST new hostnames
-      console.log('Added hostnames:', hostnameChanges.added)
-    }
-    if (hostnameChanges.removed.length > 0) {
-      // TODO: DELETE removed hostnames
-      console.log('Removed hostnames:', hostnameChanges.removed)
-    }
-
-    // Save current state as initial state
-    setInitialAccounts(deepCopy(accounts))
-    toggleEditMode(accountId)
-  }
-
   return (
-    <PageContainer title="LetsEncrypt Auto Renew">
-      {accounts.map((account) => (
-        <div
-          key={account.accountId}
-          className="bg-white shadow-lg rounded-lg p-6 mb-6"
-        >
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-semibold">
-              Account: {account.accountId}
-            </h2>
-            <CustomButton
-              onClick={() => toggleEditMode(account.accountId)}
-              className="bg-blue-500 text-white px-3 py-1 rounded"
-            >
-              {account.isEditMode ? 'View Mode' : 'Edit Mode'}
-            </CustomButton>
-          </div>
-          {account.isEditMode ? (
-            <form onSubmit={(e) => handleSubmit(e, account.accountId)}>
-              <div className="mb-4">
-                <CustomInput
-                  value={account.description ?? ''}
-                  onChange={(value) =>
-                    handleDescriptionChange(account.accountId, value)
-                  }
-                  placeholder="Add new description"
-                  type="text"
-                  error={validateDescription(account.description ?? '')}
-                  title="Description"
-                  inputClassName="border p-2 rounded w-full"
-                  errorClassName="text-red-500 text-sm mt-1"
-                  className="mr-2 flex-grow"
-                />
-              </div>
+    <>
+      <PageContainer title="LetsEncrypt Auto Renew">
+        {accounts.map((account) => (
+          <div
+            key={account.accountId}
+            className="bg-white shadow-lg rounded-lg p-6 mb-6"
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-semibold">
+                Account: {account.accountId}
+              </h2>
+              <CustomButton
+                onClick={() => {
+                  setEditingAccount(account)
+                }}
+                className="bg-blue-500 text-white px-3 py-1 rounded"
+              >
+                Edit
+              </CustomButton>
+            </div>
 
-              <div className="mb-4">
-                <CustomCheckbox
-                  checked={account.isDisabled}
-                  label="Disabled"
-                  onChange={(value) =>
-                    handleIsDisabledChange(account.accountId, value)
-                  }
-                />
-              </div>
+            <div className="mb-4">
+              <h3 className="text-xl font-medium mb-2">
+                Description: {account.description}
+              </h3>
+            </div>
 
-              <div className="mb-4">
-                <h3 className="text-xl font-medium mb-2">Contacts:</h3>
-                <ul className="list-disc list-inside pl-4 mb-2">
-                  {account.contacts.map((contact) => (
-                    <li
-                      key={contact}
-                      className="text-gray-700 flex justify-between items-center mb-2"
-                    >
-                      {contact}
-                      <CustomButton
-                        type="button"
-                        onClick={() =>
-                          deleteContact(account.accountId, contact)
-                        }
-                        className="bg-red-500 text-white p-2 rounded ml-2"
-                      >
-                        <FaTrash />
-                      </CustomButton>
-                    </li>
-                  ))}
-                </ul>
-                <div className="flex items-center mb-4">
-                  <CustomInput
-                    value={newContact}
-                    onChange={handleContactChange}
-                    placeholder="Add new contact"
-                    type="email"
-                    error={contactError}
-                    title="New Contact"
-                    inputClassName="border p-2 rounded w-full"
-                    errorClassName="text-red-500 text-sm mt-1"
-                    className="mr-2 flex-grow"
-                  >
-                    <CustomButton
-                      type="button"
-                      onClick={() => addContact(account.accountId)}
-                      className="bg-green-500 text-white p-2 rounded ml-2"
-                    >
-                      <FaPlus />
-                    </CustomButton>
-                  </CustomInput>
-                </div>
-              </div>
-              <div>
-                <h3 className="text-xl font-medium mb-2">Hostnames:</h3>
-                <ul className="list-disc list-inside pl-4 mb-2">
-                  {account.hostnames.map((hostname) => (
-                    <li
-                      key={hostname.hostname}
-                      className="text-gray-700 flex justify-between items-center mb-2"
-                    >
-                      <div>
-                        {hostname.hostname} - {hostname.expires.toDateString()}{' '}
-                        -
-                        <span
-                          className={`ml-2 px-2 py-1 rounded ${hostname.isUpcomingExpire ? 'bg-yellow-200 text-yellow-800' : 'bg-green-200 text-green-800'}`}
-                        >
-                          {hostname.isUpcomingExpire
-                            ? 'Upcoming'
-                            : 'Not Upcoming'}
-                        </span>
-                      </div>
-                      <CustomButton
-                        type="button"
-                        onClick={() =>
-                          deleteHostname(account.accountId, hostname.hostname)
-                        }
-                        className="bg-red-500 text-white p-2 rounded ml-2"
-                      >
-                        <FaTrash />
-                      </CustomButton>
-                    </li>
-                  ))}
-                </ul>
-                <div className="flex items-center">
-                  <CustomInput
-                    value={newHostname}
-                    onChange={handleHostnameChange}
-                    placeholder="Add new hostname"
-                    type="text"
-                    error={hostnameError}
-                    title="New Hostname"
-                    inputClassName="border p-2 rounded w-full"
-                    errorClassName="text-red-500 text-sm mt-1"
-                    className="mr-2 flex-grow"
-                  >
-                    <CustomButton
-                      type="button"
-                      onClick={() => addHostname(account.accountId)}
-                      className="bg-green-500 text-white p-2 rounded ml-2"
-                    >
-                      <FaPlus />
-                    </CustomButton>
-                  </CustomInput>
-                </div>
-              </div>
-              <div className="flex justify-between mt-4">
-                <CustomButton
-                  onClick={() => deleteAccount(account.accountId)}
-                  className="bg-red-500 text-white p-2 rounded ml-2"
-                >
-                  <FaTrash />
-                </CustomButton>
-                <CustomButton
-                  type="submit"
-                  className="bg-green-500 text-white p-2 rounded ml-2"
-                >
-                  Submit
-                </CustomButton>
-              </div>
-            </form>
-          ) : (
-            <>
-              <div className="mb-4">
-                <h3 className="text-xl font-medium mb-2">
-                  Description: {account.description}
-                </h3>
-              </div>
+            <div className="mb-4">
+              <CustomCheckbox
+                checked={account.isDisabled}
+                label="Disabled"
+                disabled={true}
+              />
+            </div>
 
-              <div className="mb-4">
-                <CustomCheckbox
-                  checked={account.isDisabled}
-                  label="Disabled"
-                  disabled={true}
-                />
-              </div>
-
-              <div className="mb-4">
-                <h3 className="text-xl font-medium mb-2">Contacts:</h3>
-                <ul className="list-disc list-inside pl-4 mb-2">
-                  {account.contacts.map((contact) => (
-                    <li key={contact} className="text-gray-700 mb-2">
-                      {contact}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="mb-4">
-                <CustomEnumSelect
-                  title="Challenge Type"
-                  enumType={ChallengeTypes}
-                  selectedValue={account.challengeType}
-                  onChange={(option) =>
-                    handleChallengeTypeChange(account.accountId, option)
-                  }
-                  disabled={true}
-                />
-              </div>
-              <div className="mb-4">
-                <h3 className="text-xl font-medium mb-2">Hostnames:</h3>
-                <ul className="list-disc list-inside pl-4 mb-2">
-                  {account.hostnames.map((hostname) => (
-                    <li key={hostname.hostname} className="text-gray-700 mb-2">
+            <div className="mb-4">
+              <h3 className="text-xl font-medium mb-2">Contacts:</h3>
+              <ul className="list-disc list-inside pl-4 mb-2">
+                {account.contacts.map((contact) => (
+                  <li key={contact} className="text-gray-700 mb-2">
+                    {contact}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="mb-4">
+              <CustomEnumSelect
+                title="Challenge Type"
+                enumType={ChallengeTypes}
+                selectedValue={account.challengeType}
+                onChange={(option) =>
+                  //handleChallengeTypeChange(account.accountId, option)
+                  console.log('')
+                }
+                disabled={true}
+              />
+            </div>
+            <div className="mb-4">
+              <h3 className="text-xl font-medium mb-2">Hostnames:</h3>
+              <ul className="list-disc list-inside pl-4 mb-2">
+                {account.hostnames?.map((hostname) => (
+                  <li key={hostname.hostname} className="text-gray-700 mb-2">
+                    <div className="inline-flex">
                       {hostname.hostname} - {hostname.expires.toDateString()} -
                       <span
                         className={`ml-2 px-2 py-1 rounded ${
@@ -512,29 +166,37 @@ export default function Page() {
                         label="Disabled"
                         disabled={true}
                       />
-                    </li>
-                  ))}
-                </ul>
-              </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
 
-              <div className="mb-4">
-                <CustomRadioGroup
-                  options={[
-                    { value: 'staging', label: 'Staging' },
-                    { value: 'production', label: 'Production' }
-                  ]}
-                  initialValue={account.isStaging ? 'staging' : 'production'}
-                  title="LetsEncrypt Environment"
-                  className=""
-                  radioClassName=""
-                  errorClassName="text-red-500 text-sm mt-1"
-                  disabled={true}
-                />
-              </div>
-            </>
-          )}
-        </div>
-      ))}
-    </PageContainer>
+            <div className="mb-4">
+              <CustomRadioGroup
+                options={[
+                  { value: 'staging', label: 'Staging' },
+                  { value: 'production', label: 'Production' }
+                ]}
+                initialValue={account.isStaging ? 'staging' : 'production'}
+                title="LetsEncrypt Environment"
+                className=""
+                radioClassName=""
+                errorClassName="text-red-500 text-sm mt-1"
+                disabled={true}
+              />
+            </div>
+          </div>
+        ))}
+      </PageContainer>
+
+      <OffCanvas
+        title="Edit Account"
+        isOpen={editingAccount !== null}
+        onClose={() => setEditingAccount(null)}
+      >
+        {editingAccount && <AccountEdit account={editingAccount} />}
+      </OffCanvas>
+    </>
   )
 }

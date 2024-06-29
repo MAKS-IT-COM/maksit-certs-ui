@@ -1,63 +1,47 @@
 import { useState, useEffect, useCallback } from 'react'
 
 // Helper functions for validation
-const isBypass = (value: any) => {
-  return true
-}
-
-const isValidEmail = (email: string) => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  return emailRegex.test(email)
-}
-
-const isValidPhoneNumber = (phone: string) => {
-  const phoneRegex = /^\+?[1-9]\d{1,14}$/
-  return phoneRegex.test(phone)
-}
-
-const isValidContact = (contact: string) => {
-  return isValidEmail(contact) || isValidPhoneNumber(contact)
-}
-
-const isValidHostname = (hostname: string) => {
-  const hostnameRegex = /^(?!:\/\/)([a-zA-Z0-9-_]{1,63}\.?)+[a-zA-Z]{2,6}$/
-  return hostnameRegex.test(hostname)
-}
+const isBypass = (value: any) => true
+const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+const isValidPhoneNumber = (phone: string) => /^\+?[1-9]\d{1,14}$/.test(phone)
+const isValidContact = (contact: string) =>
+  isValidEmail(contact) || isValidPhoneNumber(contact)
+const isValidHostname = (hostname: string) =>
+  /^(?!:\/\/)([a-zA-Z0-9-_]{1,63}\.?)+[a-zA-Z]{2,6}$/.test(hostname)
 
 // Props interface for useValidation hook
 interface UseValidationProps<T> {
-  initialValue: T
+  externalValue: T
+  setExternalValue: (value: T) => void
   validateFn: (value: T) => boolean
   errorMessage: string
-  emptyFieldMessage?: string // Optional custom message for empty fields
-  defaultResetValue?: T // Optional default reset value
+  emptyFieldMessage?: string
+  defaultValue: T
 }
 
 // Custom hook for input validation
-const useValidation = <T extends string | number | Date>(
+const useValidation = <T extends string | number | Date | boolean>(
   props: UseValidationProps<T>
 ) => {
   const {
-    initialValue,
+    externalValue,
+    setExternalValue,
     validateFn,
     errorMessage,
-    emptyFieldMessage = 'This field cannot be empty.', // Default message
-    defaultResetValue
+    emptyFieldMessage = 'This field cannot be empty.',
+    defaultValue
   } = props
 
-  const [value, setValue] = useState<T>(initialValue)
+  const [internalValue, setInternalValue] = useState(externalValue)
   const [error, setError] = useState('')
 
-  const handleChange = useCallback(
-    (newValue: T) => {
-      setValue(newValue)
+  const validate = useCallback(
+    (value: T) => {
       const stringValue =
-        newValue instanceof Date
-          ? newValue.toISOString()
-          : newValue.toString().trim()
+        value instanceof Date ? value.toISOString() : value.toString().trim()
       if (stringValue === '') {
         setError(emptyFieldMessage)
-      } else if (!validateFn(newValue)) {
+      } else if (!validateFn(value)) {
         setError(errorMessage)
       } else {
         setError('')
@@ -66,27 +50,26 @@ const useValidation = <T extends string | number | Date>(
     [emptyFieldMessage, errorMessage, validateFn]
   )
 
+  const handleChange = useCallback(
+    (newValue: T) => {
+      setInternalValue(newValue)
+      setExternalValue(newValue)
+      validate(newValue)
+    },
+    [setExternalValue, validate]
+  )
+
   useEffect(() => {
-    handleChange(initialValue)
-  }, [initialValue, handleChange])
+    setInternalValue(externalValue)
+    validate(externalValue)
+  }, [externalValue, validate])
 
   const reset = useCallback(() => {
-    const resetValue =
-      defaultResetValue !== undefined ? defaultResetValue : initialValue
+    setInternalValue(defaultValue)
+    setError('')
+  }, [defaultValue])
 
-    setValue(resetValue)
-    const stringValue =
-      resetValue instanceof Date
-        ? resetValue.toISOString()
-        : resetValue.toString().trim()
-    if (stringValue === '') {
-      setError(emptyFieldMessage)
-    } else {
-      setError('')
-    }
-  }, [defaultResetValue, initialValue, emptyFieldMessage])
-
-  return { value, error, handleChange, reset }
+  return { value: internalValue, error, handleChange, reset }
 }
 
 export {

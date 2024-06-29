@@ -4,11 +4,9 @@ import React, { FC, useState } from 'react'
 import { FaCog, FaBars } from 'react-icons/fa'
 import Link from 'next/link'
 
-interface TopMenuProps {
-  onToggleOffCanvas: () => void
-}
+interface TopMenuProps {}
 
-const TopMenu: FC<TopMenuProps> = ({ onToggleOffCanvas }) => {
+const TopMenu: FC<TopMenuProps> = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   const toggleMenu = () => {
@@ -44,9 +42,6 @@ const TopMenu: FC<TopMenuProps> = ({ onToggleOffCanvas }) => {
           </ul>
         )}
       </nav>
-      <button onClick={onToggleOffCanvas} className="ml-4">
-        <FaCog />
-      </button>
       <button onClick={toggleMenu} className="md:hidden">
         <FaBars />
       </button>
