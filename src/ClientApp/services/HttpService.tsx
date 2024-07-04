@@ -1,6 +1,13 @@
 import { store } from '@/redux/store'
 import { increment, decrement } from '@/redux/slices/loaderSlice'
 import { showToast } from '@/redux/slices/toastSlice'
+import { PatchOperation } from '@/models/PatchOperation'
+
+interface HttpResponse<T> {
+  data: T | null
+  status: number
+  isSuccess: boolean
+}
 
 interface RequestInterceptor {
   (req: XMLHttpRequest): void
@@ -47,7 +54,7 @@ class HttpService {
     method: string,
     url: string,
     data?: any
-  ): Promise<TResponse | null> {
+  ): Promise<HttpResponse<TResponse>> {
     const xhr = new XMLHttpRequest()
     xhr.open(method, url)
 
@@ -59,7 +66,7 @@ class HttpService {
 
     this.invokeIncrement()
 
-    return new Promise<TResponse | null>((resolve) => {
+    return new Promise<HttpResponse<TResponse>>((resolve) => {
       xhr.onload = () => this.handleLoad<TResponse>(xhr, resolve)
       xhr.onerror = () => this.handleNetworkError(resolve)
       xhr.send(data ? JSON.stringify(data) : null)
@@ -102,7 +109,7 @@ class HttpService {
 
   private handleLoad<TResponse>(
     xhr: XMLHttpRequest,
-    resolve: (value: TResponse | null) => void
+    resolve: (value: HttpResponse<TResponse>) => void
   ): void {
     this.invokeDecrement()
     if (xhr.status >= 200 && xhr.status < 300) {
@@ -114,14 +121,22 @@ class HttpService {
 
   private handleSuccessfulResponse<TResponse>(
     xhr: XMLHttpRequest,
-    resolve: (value: TResponse | null) => void
+    resolve: (value: HttpResponse<TResponse>) => void
   ): void {
     try {
       if (xhr.response) {
         const response = JSON.parse(xhr.response)
-        resolve(this.handleResponseInterceptors(response, null) as TResponse)
+        resolve({
+          data: this.handleResponseInterceptors(response, null) as TResponse,
+          status: xhr.status,
+          isSuccess: true
+        })
       } else {
-        resolve(null)
+        resolve({
+          data: null,
+          status: xhr.status,
+          isSuccess: true
+        })
       }
     } catch (error) {
       const problemDetails = this.createProblemDetails(
@@ -130,13 +145,17 @@ class HttpService {
         xhr.status
       )
       this.showProblemDetails(problemDetails)
-      resolve(null)
+      resolve({
+        data: null,
+        status: xhr.status,
+        isSuccess: false
+      })
     }
   }
 
   private handleErrorResponse<TResponse>(
     xhr: XMLHttpRequest,
-    resolve: (value: TResponse | null) => void
+    resolve: (value: HttpResponse<TResponse>) => void
   ): void {
     const problemDetails = this.createProblemDetails(
       xhr.statusText,
@@ -144,15 +163,23 @@ class HttpService {
       xhr.status
     )
     this.showProblemDetails(problemDetails)
-    resolve(this.handleResponseInterceptors(null, problemDetails))
+    resolve({
+      data: this.handleResponseInterceptors(null, problemDetails),
+      status: xhr.status,
+      isSuccess: false
+    })
   }
 
   private handleNetworkError<TResponse>(
-    resolve: (value: TResponse | null) => void
+    resolve: (value: HttpResponse<TResponse>) => void
   ): void {
     const problemDetails = this.createProblemDetails('Network Error', null, 0)
     this.showProblemDetails(problemDetails)
-    resolve(this.handleResponseInterceptors(null, problemDetails))
+    resolve({
+      data: this.handleResponseInterceptors(null, problemDetails),
+      status: 0,
+      isSuccess: false
+    })
   }
 
   private createProblemDetails(
@@ -178,26 +205,57 @@ class HttpService {
     }
   }
 
-  public async get<TResponse>(url: string): Promise<TResponse | null> {
+  public async get<TResponse>(url: string): Promise<HttpResponse<TResponse>> {
     return await this.request<TResponse>('GET', url)
   }
 
   public async post<TRequest, TResponse>(
     url: string,
     data: TRequest
-  ): Promise<TResponse | null> {
+  ): Promise<HttpResponse<TResponse>> {
     return await this.request<TResponse>('POST', url, data)
   }
 
   public async put<TRequest, TResponse>(
     url: string,
     data: TRequest
-  ): Promise<TResponse | null> {
+  ): Promise<HttpResponse<TResponse>> {
     return await this.request<TResponse>('PUT', url, data)
   }
 
-  public async delete<TResponse>(url: string): Promise<TResponse | null> {
-    return await this.request<TResponse>('DELETE', url)
+  private cleanPatchRequest(obj: any): any {
+    if (Array.isArray(obj)) {
+      const cleanedArray = obj
+        .map(this.cleanPatchRequest)
+        .filter((item) => item !== null && item !== undefined)
+      return cleanedArray.length > 0 ? cleanedArray : null
+    } else if (typeof obj === 'object' && obj !== null) {
+      if (obj.op !== undefined && obj.op === PatchOperation.None) {
+        return null
+      }
+
+      const cleanedObject: any = {}
+      Object.keys(obj).forEach((key) => {
+        const cleanedValue = this.cleanPatchRequest(obj[key])
+        if (cleanedValue !== null) {
+          cleanedObject[key] = cleanedValue
+        }
+      })
+      return Object.keys(cleanedObject).length > 0 ? cleanedObject : null
+    }
+    return obj
+  }
+
+  public async patch<TRequest, TResponse>(
+    url: string,
+    data: TRequest
+  ): Promise<HttpResponse<TResponse>> {
+    const cleanedData = this.cleanPatchRequest(data)
+    return await this.request<TResponse>('PATCH', url, cleanedData)
+  }
+
+  public async delete(url: string): Promise<HttpResponse<null>> {
+    return await this.request<null>('DELETE', url)
   }
 
   public addRequestInterceptor(interceptor: RequestInterceptor): void {
@@ -233,10 +291,10 @@ export { httpService }
 
 // Example usage of the httpService
 // async function fetchData() {
-//     const data = await httpService.get<any>('/api/data');
-//     if (data) {
-//         console.log('Data received:', data);
+//     const response = await httpService.get<any>('/api/data');
+//     if (response.isSuccess) {
+//         console.log('Data received:', response.data);
 //     } else {
-//         console.error('Failed to fetch data');
+//         console.error('Failed to fetch data, status code:', response.status);
 //     }
 // }

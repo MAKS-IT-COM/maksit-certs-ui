@@ -8,7 +8,7 @@ export interface CustomSelectOption {
 
 export interface CustomSelectPropsBase {
   selectedValue: string | null | undefined
-  onChange: (value: string) => void
+  onChange?: (value: string) => void
   readOnly?: boolean
   disabled?: boolean
   title?: string
@@ -45,7 +45,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
 
   const handleOptionClick = (option: CustomSelectOption) => {
     if (!readOnly && !disabled) {
-      onChange(option.value)
+      onChange?.(option.value)
       setIsOpen(false)
     }
   }

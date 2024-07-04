@@ -1,5 +1,6 @@
-enum PatchOperation {
+export enum PatchOperation {
   Add,
   Remove,
-  Replace
+  Replace,
+  None
 }

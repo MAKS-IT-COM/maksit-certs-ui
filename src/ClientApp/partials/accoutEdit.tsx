@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useCallback, useState } from 'react'
+import { Dispatch, FormEvent, SetStateAction, useEffect, useState } from 'react'
 import {
   useValidation,
   isValidEmail,
@@ -17,39 +17,71 @@ import {
 import { CacheAccount } from '@/entities/CacheAccount'
 import { FaPlus, FaTrash } from 'react-icons/fa'
 import { ChallengeTypes } from '@/entities/ChallengeTypes'
+import { deepCopy } from '@/functions'
+import { ApiRoutes, GetApiRoute } from '@/ApiRoutes'
+import { httpService } from '@/services/httpService'
+import { PatchAccountRequest } from '@/models/letsEncryptServer/account/requests/PatchAccountRequest'
+import { PatchOperation } from '@/models/PatchOperation'
+import { useAppDispatch } from '@/redux/store'
+import { showToast } from '@/redux/slices/toastSlice'
 
 interface AccountEditProps {
   account: CacheAccount
+  setAccount: Dispatch<SetStateAction<CacheAccount | null>>
   onCancel?: () => void
-  onSave?: (account: CacheAccount) => void
-  onDelete?: (accountId: string) => void
+  onSubmit?: (account: CacheAccount) => void
+  onDelete: (accountId: string) => void
 }
 
-const AccountEdit: React.FC<AccountEditProps> = (props) => {
-  const { account, onCancel, onSave, onDelete } = props
+const AccountEdit: React.FC<AccountEditProps> = ({
+  account,
+  setAccount,
+  onCancel,
+  onSubmit,
+  onDelete
+}) => {
+  const dispatch = useAppDispatch()
 
-  const [editingAccount, setEditingAccount] = useState<CacheAccount>(account)
+  const [newAccount, setNewAccount] = useState<PatchAccountRequest>({
+    description: { op: PatchOperation.None, value: account.description },
+    isDisabled: { op: PatchOperation.None, value: account.isDisabled },
+    contacts: account.contacts.map((contact) => ({
+      op: PatchOperation.None,
+      value: contact
+    })),
+    hostnames: account.hostnames?.map((hostname) => ({
+      hostname: { op: PatchOperation.None, value: hostname.hostname },
+      isDisabled: { op: PatchOperation.None, value: hostname.isDisabled }
+    }))
+  })
+
   const [newContact, setNewContact] = useState('')
   const [newHostname, setNewHostname] = useState('')
 
-  const setDescription = useCallback(
-    (newDescription: string) => {
-      if (editingAccount) {
-        setEditingAccount({ ...editingAccount, description: newDescription })
-      }
-    },
-    [editingAccount]
-  )
+  useEffect(() => {
+    console.log(newAccount)
+  }, [newAccount])
 
   const {
     value: description,
     error: descriptionError,
-    handleChange: handleDescriptionChange,
-    reset: resetDescription
+    handleChange: handleDescriptionChange
   } = useValidation<string>({
     defaultValue: '',
-    externalValue: account.description,
-    setExternalValue: setDescription,
+    externalValue: newAccount.description?.value ?? '',
+    setExternalValue: (newDescription) => {
+      setNewAccount((prev) => {
+        const newAccount = deepCopy(prev)
+        newAccount.description = {
+          op:
+            newDescription !== account.description
+              ? PatchOperation.Replace
+              : PatchOperation.None,
+          value: newDescription
+        }
+        return newAccount
+      })
+    },
     validateFn: isBypass,
     errorMessage: ''
   })
@@ -81,122 +113,147 @@ const AccountEdit: React.FC<AccountEditProps> = (props) => {
   })
 
   const handleIsDisabledChange = (value: boolean) => {
-    // setAccount({ ...account, isDisabled: value })
+    setNewAccount((prev) => {
+      const newAccount = deepCopy(prev)
+      newAccount.isDisabled = {
+        op:
+          value !== account.isDisabled
+            ? PatchOperation.Replace
+            : PatchOperation.None,
+        value
+      }
+      return newAccount
+    })
   }
 
-  const handleChallengeTypeChange = (option: any) => {
-    //setAccount({ ...account, challengeType: option.value })
+  const handleAddContact = () => {
+    if (newContact === '' || contactError) return
+
+    // Check if the contact already exists in the account
+    const contactExists = newAccount.contacts?.some(
+      (contact) => contact.value === newContact
+    )
+
+    if (contactExists) {
+      // Optionally, handle the duplicate contact case, e.g., show an error message
+      dispatch(
+        showToast({ message: 'Contact already exists.', type: 'warning' })
+      )
+      resetContact()
+      return
+    }
+
+    // If the contact does not exist, add it
+    setNewAccount((prev) => {
+      const newAccount = deepCopy(prev)
+      newAccount.contacts?.push({ op: PatchOperation.Add, value: newContact })
+      return newAccount
+    })
+
+    resetContact()
+  }
+
+  const handleDeleteContact = (contact: string) => {
+    setNewAccount((prev) => {
+      const newAccount = deepCopy(prev)
+      newAccount.contacts = newAccount.contacts
+        ?.map((c) => {
+          if (c.value === contact && c.op !== PatchOperation.Add)
+            c.op = PatchOperation.Remove
+          return c
+        })
+        .filter((c) => !(c.value === contact && c.op === PatchOperation.Add))
+      return newAccount
+    })
+  }
+
+  const handleAddHostname = () => {
+    if (newHostname === '' || hostnameError) return
+
+    // Check if the hostname already exists in the account
+    const hostnameExists = newAccount.hostnames?.some(
+      (hostname) => hostname.hostname?.value === newHostname
+    )
+
+    if (hostnameExists) {
+      // Optionally, handle the duplicate hostname case, e.g., show an error message
+      dispatch(
+        showToast({ message: 'Hostname already exists.', type: 'warning' })
+      )
+      resetHostname()
+      return
+    }
+
+    // If the hostname does not exist, add it
+    setNewAccount((prev) => {
+      const newAccount = deepCopy(prev)
+      newAccount.hostnames?.push({
+        hostname: { op: PatchOperation.Add, value: newHostname },
+        isDisabled: { op: PatchOperation.Add, value: false }
+      })
+      return newAccount
+    })
+
+    resetHostname()
   }
 
   const handleHostnameDisabledChange = (hostname: string, value: boolean) => {
-    //   setAccount({
-    //     ...account,
-    //     hostnames: account.hostnames.map((h) =>
-    //       h.hostname === hostname ? { ...h, isDisabled: value } : h
-    //     )
-    //   })
-    // }
-    // const handleStagingChange = (value: string) => {
-    //   setAccount({ ...account, isStaging: value === 'staging' })
+    setNewAccount((prev) => {
+      const newAccount = deepCopy(prev)
+      const targetHostname = newAccount.hostnames?.find(
+        (h) => h.hostname?.value === hostname
+      )
+      if (targetHostname) {
+        targetHostname.isDisabled = {
+          op:
+            value !== targetHostname.isDisabled?.value
+              ? PatchOperation.Replace
+              : PatchOperation.None,
+          value
+        }
+      }
+      return newAccount
+    })
   }
 
-  const deleteContact = (contact: string) => {
-    if (account?.contacts.length ?? 0 < 1) return
-
-    //   setAccount({
-    //     ...account,
-    //     contacts: account.contacts.filter((c) => c !== contact)
-    //   })
-    // }
-
-    // const addContact = () => {
-    //   if (newContact === '' || contactError) {
-    //     return
-    //   }
-
-    //   if (account.contacts.includes(newContact)) return
-
-    //   setAccount({ ...account, contacts: [...account.contacts, newContact] })
-    //   resetContact()
+  const handleDeleteHostname = (hostname: string) => {
+    setNewAccount((prev) => {
+      const newAccount = deepCopy(prev)
+      newAccount.hostnames = newAccount.hostnames
+        ?.map((h) => {
+          if (
+            h.hostname?.value === hostname &&
+            h.hostname?.op !== PatchOperation.Add
+          )
+            h.hostname.op = PatchOperation.Remove
+          return h
+        })
+        .filter(
+          (h) =>
+            !(
+              h.hostname?.value === hostname &&
+              h.hostname?.op === PatchOperation.Add
+            )
+        )
+      return newAccount
+    })
   }
 
-  const deleteHostname = (hostname: string) => {
-    //if (account?.hostnames.length ?? 0 < 1) return
-
-    //   setAccount({
-    //     ...account,
-    //     hostnames: account.hostnames.filter((h) => h.hostname !== hostname)
-    //   })
-    // }
-
-    // const addHostname = () => {
-    //   if (newHostname === '' || hostnameError) {
-    //     return
-    //   }
-
-    //   if (account.hostnames.some((h) => h.hostname === newHostname)) return
-
-    //   setAccount({
-    //     ...account,
-    //     hostnames: [
-    //       ...account.hostnames,
-    //       {
-    //         hostname: newHostname,
-    //         expires: new Date(),
-    //         isUpcomingExpire: false,
-    //         isDisabled: false
-    //       }
-    //     ]
-    //   })
-    resetHostname()
+  const handleCancel = () => {
+    onCancel?.()
   }
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
-    // const contactChanges = {
-    //   added: account.contacts.filter(
-    //     (contact) => !initialAccountState.contacts.includes(contact)
-    //   ),
-    //   removed: initialAccountState.contacts.filter(
-    //     (contact) => !account.contacts.includes(contact)
-    //   )
-    // }
+    httpService.patch<PatchAccountRequest, CacheAccount>(
+      GetApiRoute(ApiRoutes.ACCOUNT_ID, account.accountId),
+      newAccount
+    )
+  }
 
-    // const hostnameChanges = {
-    //   added: account.hostnames.filter(
-    //     (hostname) =>
-    //       !initialAccountState.hostnames.some(
-    //         (h) => h.hostname === hostname.hostname
-    //       )
-    //   ),
-    //   removed: initialAccountState.hostnames.filter(
-    //     (hostname) =>
-    //       !account.hostnames.some((h) => h.hostname === hostname.hostname)
-    //   )
-    // }
-
-    // // Handle contact changes
-    // if (contactChanges.added.length > 0) {
-    //   // TODO: POST new contacts
-    //   console.log('Added contacts:', contactChanges.added)
-    // }
-    // if (contactChanges.removed.length > 0) {
-    //   // TODO: DELETE removed contacts
-    //   console.log('Removed contacts:', contactChanges.removed)
-    // }
-
-    // // Handle hostname changes
-    // if (hostnameChanges.added.length > 0) {
-    //   // TODO: POST new hostnames
-    //   console.log('Added hostnames:', hostnameChanges.added)
-    // }
-    // if (hostnameChanges.removed.length > 0) {
-    //   // TODO: DELETE removed hostnames
-    //   console.log('Removed hostnames:', hostnameChanges.removed)
-    // }
-
-    // onSave(account)
+  const handleDelete = (accountId: string) => {
+    onDelete?.(accountId)
   }
 
   return (
@@ -217,19 +274,9 @@ const AccountEdit: React.FC<AccountEditProps> = (props) => {
 
       <div className="mb-4">
         <CustomCheckbox
-          checked={account.isDisabled}
+          checked={newAccount.isDisabled?.value ?? false}
           label="Disabled"
-          onChange={(value) => handleIsDisabledChange(value)}
-          className="mr-2 flex-grow"
-        />
-      </div>
-
-      <div className="mb-4">
-        <CustomEnumSelect
-          title="Challenge Type"
-          enumType={ChallengeTypes}
-          selectedValue={account.challengeType}
-          onChange={(option) => handleChallengeTypeChange(option)}
+          onChange={handleIsDisabledChange}
           className="mr-2 flex-grow"
         />
       </div>
@@ -237,22 +284,24 @@ const AccountEdit: React.FC<AccountEditProps> = (props) => {
       <div className="mb-4">
         <h3 className="text-xl font-medium mb-2">Contacts:</h3>
         <ul className="list-disc list-inside pl-4 mb-2">
-          {account.contacts.map((contact) => (
-            <li key={contact} className="text-gray-700 mb-2 inline-flex">
-              {contact}
-              <CustomButton
-                type="button"
-                onClick={() => deleteContact(contact)}
-                className="bg-red-500 text-white p-2 rounded ml-2"
-              >
-                <FaTrash />
-              </CustomButton>
+          {newAccount.contacts?.map((contact) => (
+            <li key={contact.value} className="text-gray-700 mb-2">
+              <div className="inline-flex">
+                {contact.value}
+                <CustomButton
+                  type="button"
+                  onClick={() => handleDeleteContact(contact.value ?? '')}
+                  className="bg-red-500 text-white p-2 rounded ml-2"
+                >
+                  <FaTrash />
+                </CustomButton>
+              </div>
             </li>
           ))}
         </ul>
         <div className="flex items-center mb-4">
           <CustomInput
-            value={newContact}
+            value={contact}
             onChange={handleContactChange}
             placeholder="Add new contact"
             type="email"
@@ -264,43 +313,49 @@ const AccountEdit: React.FC<AccountEditProps> = (props) => {
           />
           <CustomButton
             type="button"
-            //onClick={addContact}
+            onClick={handleAddContact}
             className="bg-green-500 text-white p-2 rounded ml-2"
           >
             <FaPlus />
           </CustomButton>
         </div>
       </div>
+
+      <div className="mb-4">
+        <CustomEnumSelect
+          title="Challenge Type"
+          enumType={ChallengeTypes}
+          selectedValue={account.challengeType}
+          className="mr-2 flex-grow"
+          disabled={true}
+        />
+      </div>
+
       <div>
         <h3 className="text-xl font-medium mb-2">Hostnames:</h3>
         <ul className="list-disc list-inside pl-4 mb-2">
-          {account.hostnames?.map((hostname) => (
-            <li key={hostname.hostname} className="text-gray-700 mb-2">
+          {newAccount.hostnames?.map((hostname) => (
+            <li key={hostname.hostname?.value} className="text-gray-700 mb-2">
               <div className="inline-flex">
-                {hostname.hostname} - {hostname.expires.toDateString()} -{' '}
-                <span
-                  className={`ml-2 px-2 py-1 rounded ${
-                    hostname.isUpcomingExpire
-                      ? 'bg-yellow-200 text-yellow-800'
-                      : 'bg-green-200 text-green-800'
-                  }`}
-                >
-                  {hostname.isUpcomingExpire ? 'Upcoming' : 'Not Upcoming'}
-                </span>{' '}
-                -{' '}
+                {hostname.hostname?.value} -{' '}
                 <CustomCheckbox
                   className="ml-2"
-                  checked={hostname.isDisabled}
+                  checked={hostname.isDisabled?.value ?? false}
                   label="Disabled"
                   onChange={(value) =>
-                    handleHostnameDisabledChange(hostname.hostname, value)
+                    handleHostnameDisabledChange(
+                      hostname.hostname?.value ?? '',
+                      value
+                    )
                   }
                 />
               </div>
 
               <CustomButton
                 type="button"
-                onClick={() => deleteHostname(hostname.hostname)}
+                onClick={() =>
+                  handleDeleteHostname(hostname.hostname?.value ?? '')
+                }
                 className="bg-red-500 text-white p-2 rounded ml-2"
               >
                 <FaTrash />
@@ -310,7 +365,7 @@ const AccountEdit: React.FC<AccountEditProps> = (props) => {
         </ul>
         <div className="flex items-center">
           <CustomInput
-            value={newHostname}
+            value={hostname}
             onChange={handleHostnameChange}
             placeholder="Add new hostname"
             type="text"
@@ -322,7 +377,7 @@ const AccountEdit: React.FC<AccountEditProps> = (props) => {
           />
           <CustomButton
             type="button"
-            //onClick={addHostname}
+            onClick={handleAddHostname}
             className="bg-green-500 text-white p-2 rounded ml-2"
           >
             <FaPlus />
@@ -345,13 +400,15 @@ const AccountEdit: React.FC<AccountEditProps> = (props) => {
       </div>
       <div className="flex justify-between mt-4">
         <CustomButton
-          //onClick={() => onDelete(account.accountId)}
+          type="button"
+          onClick={() => handleDelete(account.accountId)}
           className="bg-red-500 text-white p-2 rounded ml-2"
         >
           <FaTrash />
         </CustomButton>
         <CustomButton
-          onClick={onCancel}
+          type="button"
+          onClick={handleCancel}
           className="bg-yellow-500 text-white p-2 rounded ml-2"
         >
           Cancel

@@ -18,6 +18,7 @@ import { FaPlus, FaTrash } from 'react-icons/fa'
 import { PageContainer } from '@/components/pageContainer'
 import { OffCanvas } from '@/components/offcanvas'
 import { AccountEdit } from '@/partials/accoutEdit'
+import { get } from 'http'
 
 export default function Page() {
   const [accounts, setAccounts] = useState<CacheAccount[]>([])
@@ -34,11 +35,13 @@ export default function Page() {
 
     const fetchAccounts = async () => {
       const newAccounts: CacheAccount[] = []
-      const accounts = await httpService.get<GetAccountResponse[]>(
+      const gatAccountsResult = await httpService.get<GetAccountResponse[]>(
         GetApiRoute(ApiRoutes.ACCOUNTS)
       )
 
-      accounts?.forEach((account) => {
+      if (!gatAccountsResult.isSuccess) return
+
+      gatAccountsResult.data?.forEach((account) => {
         newAccounts.push({
           accountId: account.accountId,
           isDisabled: account.isDisabled,
@@ -79,10 +82,15 @@ export default function Page() {
   }
 
   const deleteAccount = (accountId: string) => {
-    setAccounts(accounts.filter((account) => account.accountId !== accountId))
-
-    // TODO: Revoke all certificates
-    // TODO: Remove from cache
+    httpService
+      .delete(GetApiRoute(ApiRoutes.ACCOUNT_ID, accountId))
+      .then((response) => {
+        if (response.isSuccess) {
+          setAccounts(
+            accounts.filter((account) => account.accountId !== accountId)
+          )
+        }
+      })
   }
 
   return (
@@ -195,7 +203,14 @@ export default function Page() {
         isOpen={editingAccount !== null}
         onClose={() => setEditingAccount(null)}
       >
-        {editingAccount && <AccountEdit account={editingAccount} />}
+        {editingAccount && (
+          <AccountEdit
+            account={editingAccount}
+            setAccount={setEditingAccount}
+            onCancel={() => setEditingAccount(null)}
+            onDelete={deleteAccount}
+          />
+        )}
       </OffCanvas>
     </>
   )

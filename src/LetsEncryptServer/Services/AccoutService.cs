@@ -182,6 +182,9 @@ public class AccountService : IAccountService {
   }
 
   public async Task<IDomainResult> DeleteAccountAsync(Guid accountId) {
+    // TODO: Revoke all certificates
+
+    // Remove from cache
     return await _cacheService.DeleteFromCacheAsync(accountId);
   }
   #endregion

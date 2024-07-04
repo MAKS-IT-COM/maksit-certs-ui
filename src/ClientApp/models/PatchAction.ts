@@ -1,3 +1,5 @@
+import { PatchOperation } from './PatchOperation'
+
 export interface PatchAction<T> {
   op: PatchOperation // Enum for operation type
   index?: number // Index for the operation (for arrays/lists)

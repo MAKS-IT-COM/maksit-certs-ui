@@ -216,10 +216,11 @@ public class CertsFlowService : ICertsFlowService {
   public (string?, IDomainResult) AcmeChallenge(string fileName) {
     DeleteExporedChallenges();
 
-    var fileContent = File.ReadAllText(Path.Combine(_acmePath, fileName));
-    if (fileContent == null)
+    var challengePath = Path.Combine(_acmePath, fileName);
+    if(!File.Exists(challengePath))
       return IDomainResult.NotFound<string?>();
 
+    var fileContent = File.ReadAllText(Path.Combine(_acmePath, fileName));
     return IDomainResult.Success(fileContent);
   }
 
