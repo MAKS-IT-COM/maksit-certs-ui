@@ -1,7 +1,7 @@
 'use client'
 
 import { ApiRoutes, GetApiRoute } from '@/ApiRoutes'
-import { httpService } from '@/services/httpService'
+import { httpService } from '@/services/HttpService'
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import {
   CustomButton,
@@ -10,7 +10,10 @@ import {
   CustomInput,
   CustomRadioGroup
 } from '@/controls'
-import { GetAccountResponse } from '@/models/letsEncryptServer/account/responses/GetAccountResponse'
+import {
+  GetAccountResponse,
+  toCacheAccount
+} from '@/models/letsEncryptServer/account/responses/GetAccountResponse'
 import { deepCopy, enumToArray } from '../functions'
 import { CacheAccount } from '@/entities/CacheAccount'
 import { ChallengeTypes } from '@/entities/ChallengeTypes'
@@ -42,22 +45,7 @@ export default function Page() {
       if (!gatAccountsResult.isSuccess) return
 
       gatAccountsResult.data?.forEach((account) => {
-        newAccounts.push({
-          accountId: account.accountId,
-          isDisabled: account.isDisabled,
-          description: account.description,
-          contacts: account.contacts.map((contact) => contact),
-          challengeType: account.challengeType,
-          hostnames:
-            account.hostnames?.map((hostname) => ({
-              hostname: hostname.hostname,
-              expires: new Date(hostname.expires),
-              isUpcomingExpire: hostname.isUpcomingExpire,
-              isDisabled: hostname.isDisabled
-            })) ?? [],
-          isStaging: account.isStaging,
-          isEditMode: false
-        })
+        newAccounts.push(toCacheAccount(account))
       })
 
       setAccounts(newAccounts)
@@ -144,10 +132,6 @@ export default function Page() {
                 title="Challenge Type"
                 enumType={ChallengeTypes}
                 selectedValue={account.challengeType}
-                onChange={(option) =>
-                  //handleChallengeTypeChange(account.accountId, option)
-                  console.log('')
-                }
                 disabled={true}
               />
             </div>
@@ -206,9 +190,12 @@ export default function Page() {
         {editingAccount && (
           <AccountEdit
             account={editingAccount}
-            setAccount={setEditingAccount}
             onCancel={() => setEditingAccount(null)}
             onDelete={deleteAccount}
+            onSubmit={(account) => {
+              setEditingAccount(null)
+              handleAccountUpdate(account)
+            }}
           />
         )}
       </OffCanvas>

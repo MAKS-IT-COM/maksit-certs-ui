@@ -1,4 +1,6 @@
+import { PatchOperation } from '@/models/PatchOperation'
 import { CacheAccountHostname } from './CacheAccountHostname'
+import { PatchAccountRequest } from '@/models/letsEncryptServer/account/requests/PatchAccountRequest'
 
 export interface CacheAccount {
   accountId: string
@@ -10,3 +12,29 @@ export interface CacheAccount {
   isEditMode: boolean
   isStaging: boolean
 }
+
+const toPatchAccountRequest = (account: CacheAccount): PatchAccountRequest => {
+  return {
+    description: { op: PatchOperation.None, value: account.description },
+    isDisabled: { op: PatchOperation.None, value: account.isDisabled },
+    contacts: account.contacts.map((contact, index) => ({
+      index: index,
+      op: PatchOperation.None,
+      value: contact
+    })),
+    hostnames: account.hostnames?.map((hostname, index) => ({
+      hostname: {
+        index: index,
+        op: PatchOperation.None,
+        value: hostname.hostname
+      },
+      isDisabled: {
+        index: index,
+        op: PatchOperation.None,
+        value: hostname.isDisabled
+      }
+    }))
+  }
+}
+
+export { toPatchAccountRequest }

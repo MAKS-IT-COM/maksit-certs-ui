@@ -18,12 +18,12 @@ import { deepCopy } from '../../functions'
 import {
   PostAccountRequest,
   validatePostAccountRequest
-} from '@/models/letsEncryptServer/certsFlow/PostAccountRequest'
+} from '@/models/letsEncryptServer/account/requests/PostAccountRequest'
 import { useAppDispatch } from '@/redux/store'
 import { showToast } from '@/redux/slices/toastSlice'
 import { ChallengeTypes } from '@/entities/ChallengeTypes'
 import { GetAccountResponse } from '@/models/letsEncryptServer/account/responses/GetAccountResponse'
-import { httpService } from '@/services/httpService'
+import { httpService } from '@/services/HttpService'
 import { ApiRoutes, GetApiRoute } from '@/ApiRoutes'
 import { PageContainer } from '@/components/pageContainer'
 

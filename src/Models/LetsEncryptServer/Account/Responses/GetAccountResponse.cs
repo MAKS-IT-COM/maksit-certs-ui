@@ -15,7 +15,7 @@ namespace MaksIT.Models.LetsEncryptServer.Account.Responses {
 
     public string? ChallengeType { get; set; }
 
-    public HostnameResponse[]? Hostnames { get; set; }
+    public GetHostnameResponse[]? Hostnames { get; set; }
 
     public required bool IsStaging { get; set; }
   }

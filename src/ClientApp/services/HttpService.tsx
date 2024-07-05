@@ -73,6 +73,29 @@ class HttpService {
     })
   }
 
+  private cleanObject = (obj: any): any => {
+    if (Array.isArray(obj)) {
+      const cleanedArray = obj
+        .map(this.cleanObject)
+        .filter((item) => item !== null && item !== undefined)
+      return cleanedArray.length > 0 ? cleanedArray : null
+    } else if (typeof obj === 'object' && obj !== null) {
+      if (obj.op !== undefined && obj.op === PatchOperation.None) {
+        return null
+      }
+
+      const cleanedObject: any = {}
+      Object.keys(obj).forEach((key) => {
+        const cleanedValue = this.cleanObject(obj[key])
+        if (cleanedValue !== null) {
+          cleanedObject[key] = cleanedValue
+        }
+      })
+      return Object.keys(cleanedObject).length > 0 ? cleanedObject : null
+    }
+    return obj
+  }
+
   private handleRequestInterceptors(xhr: XMLHttpRequest): void {
     this.requestInterceptors.forEach((interceptor) => {
       try {
@@ -223,34 +246,12 @@ class HttpService {
     return await this.request<TResponse>('PUT', url, data)
   }
 
-  private cleanPatchRequest(obj: any): any {
-    if (Array.isArray(obj)) {
-      const cleanedArray = obj
-        .map(this.cleanPatchRequest)
-        .filter((item) => item !== null && item !== undefined)
-      return cleanedArray.length > 0 ? cleanedArray : null
-    } else if (typeof obj === 'object' && obj !== null) {
-      if (obj.op !== undefined && obj.op === PatchOperation.None) {
-        return null
-      }
-
-      const cleanedObject: any = {}
-      Object.keys(obj).forEach((key) => {
-        const cleanedValue = this.cleanPatchRequest(obj[key])
-        if (cleanedValue !== null) {
-          cleanedObject[key] = cleanedValue
-        }
-      })
-      return Object.keys(cleanedObject).length > 0 ? cleanedObject : null
-    }
-    return obj
-  }
-
   public async patch<TRequest, TResponse>(
     url: string,
     data: TRequest
   ): Promise<HttpResponse<TResponse>> {
-    const cleanedData = this.cleanPatchRequest(data)
+    // Clean the data before sending the patch request
+    const cleanedData = this.cleanObject(data)
     return await this.request<TResponse>('PATCH', url, cleanedData)
   }
 

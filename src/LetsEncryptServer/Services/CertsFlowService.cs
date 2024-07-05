@@ -23,6 +23,7 @@ public interface ICertsInternalService : ICertsCommonService {
   Task<IDomainResult> GetOrderAsync(Guid sessionId, string[] hostnames);
   Task<IDomainResult> GetCertificatesAsync(Guid sessionId, string[] hostnames);
   Task<(Dictionary<string, string>?, IDomainResult)> ApplyCertificatesAsync(Guid sessionId, string[] hostnames);
+  Task<(Guid?, IDomainResult)> FullFlow(bool isStaging, Guid? accountId, string description, string[] contacts, string challengeType, string[] hostnames);
 }
 
 public interface ICertsRestService : ICertsCommonService {
@@ -187,6 +188,39 @@ public class CertsFlowService : ICertsFlowService {
 
     return IDomainResult.Success(results);
   }
+
+  public async Task<(Guid?, IDomainResult)> FullFlow(bool isStaging, Guid? accountId, string description, string[] contacts, string challengeType, string[]hostnames) {
+    var (sessionId, configureClientResult) = await ConfigureClientAsync(isStaging);
+    if (!configureClientResult.IsSuccess || sessionId == null)
+      return (null, configureClientResult);
+    
+    (accountId, var initResult) = await InitAsync(sessionId.Value, accountId, description, contacts);
+    if (!initResult.IsSuccess)
+      return (null, initResult);
+    
+    var (_, newOrderResult) = await NewOrderAsync(sessionId.Value, hostnames, challengeType);
+    if (!newOrderResult.IsSuccess)
+      return (null, newOrderResult);
+    
+    var challengeResult = await CompleteChallengesAsync(sessionId.Value);
+    if (!challengeResult.IsSuccess)
+      return (null, challengeResult);
+    
+    var getOrderResult = await GetOrderAsync(sessionId.Value, hostnames);
+    if (!getOrderResult.IsSuccess)
+      return (null, getOrderResult);
+    
+    var certs = await GetCertificatesAsync(sessionId.Value, hostnames);
+    if (!certs.IsSuccess)
+      return (null, certs);
+    
+    var (_, applyCertsResult) = await ApplyCertificatesAsync(sessionId.Value, hostnames);
+    if (!applyCertsResult.IsSuccess)
+      return (null, applyCertsResult);
+
+    return IDomainResult.Success(accountId);
+  }
+
 
   #endregion
 

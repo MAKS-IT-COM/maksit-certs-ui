@@ -15,11 +15,10 @@ public class RegistrationCache {
   /// </summary>
   public required Guid AccountId { get; set; }
   public bool IsDisabled { get; set; }
-  public string? Description { get; set; }
+  public required string Description { get; set; }
   public required string[] Contacts { get; set; }
-  public string? ChallengeType { get; set; }
-
   public required bool IsStaging { get; set; }
+  public string? ChallengeType { get; set; }
   #endregion
 
 

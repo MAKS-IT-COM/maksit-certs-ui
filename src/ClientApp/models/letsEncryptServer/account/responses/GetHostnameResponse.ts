@@ -1,4 +1,4 @@
-export interface HostnameResponse {
+export interface GetHostnameResponse {
   hostname: string
   expires: string
   isUpcomingExpire: boolean

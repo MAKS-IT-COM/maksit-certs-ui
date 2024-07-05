@@ -1,14 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿
 
-namespace MaksIT.Models.LetsEncryptServer.Account.Requests {
-  public class PatchAccountRequest {
+namespace MaksIT.Models.LetsEncryptServer.Account.Requests;
 
-    public PatchAction<string>? Description { get; set; }
+public class PatchAccountRequest {
 
-    public List<PatchAction<string>>? Contacts { get; set; }
-  }
+  public PatchAction<string>? Description { get; set; }
+
+  public PatchAction<bool>? IsDisabled { get; set; }
+
+  public List<PatchAction<string>>? Contacts { get; set; }
+
+  public List<PatchHostnameRequest>? Hostnames { get; set; }
 }
