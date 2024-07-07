@@ -23,6 +23,8 @@ using MaksIT.LetsEncrypt.Models.Requests;
 using MaksIT.LetsEncrypt.Entities.Jws;
 using MaksIT.LetsEncrypt.Entities.LetsEncrypt;
 using System.Net.Mime;
+using System;
+using System.Security.Principal;
 
 namespace MaksIT.LetsEncrypt.Services;
 
@@ -71,21 +73,27 @@ public class LetsEncryptService : ILetsEncryptService {
         ? "https://acme-staging-v02.api.letsencrypt.org/directory"
         : "https://acme-v02.api.letsencrypt.org/directory");
 
-      
-
       if (state.Directory == null) {
-        var (directory, getAcmeDirectoryResult) = await SendAsync<AcmeDirectory>(sessionId, HttpMethod.Get, new Uri("directory", UriKind.Relative), false, null);
-        if (!getAcmeDirectoryResult.IsSuccess || directory == null)
-          return getAcmeDirectoryResult;
+          var request = new HttpRequestMessage(HttpMethod.Get, new Uri("directory", UriKind.Relative));
+          await HandleNonceAsync(sessionId, new Uri("directory", UriKind.Relative), state);
 
-        state.Directory = directory.Result;
+          var response = await _httpClient.SendAsync(request);
+          UpdateStateNonceIfNeededAsync(response, state, HttpMethod.Get);
+
+          var responseText = await response.Content.ReadAsStringAsync();            
+          HandleProblemResponseAsync(response, responseText);
+
+          var directory = ProcessResponseContent<AcmeDirectory>(response, responseText);
+
+          state.Directory = directory.Result;
       }
 
       return IDomainResult.Success();
     }
     catch (Exception ex) {
-      _logger.LogError(ex, "Let's Encrypt client unhandled exception");
-      return IDomainResult.CriticalDependencyError();
+      const string message = "Let's Encrypt client unhandled exception";
+      _logger.LogError(ex, message);
+      return IDomainResult.CriticalDependencyError(message);
     }
   }
   #endregion
@@ -117,12 +125,10 @@ public class LetsEncryptService : ILetsEncryptService {
       if (cache != null && cache.AccountKey != null) {
         state.Cache = cache;
         accountKey.ImportCspBlob(cache.AccountKey);
-
         state.JwsService = new JwsService(accountKey);
         state.JwsService.SetKeyId(cache.Location.ToString());
       }
       else {
-        // New Account request
         state.JwsService = new JwsService(accountKey);
 
         var letsEncryptOrder = new Account {
@@ -130,15 +136,27 @@ public class LetsEncryptService : ILetsEncryptService {
           Contacts = contacts.Select(contact => $"mailto:{contact}").ToArray()
         };
 
-        var (account, postAccountResult) = await SendAsync<Account>(sessionId, HttpMethod.Post, state.Directory.NewAccount, false, letsEncryptOrder);
-        if (!postAccountResult.IsSuccess || account?.Result?.Location == null)
-          return postAccountResult;
+        var request = new HttpRequestMessage(HttpMethod.Post, state.Directory.NewAccount);
 
         
-        state.JwsService.SetKeyId(account.Result.Location.ToString());
+        await HandleNonceAsync(sessionId, state.Directory.NewAccount, state);
 
-        if (account.Result.Status != "valid") {
-          _logger.LogError($"Account status is not valid, was: {account.Result.Status} \r\n {account.ResponseText}");
+        var jwsHeader = CreateJwsHeader(state.Directory.NewAccount, state.Nonce);
+        var json = EncodeMessage(false, letsEncryptOrder, state, jwsHeader);
+        PrepareRequestContent(request, json, HttpMethod.Post);
+
+        var response = await _httpClient.SendAsync(request);
+        UpdateStateNonceIfNeededAsync(response, state, HttpMethod.Post);
+
+        var responseText = await response.Content.ReadAsStringAsync();
+        HandleProblemResponseAsync(response, responseText);
+
+        var result = ProcessResponseContent<Account>(response, responseText);
+
+        state.JwsService.SetKeyId(result.Result.Location.ToString());
+
+        if (result.Result.Status != "valid") {
+          _logger.LogError($"Account status is not valid, was: {result.Result.Status} \r\n {result.ResponseText}");
           return IDomainResult.Failed();
         }
 
@@ -147,22 +165,20 @@ public class LetsEncryptService : ILetsEncryptService {
           Description = description,
           Contacts = contacts,
           IsStaging = state.IsStaging,
-
-          Location = account.Result.Location,
+          Location = result.Result.Location,
           AccountKey = accountKey.ExportCspBlob(true),
-          Id = account.Result.Id,
-          Key = account.Result.Key
+          Id = result.Result.Id,
+          Key = result.Result.Key
         };
       }
 
       return IDomainResult.Success();
     }
     catch (Exception ex) {
-      var message = "Let's Encrypt client unhandled exception";
+      const string message = "Let's Encrypt client unhandled exception";
       _logger.LogError(ex, message);
       return IDomainResult.CriticalDependencyError(message);
     }
-
   }
   #endregion
 
@@ -214,10 +230,20 @@ public class LetsEncryptService : ILetsEncryptService {
         }).ToArray()
       };
 
-      var (order, postNewOrderResult) = await SendAsync<Order>(sessionId, HttpMethod.Post, state.Directory.NewOrder, false, letsEncryptOrder);
-      if (!postNewOrderResult.IsSuccess) {
-        return (null, postNewOrderResult);
-      }
+      var request = new HttpRequestMessage(HttpMethod.Post, state.Directory.NewOrder);
+      await HandleNonceAsync(sessionId, state.Directory.NewOrder, state);
+                
+      var jwsHeader = CreateJwsHeader(state.Directory.NewOrder, state.Nonce);
+      var json = EncodeMessage(false, letsEncryptOrder, state, jwsHeader);
+      PrepareRequestContent(request, json, HttpMethod.Post);
+ 
+      var response = await _httpClient.SendAsync(request);
+      UpdateStateNonceIfNeededAsync(response, state, HttpMethod.Post);
+
+      var responseText = await response.Content.ReadAsStringAsync();
+      HandleProblemResponseAsync(response, responseText);
+
+      var order = ProcessResponseContent<Order>(response, responseText);
 
       if (order.Result.Status == "ready")
         return IDomainResult.Success(new Dictionary<string, string>());
@@ -228,19 +254,34 @@ public class LetsEncryptService : ILetsEncryptService {
       }
 
       state.CurrentOrder = order.Result;
-
+      
       var results = new Dictionary<string, string>();
-      foreach (var item in order.Result.Authorizations) {
-        var (challengeResponse, postAuthorisationChallengeResult) = await SendAsync<AuthorizationChallengeResponse>(sessionId, HttpMethod.Post, item, true, null);
-        if (!postAuthorisationChallengeResult.IsSuccess) {
-          return (null, postAuthorisationChallengeResult);
-        }
+      foreach (var item in state.CurrentOrder.Authorizations) {
+
+        request = new HttpRequestMessage(HttpMethod.Post, item);
+        await HandleNonceAsync(sessionId, item, state);
+
+          
+        jwsHeader = CreateJwsHeader(item, state.Nonce);
+        json = EncodeMessage(true, null, state, jwsHeader);
+        PrepareRequestContent(request, json, HttpMethod.Post);
+
+          
+
+        response = await _httpClient.SendAsync(request);
+        UpdateStateNonceIfNeededAsync(response, state, HttpMethod.Post);
+
+        responseText = await response.Content.ReadAsStringAsync();
+        HandleProblemResponseAsync(response, responseText);
+
+        var challengeResponse = ProcessResponseContent<AuthorizationChallengeResponse>(response, responseText);
+
 
         if (challengeResponse.Result.Status == "valid")
           continue;
 
         if (challengeResponse.Result.Status != "pending") {
-          _logger.LogError($"Expected authorization status 'pending', but got: {order.Result.Status} \r\n {challengeResponse.ResponseText}");
+          _logger.LogError($"Expected authorization status 'pending', but got: {state.CurrentOrder.Status} \r\n {challengeResponse.ResponseText}");
           return IDomainResult.Failed<Dictionary<string, string>?>();
         }
 
@@ -305,10 +346,22 @@ public class LetsEncryptService : ILetsEncryptService {
               break;
           }
 
-          var (authChallenge, postAuthChallengeResult) = await SendAsync<AuthorizationChallengeResponse>(sessionId, HttpMethod.Post, challenge.Url, false, "{}");
-          if (!postAuthChallengeResult.IsSuccess) {
-            return postAuthChallengeResult;
-          }
+          var request = new HttpRequestMessage(HttpMethod.Post, challenge.Url);
+          await HandleNonceAsync(sessionId, challenge.Url, state);
+
+          var jwsHeader = CreateJwsHeader(challenge.Url, state.Nonce);
+          var json = EncodeMessage(false, "{}", state, jwsHeader);
+          PrepareRequestContent(request, json, HttpMethod.Post);
+
+          var response = await _httpClient.SendAsync(request);
+          UpdateStateNonceIfNeededAsync(response, state, HttpMethod.Post);
+
+          var responseText = await response.Content.ReadAsStringAsync();
+          HandleProblemResponseAsync(response, responseText);
+
+          var authChallenge = ProcessResponseContent<AuthorizationChallengeResponse>(response, responseText);
+          //return IDomainResult.Success(result);
+
 
           if (authChallenge.Result.Status == "valid")
             break;
@@ -351,12 +404,22 @@ public class LetsEncryptService : ILetsEncryptService {
         }).ToArray()
       };
 
-      var (order, postOrderResult) = await SendAsync<Order>(sessionId, HttpMethod.Post, state.Directory.NewOrder, false, letsEncryptOrder);
-      if (!postOrderResult.IsSuccess)
-        return postOrderResult;
+      var request = new HttpRequestMessage(HttpMethod.Post, state.Directory.NewOrder);
+      await HandleNonceAsync(sessionId, state.Directory.NewOrder, state);
+        
+      var jwsHeader = CreateJwsHeader(state.Directory.NewOrder, state.Nonce);
+      var json = EncodeMessage(false, letsEncryptOrder, state, jwsHeader);
+      PrepareRequestContent(request, json, HttpMethod.Post);
 
+      var response = await _httpClient.SendAsync(request);
+      UpdateStateNonceIfNeededAsync(response, state, HttpMethod.Post);
+
+      var responseText = await response.Content.ReadAsStringAsync();
+      HandleProblemResponseAsync(response, responseText);
+
+      var order = ProcessResponseContent<Order>(response, responseText);
       state.CurrentOrder = order.Result;
-
+      
       return IDomainResult.Success();
     }
     catch (Exception ex) {
@@ -402,14 +465,47 @@ public class LetsEncryptService : ILetsEncryptService {
         await GetOrder(sessionId, state.CurrentOrder.Identifiers.Select(x => x.Value).ToArray());
 
         if (state.CurrentOrder.Status == "ready") {
-          var (order, postOrderResult) = await SendAsync<Order>(sessionId, HttpMethod.Post, state.CurrentOrder.Finalize, false, letsEncryptOrder);
-          if (!postOrderResult.IsSuccess || order?.Result == null)
-            return postOrderResult;
+          
+          
+          var request = new HttpRequestMessage(HttpMethod.Post, state.CurrentOrder.Finalize);
+          await HandleNonceAsync(sessionId, state.CurrentOrder.Finalize, state);
+
+            
+          var jwsHeader = CreateJwsHeader(state.CurrentOrder.Finalize, state.Nonce);
+          var json = EncodeMessage(false, letsEncryptOrder, state, jwsHeader);
+          PrepareRequestContent(request, json, HttpMethod.Post);
+
+            
+
+          var response = await _httpClient.SendAsync(request);
+          UpdateStateNonceIfNeededAsync(response, state, HttpMethod.Post);
+
+          var responseText = await response.Content.ReadAsStringAsync();
+          HandleProblemResponseAsync(response, responseText);
+
+          var order = ProcessResponseContent<Order>(response, responseText);
+
+
 
           if (order.Result.Status == "processing") {
-            (order, postOrderResult) = await SendAsync<Order>(sessionId, HttpMethod.Post, state.CurrentOrder.Location, true, null);
-            if (!postOrderResult.IsSuccess || order?.Result == null)
-              return postOrderResult;
+
+            request = new HttpRequestMessage(HttpMethod.Post, state.CurrentOrder.Location);
+            await HandleNonceAsync(sessionId, state.CurrentOrder.Location, state);
+
+                
+            jwsHeader = CreateJwsHeader(state.CurrentOrder.Location, state.Nonce);
+            json = EncodeMessage(true, null, state, jwsHeader);
+            PrepareRequestContent(request, json, HttpMethod.Post);
+
+                
+
+            response = await _httpClient.SendAsync(request);
+            UpdateStateNonceIfNeededAsync(response, state, HttpMethod.Post);
+
+            responseText = await response.Content.ReadAsStringAsync();
+            HandleProblemResponseAsync(response, responseText);
+
+            order = ProcessResponseContent<Order>(response, responseText);
           }
 
           if (order.Result.Status == "valid") {
@@ -423,9 +519,26 @@ public class LetsEncryptService : ILetsEncryptService {
         await Task.Delay(1000);
       }     
 
-      var (pem, postPemResult) = await SendAsync<string>(sessionId, HttpMethod.Post, certificateUrl, true, null);
-      if (!postPemResult.IsSuccess || pem?.Result == null)
-        return postPemResult;
+      
+
+      var finalRequest = new HttpRequestMessage(HttpMethod.Post, certificateUrl);
+      await HandleNonceAsync(sessionId, certificateUrl, state);
+
+        
+      var finalJwsHeader = CreateJwsHeader(certificateUrl, state.Nonce);
+      var finalJson = EncodeMessage(true, null, state, finalJwsHeader);
+      PrepareRequestContent(finalRequest, finalJson, HttpMethod.Post);
+
+        
+
+      var finalResponse = await _httpClient.SendAsync(finalRequest);
+      UpdateStateNonceIfNeededAsync(finalResponse, state, HttpMethod.Post);
+
+      var finalResponseText = await finalResponse.Content.ReadAsStringAsync();
+      HandleProblemResponseAsync(finalResponse, finalResponseText);
+
+      var pem = ProcessResponseContent<string>(finalResponse, finalResponseText);
+        
 
       if (state.Cache == null) {
         _logger.LogError($"{nameof(state.Cache)} is null");
@@ -440,6 +553,8 @@ public class LetsEncryptService : ILetsEncryptService {
       };
 
       var cert = new X509Certificate2(Encoding.UTF8.GetBytes(pem.Result));
+      
+
 
       return IDomainResult.Success();
     }
@@ -491,15 +606,25 @@ public class LetsEncryptService : ILetsEncryptService {
         Reason = (int)reason
       };
 
-      var (revokeResult, domainResult) = await SendAsync<object>(sessionId, HttpMethod.Post, state.Directory.RevokeCert, false, revokeRequest);
-      if (!domainResult.IsSuccess) {
-        return domainResult;
-      }
+      var request = new HttpRequestMessage(HttpMethod.Post, state.Directory.RevokeCert);
+      await HandleNonceAsync(sessionId, state.Directory.RevokeCert, state);
+
+      var jwsHeader = CreateJwsHeader(state.Directory.RevokeCert, state.Nonce);
+      var json = EncodeMessage(false, revokeRequest, state, jwsHeader);
+      PrepareRequestContent(request, json, HttpMethod.Post);
+      var response = await _httpClient.SendAsync(request);
+      UpdateStateNonceIfNeededAsync(response, state, HttpMethod.Post);
+
+      var responseText = await response.Content.ReadAsStringAsync();
+      HandleProblemResponseAsync(response, responseText);
+
+      var revokeResult = ProcessResponseContent<object>(response, responseText);
 
       // Remove the certificate from the cache after successful revocation
       state.Cache.CachedCerts.Remove(subject);
 
       _logger.LogInformation("Certificate revoked successfully");
+      
       return IDomainResult.Success();
     }
     catch (Exception ex) {
@@ -509,138 +634,7 @@ public class LetsEncryptService : ILetsEncryptService {
     }
   }
 
-
-
-
   #region SendAsync
-  /// <summary>
-  /// 
-  /// </summary>
-  /// <typeparam name="TResult"></typeparam>
-  /// <param name="sessionId"></param>
-  /// <param name="method"></param>
-  /// <param name="uri"></param>
-  /// <param name="isPostAsGet"></param>
-  /// <param name="requestModel"></param>
-  /// <returns></returns>
-  //private async Task<(SendResult<TResult>?, IDomainResult)> SendAsync<TResult>(Guid sessionId, HttpMethod method, Uri uri, bool isPostAsGet, object? requestModel) {
-  //  try {
-  //    var state = GetOrCreateState(sessionId);
-
-  //    _logger.LogInformation($"Executing {nameof(SendAsync)}...");
-
-  //    var request = new HttpRequestMessage(method, uri);
-
-  //    if (uri.OriginalString != "directory") {
-  //      var (nonce, newNonceResult) = await NewNonce(sessionId);
-  //      if (!newNonceResult.IsSuccess || nonce == null) {
-  //        return (null, newNonceResult);
-  //      }
-
-  //      state.Nonce = nonce;
-  //    }
-  //    else {
-  //      state.Nonce = default;
-  //    }
-
-  //    if (requestModel != null || isPostAsGet) {
-  //      var jwsHeader = new JwsHeader {
-  //        Url = uri,
-  //      };
-
-  //      if (state.Nonce != null)
-  //        jwsHeader.Nonce = state.Nonce;
-
-  //      var encodedMessage = isPostAsGet
-  //          ? state.JwsService.Encode(jwsHeader)
-  //          : state.JwsService.Encode(requestModel, jwsHeader);
-
-  //      var json = encodedMessage.ToJson();
-
-  //      request.Content = new StringContent(json);
-
-  //      var requestType = "application/json";
-  //      if (method == HttpMethod.Post)
-  //        requestType = "application/jose+json";
-
-  //      request.Content.Headers.Remove("Content-Type");
-  //      request.Content.Headers.Add("Content-Type", requestType);
-  //    }
-
-  //    var response = await _httpClient.SendAsync(request);
-
-  //    if (method == HttpMethod.Post)
-  //      state.Nonce = response.Headers.GetValues("Replay-Nonce").First();
-
-  //    var responseText = await response.Content.ReadAsStringAsync();
-
-  //    if (response.Content.Headers.ContentType?.MediaType == "application/problem+json")
-  //      throw new LetsEncrytException(responseText.ToObject<Problem>(), response);
-
-  //    if (response.Content.Headers.ContentType?.MediaType == "application/pem-certificate-chain" && typeof(TResult) == typeof(string)) {
-  //      return IDomainResult.Success(new SendResult<TResult> {
-  //        Result = (TResult)(object)responseText
-  //      });
-  //    }
-
-  //    var responseContent = responseText.ToObject<TResult>();
-
-  //    if (responseContent is IHasLocation ihl) {
-  //      if (response.Headers.Location != null)
-  //        ihl.Location = response.Headers.Location;
-  //    }
-
-  //    return IDomainResult.Success(new SendResult<TResult> {
-  //      Result = responseContent,
-  //      ResponseText = responseText
-  //    });
-
-  //  }
-  //  catch (Exception ex) {
-  //    var message = "Let's Encrypt client unhandled exception";
-
-  //    _logger.LogError(ex, message);
-  //    return IDomainResult.CriticalDependencyError<SendResult<TResult>?>(message);
-  //  }
-  //}
-
-  private async Task<(SendResult<TResult>?, IDomainResult)> SendAsync<TResult>(
-    Guid sessionId,
-    HttpMethod method,
-    Uri uri,
-    bool isPostAsGet,
-    object? requestModel
-  ) {
-    try {
-      var state = GetOrCreateState(sessionId);
-      _logger.LogInformation($"Executing {nameof(SendAsync)}...");
-
-      var request = new HttpRequestMessage(method, uri);
-      await HandleNonceAsync(sessionId, uri, state);
-
-      if (requestModel != null || isPostAsGet) {
-        var jwsHeader = CreateJwsHeader(uri, state.Nonce);
-        var json = EncodeMessage(isPostAsGet, requestModel, state, jwsHeader);
-        PrepareRequestContent(request, json, method);
-
-      }
-
-      var response = await _httpClient.SendAsync(request);
-      UpdateStateNonceIfNeededAsync(response, state, method);
-
-      var responseText = await response.Content.ReadAsStringAsync();
-      HandleProblemResponseAsync(response, responseText);
-
-      var result = ProcessResponseContent<TResult>(response, responseText);
-      return IDomainResult.Success(result);
-    }
-    catch (Exception ex) {
-      const string message = "Let's Encrypt client unhandled exception";
-      _logger.LogError(ex, message);
-      return IDomainResult.CriticalDependencyError<SendResult<TResult>?>(message);
-    }
-  }
-
   private async Task HandleNonceAsync(Guid sessionId, Uri uri, State state) {
     if (uri.OriginalString != "directory") {
       var (nonce, newNonceResult) = await NewNonce(sessionId);
