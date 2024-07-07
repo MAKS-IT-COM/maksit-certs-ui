@@ -1,13 +1,13 @@
 {
 	"info": {
-		"_postman_id": "728f64b6-893b-43fa-802e-ee836d1dc372",
-		"name": "LetsEncrypt Production",
+		"_postman_id": "95186b61-1197-4a6e-a90f-d97223528d90",
+		"name": "LetsEncrypt Client",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "33635244"
 	},
 	"item": [
 		{
-			"name": "Cache",
+			"name": "account",
 			"item": [
 				{
 					"name": "get cache contacts",
@@ -81,7 +81,7 @@
 					"response": []
 				},
 				{
-					"name": "host with upcoming ssl expire",
+					"name": "host with upcoming ssl expire Copy",
 					"request": {
 						"method": "GET",
 						"header": [
@@ -116,31 +116,25 @@
 			]
 		},
 		{
-			"name": "Certs Manual Flow",
+			"name": "certs",
 			"item": [
 				{
-					"name": "letsencrypt production",
+					"name": "letsencrypt directory",
 					"request": {
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "https://acme-v02.api.letsencrypt.org/directory",
-							"protocol": "https",
+							"raw": "{{letsEncryptDirectory}}",
 							"host": [
-								"acme-v02",
-								"api",
-								"letsencrypt",
-								"org"
-							],
-							"path": [
-								"directory"
+								"{{letsEncryptDirectory}}"
 							]
-						}
+						},
+						"description": "[https://letsencrypt.status.io/](https://letsencrypt.status.io/)"
 					},
 					"response": []
 				},
 				{
-					"name": "configure client",
+					"name": "configure-client",
 					"event": [
 						{
 							"listen": "test",
@@ -184,8 +178,17 @@
 								"value": "application/json"
 							}
 						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"isStaging\": {{isStaging}}\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
 						"url": {
-							"raw": "http://localhost:8080/api/CertsFlow/ConfigureClient",
+							"raw": "http://localhost:8080/api/certs/configure-client",
 							"protocol": "http",
 							"host": [
 								"localhost"
@@ -193,20 +196,20 @@
 							"port": "8080",
 							"path": [
 								"api",
-								"CertsFlow",
-								"ConfigureClient"
+								"certs",
+								"configure-client"
 							]
 						}
 					},
 					"response": []
 				},
 				{
-					"name": "terms of service",
+					"name": "terms-of-service",
 					"request": {
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "http://localhost:8080/api/CertsFlow/TermsOfService/{{sessionId}}",
+							"raw": "http://localhost:8080/api/certs/{{sessionId}}/terms-of-service",
 							"protocol": "http",
 							"host": [
 								"localhost"
@@ -214,9 +217,9 @@
 							"port": "8080",
 							"path": [
 								"api",
-								"CertsFlow",
-								"TermsOfService",
-								"{{sessionId}}"
+								"certs",
+								"{{sessionId}}",
+								"terms-of-service"
 							]
 						}
 					},
@@ -299,7 +302,7 @@
 							}
 						},
 						"url": {
-							"raw": "http://localhost:8080/api/CertsFlow/Init/{{sessionId}}/{{accountId}}",
+							"raw": "http://localhost:8080/api/certs/{{sessionId}}/init/{{accountId}}",
 							"protocol": "http",
 							"host": [
 								"localhost"
@@ -307,9 +310,9 @@
 							"port": "8080",
 							"path": [
 								"api",
-								"CertsFlow",
-								"Init",
+								"certs",
 								"{{sessionId}}",
+								"init",
 								"{{accountId}}"
 							]
 						}
@@ -317,7 +320,7 @@
 					"response": []
 				},
 				{
-					"name": "new order",
+					"name": "order",
 					"event": [
 						{
 							"listen": "test",
@@ -369,7 +372,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n  \"hostnames\": [\r\n    \"maks-it.com\",\r\n    \"auth.maks-it.com\"\r\n  ],\r\n  \"challengeType\": \"http-01\"\r\n}",
+							"raw": "{\r\n  \"hostnames\": [\r\n    \"staging.maks-it.com\"\r\n  ],\r\n  \"challengeType\": \"http-01\"\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -377,7 +380,7 @@
 							}
 						},
 						"url": {
-							"raw": "http://localhost:8080/api/CertsFlow/NewOrder/{{sessionId}}",
+							"raw": "http://localhost:8080/api/certs/{{sessionId}}/order",
 							"protocol": "http",
 							"host": [
 								"localhost"
@@ -385,9 +388,9 @@
 							"port": "8080",
 							"path": [
 								"api",
-								"CertsFlow",
-								"NewOrder",
-								"{{sessionId}}"
+								"certs",
+								"{{sessionId}}",
+								"order"
 							]
 						}
 					},
@@ -420,9 +423,10 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "http://maks-it.com/.well-known/acme-challenge/{{challenge}}",
+							"raw": "http://staging.maks-it.com/.well-known/acme-challenge/{{challenge}}",
 							"protocol": "http",
 							"host": [
+								"staging",
 								"maks-it",
 								"com"
 							],
@@ -436,7 +440,7 @@
 					"response": []
 				},
 				{
-					"name": "complete challenges",
+					"name": "complete-challenges",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -459,7 +463,7 @@
 							}
 						},
 						"url": {
-							"raw": "http://localhost:8080/api/CertsFlow/CompleteChallenges/{{sessionId}}",
+							"raw": "http://localhost:8080/api/certs/{{sessionId}}/complete-challenges",
 							"protocol": "http",
 							"host": [
 								"localhost"
@@ -467,16 +471,16 @@
 							"port": "8080",
 							"path": [
 								"api",
-								"CertsFlow",
-								"CompleteChallenges",
-								"{{sessionId}}"
+								"certs",
+								"{{sessionId}}",
+								"complete-challenges"
 							]
 						}
 					},
 					"response": []
 				},
 				{
-					"name": "get order",
+					"name": "order-status",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -491,7 +495,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n  \"hostnames\": [\r\n    \"maks-it.com\",\r\n    \"auth.maks-it.com\"\r\n  ]\r\n}",
+							"raw": "{\r\n  \"hostnames\": [\r\n    \"staging.maks-it.com\"\r\n  ]\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -499,7 +503,7 @@
 							}
 						},
 						"url": {
-							"raw": "http://localhost:8080/api/CertsFlow/GetOrder/{{sessionId}}",
+							"raw": "http://localhost:8080/api/certs/{{sessionId}}/order-status",
 							"protocol": "http",
 							"host": [
 								"localhost"
@@ -507,16 +511,16 @@
 							"port": "8080",
 							"path": [
 								"api",
-								"CertsFlow",
-								"GetOrder",
-								"{{sessionId}}"
+								"certs",
+								"{{sessionId}}",
+								"order-status"
 							]
 						}
 					},
 					"response": []
 				},
 				{
-					"name": "get certificates",
+					"name": "download",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -531,7 +535,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n  \"hostnames\": [\r\n    \"maks-it.com\",\r\n    \"auth.maks-it.com\"\r\n  ]\r\n}",
+							"raw": "{\r\n  \"hostnames\": [\r\n    \"staging.maks-it.com\"\r\n  ]\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -539,7 +543,7 @@
 							}
 						},
 						"url": {
-							"raw": "http://localhost:8080/api/CertsFlow/GetCertificates/{{sessionId}}",
+							"raw": "http://localhost:8080/api/certs/{{sessionId}}//certificates/download",
 							"protocol": "http",
 							"host": [
 								"localhost"
@@ -547,16 +551,18 @@
 							"port": "8080",
 							"path": [
 								"api",
-								"CertsFlow",
-								"GetCertificates",
-								"{{sessionId}}"
+								"certs",
+								"{{sessionId}}",
+								"",
+								"certificates",
+								"download"
 							]
 						}
 					},
 					"response": []
 				},
 				{
-					"name": "apply certificates",
+					"name": "apply",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -571,7 +577,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n  \"hostnames\": [\r\n    \"maks-it.com\",\r\n    \"auth.maks-it.com\"\r\n  ]\r\n}",
+							"raw": "{\r\n  \"hostnames\": [\r\n    \"staging.maks-it.com\"\r\n  ]\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -579,7 +585,7 @@
 							}
 						},
 						"url": {
-							"raw": "http://localhost:8080/api/CertsFlow/ApplyCertificates/{{sessionId}}",
+							"raw": "http://localhost:8080/api/certs/{{sessionId}}/certificates/apply",
 							"protocol": "http",
 							"host": [
 								"localhost"
@@ -587,9 +593,53 @@
 							"port": "8080",
 							"path": [
 								"api",
-								"CertsFlow",
-								"ApplyCertificates",
-								"{{sessionId}}"
+								"certs",
+								"{{sessionId}}",
+								"certificates",
+								"apply"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "revoke",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"hostnames\": [\r\n    \"staging.maks-it.com\"\r\n  ]\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/certs/{{sessionId}}/certificates/revoke",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"certs",
+								"{{sessionId}}",
+								"certificates",
+								"revoke"
 							]
 						}
 					},

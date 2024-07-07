@@ -22,9 +22,6 @@ using MaksIT.LetsEncrypt.Models.Interfaces;
 using MaksIT.LetsEncrypt.Models.Requests;
 using MaksIT.LetsEncrypt.Entities.Jws;
 using MaksIT.LetsEncrypt.Entities.LetsEncrypt;
-using System.Net.Mime;
-using System;
-using System.Security.Principal;
 
 namespace MaksIT.LetsEncrypt.Services;
 
@@ -141,8 +138,10 @@ public class LetsEncryptService : ILetsEncryptService {
         
         await HandleNonceAsync(sessionId, state.Directory.NewAccount, state);
 
-        var jwsHeader = CreateJwsHeader(state.Directory.NewAccount, state.Nonce);
-        var json = EncodeMessage(false, letsEncryptOrder, state, jwsHeader);
+        var json = EncodeMessage(false, letsEncryptOrder, state, new JwsHeader {
+          Url = state.Directory.NewAccount,
+          Nonce = state.Nonce
+        });
         PrepareRequestContent(request, json, HttpMethod.Post);
 
         var response = await _httpClient.SendAsync(request);
@@ -232,9 +231,11 @@ public class LetsEncryptService : ILetsEncryptService {
 
       var request = new HttpRequestMessage(HttpMethod.Post, state.Directory.NewOrder);
       await HandleNonceAsync(sessionId, state.Directory.NewOrder, state);
-                
-      var jwsHeader = CreateJwsHeader(state.Directory.NewOrder, state.Nonce);
-      var json = EncodeMessage(false, letsEncryptOrder, state, jwsHeader);
+
+      var json = EncodeMessage(false, letsEncryptOrder, state, new JwsHeader {
+        Url = state.Directory.NewOrder,
+        Nonce = state.Nonce
+      });
       PrepareRequestContent(request, json, HttpMethod.Post);
  
       var response = await _httpClient.SendAsync(request);
@@ -261,9 +262,10 @@ public class LetsEncryptService : ILetsEncryptService {
         request = new HttpRequestMessage(HttpMethod.Post, item);
         await HandleNonceAsync(sessionId, item, state);
 
-          
-        jwsHeader = CreateJwsHeader(item, state.Nonce);
-        json = EncodeMessage(true, null, state, jwsHeader);
+        json = EncodeMessage(true, null, state, new JwsHeader {
+          Url = item,
+          Nonce = state.Nonce
+        });
         PrepareRequestContent(request, json, HttpMethod.Post);
 
           
@@ -349,8 +351,10 @@ public class LetsEncryptService : ILetsEncryptService {
           var request = new HttpRequestMessage(HttpMethod.Post, challenge.Url);
           await HandleNonceAsync(sessionId, challenge.Url, state);
 
-          var jwsHeader = CreateJwsHeader(challenge.Url, state.Nonce);
-          var json = EncodeMessage(false, "{}", state, jwsHeader);
+          var json = EncodeMessage(false, "{}", state, new JwsHeader {
+            Url = challenge.Url,
+            Nonce = state.Nonce
+          });
           PrepareRequestContent(request, json, HttpMethod.Post);
 
           var response = await _httpClient.SendAsync(request);
@@ -406,9 +410,11 @@ public class LetsEncryptService : ILetsEncryptService {
 
       var request = new HttpRequestMessage(HttpMethod.Post, state.Directory.NewOrder);
       await HandleNonceAsync(sessionId, state.Directory.NewOrder, state);
-        
-      var jwsHeader = CreateJwsHeader(state.Directory.NewOrder, state.Nonce);
-      var json = EncodeMessage(false, letsEncryptOrder, state, jwsHeader);
+      
+      var json = EncodeMessage(false, letsEncryptOrder, state, new JwsHeader {
+        Url = state.Directory.NewOrder,
+        Nonce = state.Nonce
+      });
       PrepareRequestContent(request, json, HttpMethod.Post);
 
       var response = await _httpClient.SendAsync(request);
@@ -470,12 +476,11 @@ public class LetsEncryptService : ILetsEncryptService {
           var request = new HttpRequestMessage(HttpMethod.Post, state.CurrentOrder.Finalize);
           await HandleNonceAsync(sessionId, state.CurrentOrder.Finalize, state);
 
-            
-          var jwsHeader = CreateJwsHeader(state.CurrentOrder.Finalize, state.Nonce);
-          var json = EncodeMessage(false, letsEncryptOrder, state, jwsHeader);
+          var json = EncodeMessage(false, letsEncryptOrder, state, new JwsHeader {
+            Url = state.CurrentOrder.Finalize,
+            Nonce = state.Nonce
+          });
           PrepareRequestContent(request, json, HttpMethod.Post);
-
-            
 
           var response = await _httpClient.SendAsync(request);
           UpdateStateNonceIfNeededAsync(response, state, HttpMethod.Post);
@@ -492,12 +497,11 @@ public class LetsEncryptService : ILetsEncryptService {
             request = new HttpRequestMessage(HttpMethod.Post, state.CurrentOrder.Location);
             await HandleNonceAsync(sessionId, state.CurrentOrder.Location, state);
 
-                
-            jwsHeader = CreateJwsHeader(state.CurrentOrder.Location, state.Nonce);
-            json = EncodeMessage(true, null, state, jwsHeader);
+            json = EncodeMessage(true, null, state, new JwsHeader {
+              Url = state.CurrentOrder.Location,
+              Nonce = state.Nonce
+            });
             PrepareRequestContent(request, json, HttpMethod.Post);
-
-                
 
             response = await _httpClient.SendAsync(request);
             UpdateStateNonceIfNeededAsync(response, state, HttpMethod.Post);
@@ -524,12 +528,11 @@ public class LetsEncryptService : ILetsEncryptService {
       var finalRequest = new HttpRequestMessage(HttpMethod.Post, certificateUrl);
       await HandleNonceAsync(sessionId, certificateUrl, state);
 
-        
-      var finalJwsHeader = CreateJwsHeader(certificateUrl, state.Nonce);
-      var finalJson = EncodeMessage(true, null, state, finalJwsHeader);
+      var finalJson = EncodeMessage(true, null, state, new JwsHeader {
+        Url = certificateUrl,
+        Nonce = state.Nonce
+      });
       PrepareRequestContent(finalRequest, finalJson, HttpMethod.Post);
-
-        
 
       var finalResponse = await _httpClient.SendAsync(finalRequest);
       UpdateStateNonceIfNeededAsync(finalResponse, state, HttpMethod.Post);
@@ -583,43 +586,42 @@ public class LetsEncryptService : ILetsEncryptService {
         return IDomainResult.Failed("Certificate not found");
       }
 
-
-
-      string Base64UrlEncode(byte[] input) {
-        return Convert.ToBase64String(input)
-          .TrimEnd('=')
-          .Replace('+', '-')
-          .Replace('/', '_');
-      }
-
-
       // Load the certificate from PEM format and convert it to DER format
       var certificate = new X509Certificate2(Encoding.UTF8.GetBytes(certificateCache.Cert));
       var derEncodedCert = certificate.Export(X509ContentType.Cert);
-      var base64UrlEncodedCert = Base64UrlEncode(derEncodedCert);
+      var base64UrlEncodedCert = state.JwsService.Base64UrlEncoded(derEncodedCert);
 
-      // Convert the certificate to DER format and Base64 encode it
-      var base64Cert = Convert.ToBase64String(certificate.Export(X509ContentType.Cert));
 
       var revokeRequest = new RevokeRequest {
-        Certificate = certificateCache.Cert,
+        Certificate = base64UrlEncodedCert,
         Reason = (int)reason
       };
 
       var request = new HttpRequestMessage(HttpMethod.Post, state.Directory.RevokeCert);
       await HandleNonceAsync(sessionId, state.Directory.RevokeCert, state);
 
-      var jwsHeader = CreateJwsHeader(state.Directory.RevokeCert, state.Nonce);
-      var json = EncodeMessage(false, revokeRequest, state, jwsHeader);
-      PrepareRequestContent(request, json, HttpMethod.Post);
+      var jwsHeader = new JwsHeader {
+        Url = state.Directory.RevokeCert,
+        Nonce = state.Nonce
+      };
+
+      var json = state.JwsService.Encode(revokeRequest, jwsHeader).ToJson();
+      
+      request.Content = new StringContent(json);
+      request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/jose+json");
+
       var response = await _httpClient.SendAsync(request);
       UpdateStateNonceIfNeededAsync(response, state, HttpMethod.Post);
 
       var responseText = await response.Content.ReadAsStringAsync();
-      HandleProblemResponseAsync(response, responseText);
+      if (response.Content.Headers.ContentType?.MediaType == "application/problem+json") {
+        var erroObj = responseText.ToObject<Problem>();
+      }
 
-      var revokeResult = ProcessResponseContent<object>(response, responseText);
+      if (!response.IsSuccessStatusCode)
+        IDomainResult.CriticalDependencyError(responseText);
 
+      
       // Remove the certificate from the cache after successful revocation
       state.Cache.CachedCerts.Remove(subject);
 
@@ -630,7 +632,7 @@ public class LetsEncryptService : ILetsEncryptService {
     catch (Exception ex) {
       var message = "Let's Encrypt client unhandled exception";
       _logger.LogError(ex, message);
-      return IDomainResult.CriticalDependencyError(message);
+      return IDomainResult.CriticalDependencyError($"{message}: {ex.Message}");
     }
   }
 
@@ -666,13 +668,6 @@ public class LetsEncryptService : ILetsEncryptService {
       _logger.LogError(ex, message);
       return IDomainResult.CriticalDependencyError<string?>(message);
     }
-  }
-
-  private JwsHeader CreateJwsHeader(Uri uri, string? nonce) {
-    return new JwsHeader {
-      Url = uri,
-      Nonce = nonce
-    };
   }
 
   private string EncodeMessage(bool isPostAsGet, object? requestModel, State state, JwsHeader jwsHeader) {

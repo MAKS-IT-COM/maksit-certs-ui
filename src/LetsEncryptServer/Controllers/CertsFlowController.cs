@@ -114,5 +114,17 @@ namespace MaksIT.LetsEncryptServer.Controllers {
       var result = await _certsFlowService.ApplyCertificatesAsync(sessionId, requestData);
       return result.ToActionResult();
     }
+
+    /// <summary>
+    /// Revoke certificates
+    /// </summary>
+    /// <param name="sessionId"></param>
+    /// <param name="requestData"></param>
+    /// <returns></returns>
+    [HttpPost("{sessionId}/certificates/revoke")]
+    public async Task<IActionResult> RevokeCertificates(Guid sessionId, [FromBody] RevokeCertificatesRequest requestData) {
+      var result = await _certsFlowService.RevokeCertificatesAsync(sessionId, requestData);
+      return result.ToActionResult();
+    }
   }
 }

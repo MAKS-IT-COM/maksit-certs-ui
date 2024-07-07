@@ -25,7 +25,7 @@ const GetApiRoute = (route: ApiRoutes, ...args: string[]): string => {
   args.forEach((arg) => {
     result = result.replace(/{.*?}/, arg)
   })
-  return `http://localhost:5000/${result}`
+  return `http://localhost:8080/${result}`
 }
 
 export { GetApiRoute, ApiRoutes }

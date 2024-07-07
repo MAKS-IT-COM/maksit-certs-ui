@@ -23,8 +23,8 @@ public interface ICertsInternalService : ICertsCommonService {
   Task<(List<string>?, IDomainResult)> NewOrderAsync(Guid sessionId, string[] hostnames, string challengeType);
   Task<IDomainResult> GetOrderAsync(Guid sessionId, string[] hostnames);
   Task<IDomainResult> GetCertificatesAsync(Guid sessionId, string[] hostnames);
-  Task<IDomainResult> RevokeCertificatesAsync(Guid sessionId, string[] hostnames);
   Task<(Dictionary<string, string>?, IDomainResult)> ApplyCertificatesAsync(Guid sessionId, string[] hostnames);
+  Task<IDomainResult> RevokeCertificatesAsync(Guid sessionId, string[] hostnames);
   Task<(Guid?, IDomainResult)> FullFlow(bool isStaging, Guid? accountId, string description, string[] contacts, string challengeType, string[] hostnames);
   Task<IDomainResult> FullRevocationFlow(bool isStaging, Guid accountId, string description, string[] contacts, string[] hostnames);
 
@@ -37,6 +37,7 @@ public interface ICertsRestService : ICertsCommonService {
   Task<IDomainResult> GetOrderAsync(Guid sessionId, GetOrderRequest requestData);
   Task<IDomainResult> GetCertificatesAsync(Guid sessionId, GetCertificatesRequest requestData);
   Task<(Dictionary<string, string>?, IDomainResult)> ApplyCertificatesAsync(Guid sessionId, GetCertificatesRequest requestData);
+  Task<IDomainResult> RevokeCertificatesAsync(Guid sessionId, RevokeCertificatesRequest requestData);
 }
 
 public interface ICertsRestChallengeService {
@@ -166,33 +167,6 @@ public class CertsFlowService : ICertsFlowService {
     return await _letsEncryptService.GetOrder(sessionId, hostnames);
   }
 
-  public async Task<IDomainResult> RevokeCertificatesAsync(Guid sessionId, string[] hostnames) {
-    foreach (var hostname in hostnames) {
-      var result = await _letsEncryptService.RevokeCertificate(sessionId, hostname, RevokeReason.Unspecified);
-      if (!result.IsSuccess)
-        return result;
-    }
-
-    // TODO: Move to separate method
-    // Persist the cache
-    var (cache, getCacheResult) = _letsEncryptService.GetRegistrationCache(sessionId);
-    if (!getCacheResult.IsSuccess || cache == null)
-      return getCacheResult;
-
-    var saveResult = await _cacheService.SaveToCacheAsync(cache.AccountId, cache);
-    if (!saveResult.IsSuccess)
-      return saveResult;
-
-    return IDomainResult.Success();
-  }
-
-
-
-
-
-
-
-
   public async Task<(Dictionary<string, string>?, IDomainResult)> ApplyCertificatesAsync(Guid sessionId, string[] hostnames) {
 
     var (cache, getCacheResult) = _letsEncryptService.GetRegistrationCache(sessionId);
@@ -221,6 +195,26 @@ public class CertsFlowService : ICertsFlowService {
     return IDomainResult.Success(results);
   }
 
+  public async Task<IDomainResult> RevokeCertificatesAsync(Guid sessionId, string[] hostnames) {
+    foreach (var hostname in hostnames) {
+      var result = await _letsEncryptService.RevokeCertificate(sessionId, hostname, RevokeReason.Unspecified);
+      if (!result.IsSuccess)
+        return result;
+    }
+
+    // TODO: Move to separate method
+    // Persist the cache
+    var (cache, getCacheResult) = _letsEncryptService.GetRegistrationCache(sessionId);
+    if (!getCacheResult.IsSuccess || cache == null)
+      return getCacheResult;
+
+    var saveResult = await _cacheService.SaveToCacheAsync(cache.AccountId, cache);
+    if (!saveResult.IsSuccess)
+      return saveResult;
+
+    return IDomainResult.Success();
+  }
+
   public async Task<(Guid?, IDomainResult)> FullFlow(bool isStaging, Guid? accountId, string description, string[] contacts, string challengeType, string[]hostnames) {
     var (sessionId, configureClientResult) = await ConfigureClientAsync(isStaging);
     if (!configureClientResult.IsSuccess || sessionId == null)
@@ -230,14 +224,17 @@ public class CertsFlowService : ICertsFlowService {
     if (!initResult.IsSuccess)
       return (null, initResult);
     
-    var (_, newOrderResult) = await NewOrderAsync(sessionId.Value, hostnames, challengeType);
+    var (challenges, newOrderResult) = await NewOrderAsync(sessionId.Value, hostnames, challengeType);
     if (!newOrderResult.IsSuccess)
       return (null, newOrderResult);
-    
-    var challengeResult = await CompleteChallengesAsync(sessionId.Value);
-    if (!challengeResult.IsSuccess)
-      return (null, challengeResult);
-    
+
+    if (challenges?.Count > 0) {
+      var challengeResult = await CompleteChallengesAsync(sessionId.Value);
+      if (!challengeResult.IsSuccess)
+        return (null, challengeResult);
+    }
+
+
     var getOrderResult = await GetOrderAsync(sessionId.Value, hostnames);
     if (!getOrderResult.IsSuccess)
       return (null, getOrderResult);
@@ -273,6 +270,7 @@ public class CertsFlowService : ICertsFlowService {
   #endregion
 
   #region REST methods
+
   public Task<(Guid?, IDomainResult)> ConfigureClientAsync(ConfigureClientRequest requestData) =>
     ConfigureClientAsync(requestData.IsStaging);
 
@@ -290,6 +288,9 @@ public class CertsFlowService : ICertsFlowService {
 
   public Task<(Dictionary<string, string>?, IDomainResult)> ApplyCertificatesAsync(Guid sessionId, GetCertificatesRequest requestData) =>
     ApplyCertificatesAsync(sessionId, requestData.Hostnames);
+
+  public Task<IDomainResult> RevokeCertificatesAsync(Guid sessionId, RevokeCertificatesRequest requestData) =>
+    RevokeCertificatesAsync(sessionId, requestData.Hostnames);
 
   #endregion
 
