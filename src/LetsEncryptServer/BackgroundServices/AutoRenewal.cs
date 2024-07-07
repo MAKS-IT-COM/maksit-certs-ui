@@ -47,8 +47,6 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
 
     private async Task<IDomainResult> ProcessAccountAsync(RegistrationCache cache) {
       
-      
-
       var hostnames = cache.GetHostsWithUpcomingSslExpiry();
       if (hostnames == null) {
         _logger.LogError("Unexpected hostnames null");
@@ -61,7 +59,7 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
         return IDomainResult.Success();
       }
 
-      var renewResult = await RenewCertificatesForHostnames(cache.AccountId, cache.Description, cache.Contacts, hostnames, cache.ChallengeType, cache.IsStaging);
+      var (_, renewResult) = await _certsFlowService.FullFlow(cache.IsStaging, cache.AccountId, cache.Description, cache.Contacts, cache.ChallengeType, hostnames);
       if (!renewResult.IsSuccess)
         return renewResult;
 
@@ -70,53 +68,7 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
       return IDomainResult.Success();
     }
 
-    private async Task<IDomainResult> RenewCertificatesForHostnames(Guid accountId, string description, string[] contacts, string[] hostnames, string challengeType, bool isStaging) {
-      var (sessionId, configureClientResult) = await _certsFlowService.ConfigureClientAsync(isStaging);
-      if (!configureClientResult.IsSuccess || sessionId == null) {
-        LogErrors(configureClientResult.Errors);
-        return configureClientResult;
-      }
-
-      var sessionIdValue = sessionId.Value;
-
-      var (_, initResult) = await _certsFlowService.InitAsync(sessionIdValue, accountId, description, contacts);
-      if (!initResult.IsSuccess) {
-        LogErrors(initResult.Errors);
-        return initResult;
-      }
-
-      var (_, newOrderResult) = await _certsFlowService.NewOrderAsync(sessionIdValue, hostnames, challengeType);
-      if (!newOrderResult.IsSuccess) {
-        LogErrors(newOrderResult.Errors);
-        return newOrderResult;
-      }
-
-      var challengeResult = await _certsFlowService.CompleteChallengesAsync(sessionIdValue);
-      if (!challengeResult.IsSuccess) {
-        LogErrors(challengeResult.Errors);
-        return challengeResult;
-      }
-
-      var getOrderResult = await _certsFlowService.GetOrderAsync(sessionIdValue, hostnames);
-      if (!getOrderResult.IsSuccess) {
-        LogErrors(getOrderResult.Errors);
-        return getOrderResult;
-      }
-
-      var certs = await _certsFlowService.GetCertificatesAsync(sessionIdValue, hostnames);
-      if (!certs.IsSuccess) {
-        LogErrors(certs.Errors);
-        return certs;
-      }
-
-      var (_, applyCertsResult) = await _certsFlowService.ApplyCertificatesAsync(sessionIdValue, hostnames);
-      if (!applyCertsResult.IsSuccess) {
-        LogErrors(applyCertsResult.Errors);
-        return applyCertsResult;
-      }
-
-      return IDomainResult.Success();
-    }
+    
 
     private void LogErrors(IEnumerable<string> errors) {
       foreach (var error in errors) {

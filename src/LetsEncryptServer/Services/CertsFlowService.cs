@@ -6,6 +6,7 @@ using MaksIT.LetsEncrypt.Entities;
 using MaksIT.LetsEncrypt.Services;
 using MaksIT.Models.LetsEncryptServer.CertsFlow.Requests;
 using System.Security.Cryptography;
+using MaksIT.LetsEncrypt.Entities.LetsEncrypt;
 
 
 namespace MaksIT.LetsEncryptServer.Services;
@@ -22,8 +23,11 @@ public interface ICertsInternalService : ICertsCommonService {
   Task<(List<string>?, IDomainResult)> NewOrderAsync(Guid sessionId, string[] hostnames, string challengeType);
   Task<IDomainResult> GetOrderAsync(Guid sessionId, string[] hostnames);
   Task<IDomainResult> GetCertificatesAsync(Guid sessionId, string[] hostnames);
+  Task<IDomainResult> RevokeCertificatesAsync(Guid sessionId, string[] hostnames);
   Task<(Dictionary<string, string>?, IDomainResult)> ApplyCertificatesAsync(Guid sessionId, string[] hostnames);
   Task<(Guid?, IDomainResult)> FullFlow(bool isStaging, Guid? accountId, string description, string[] contacts, string challengeType, string[] hostnames);
+  Task<IDomainResult> FullRevocationFlow(bool isStaging, Guid accountId, string description, string[] contacts, string[] hostnames);
+
 }
 
 public interface ICertsRestService : ICertsCommonService {
@@ -145,6 +149,7 @@ public class CertsFlowService : ICertsFlowService {
       Thread.Sleep(1000);
     }
 
+    // TODO: Move to separate method
     // Persist the cache
     var (cache, getCacheResult) = _letsEncryptService.GetRegistrationCache(sessionId);
     if (!getCacheResult.IsSuccess || cache == null)
@@ -160,6 +165,33 @@ public class CertsFlowService : ICertsFlowService {
   public async Task<IDomainResult> GetOrderAsync(Guid sessionId, string[] hostnames) {
     return await _letsEncryptService.GetOrder(sessionId, hostnames);
   }
+
+  public async Task<IDomainResult> RevokeCertificatesAsync(Guid sessionId, string[] hostnames) {
+    foreach (var hostname in hostnames) {
+      var result = await _letsEncryptService.RevokeCertificate(sessionId, hostname, RevokeReason.Unspecified);
+      if (!result.IsSuccess)
+        return result;
+    }
+
+    // TODO: Move to separate method
+    // Persist the cache
+    var (cache, getCacheResult) = _letsEncryptService.GetRegistrationCache(sessionId);
+    if (!getCacheResult.IsSuccess || cache == null)
+      return getCacheResult;
+
+    var saveResult = await _cacheService.SaveToCacheAsync(cache.AccountId, cache);
+    if (!saveResult.IsSuccess)
+      return saveResult;
+
+    return IDomainResult.Success();
+  }
+
+
+
+
+
+
+
 
   public async Task<(Dictionary<string, string>?, IDomainResult)> ApplyCertificatesAsync(Guid sessionId, string[] hostnames) {
 
@@ -219,6 +251,22 @@ public class CertsFlowService : ICertsFlowService {
       return (null, applyCertsResult);
 
     return IDomainResult.Success(accountId);
+  }
+
+  public async Task<IDomainResult> FullRevocationFlow(bool isStaging, Guid accountId, string description, string[] contacts, string[] hostnames) {
+    var (sessionId, configureClientResult) = await ConfigureClientAsync(isStaging);
+    if (!configureClientResult.IsSuccess || sessionId == null)
+      return configureClientResult;
+
+    var (_, initResult) = await InitAsync(sessionId.Value, accountId, description, contacts);
+    if (!initResult.IsSuccess)
+      return initResult;
+
+    var revokeResult = await RevokeCertificatesAsync(sessionId.Value, hostnames);
+    if (!revokeResult.IsSuccess)
+      return revokeResult;
+
+    return IDomainResult.Success();
   }
 
 

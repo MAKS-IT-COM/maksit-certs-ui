@@ -133,10 +133,6 @@ public class AccountService : IAccountService {
       cache.Contacts = contacts.ToArray();
     }
 
-
-
-
-
     var hostnamesToAdd = new List<string>();
     var hostnamesToRemove = new List<string>();
 
@@ -174,12 +170,10 @@ public class AccountService : IAccountService {
       }
     }
 
-
     var saveResult = await _cacheService.SaveToCacheAsync(accountId, cache);
     if (!saveResult.IsSuccess) {
       return (null, saveResult);
     }
-
 
     if (hostnamesToAdd.Count > 0) {
       var (_, newCertsResult) = await _certsFlowService.FullFlow(
@@ -195,13 +189,18 @@ public class AccountService : IAccountService {
         return (null, newCertsResult);
     }
 
-
     if (hostnamesToRemove.Count > 0) {
-      hostnamesToRemove.ForEach(hostname => {
-        cache.CachedCerts?.Remove(hostname);
-      });
-    }
+      var revokeResult = await _certsFlowService.FullRevocationFlow(
+        cache.IsStaging,
+        cache.AccountId,
+        cache.Description,
+        cache.Contacts,
+        hostnamesToRemove.ToArray()
+      );
 
+      if (!revokeResult.IsSuccess)
+        return (null, revokeResult);
+    }
 
     (cache, loadResult) = await _cacheService.LoadAccountFromCacheAsync(accountId);
     if (!loadResult.IsSuccess || cache == null) {

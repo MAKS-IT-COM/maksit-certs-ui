@@ -1,3 +1,9 @@
+/**
+ * https://datatracker.ietf.org/doc/html/rfc8555
+ * https://datatracker.ietf.org/doc/html/draft-ietf-acme-acme-12
+ */
+
+
 using System.Text;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -16,6 +22,7 @@ using MaksIT.LetsEncrypt.Models.Interfaces;
 using MaksIT.LetsEncrypt.Models.Requests;
 using MaksIT.LetsEncrypt.Entities.Jws;
 using MaksIT.LetsEncrypt.Entities.LetsEncrypt;
+using System.Net.Mime;
 
 namespace MaksIT.LetsEncrypt.Services;
 
@@ -28,6 +35,7 @@ public interface ILetsEncryptService {
   Task<IDomainResult> CompleteChallenges(Guid sessionId);
   Task<IDomainResult> GetOrder(Guid sessionId, string[] hostnames);
   Task<IDomainResult> GetCertificate(Guid sessionId, string subject);
+  Task<IDomainResult> RevokeCertificate(Guid sessionId, string subject, RevokeReason reason);
 }
 
 public class LetsEncryptService : ILetsEncryptService {
@@ -278,7 +286,7 @@ public class LetsEncryptService : ILetsEncryptService {
       _logger.LogInformation($"Executing {nameof(CompleteChallenges)}...");
 
       if (state.CurrentOrder?.Identifiers == null) {
-        return IDomainResult.Failed();
+        return IDomainResult.Failed("Current order identifiers are null");
       }
 
       for (var index = 0; index < state.Challenges.Count; index++) {
@@ -449,9 +457,60 @@ public class LetsEncryptService : ILetsEncryptService {
     throw new NotImplementedException();
   }
 
-  public Task<IDomainResult> RevokeCertificate(Guid sessionId) {
-    throw new NotImplementedException();
+  public async Task<IDomainResult> RevokeCertificate(Guid sessionId, string subject, RevokeReason reason) {
+    try {
+      var state = GetOrCreateState(sessionId);
+
+      _logger.LogInformation($"Executing {nameof(RevokeCertificate)}...");
+
+      if (state.Cache == null || state.Cache.CachedCerts == null || !state.Cache.CachedCerts.TryGetValue(subject, out var certificateCache)) {
+        _logger.LogError("Certificate not found in cache");
+        return IDomainResult.Failed("Certificate not found");
+      }
+
+
+
+      string Base64UrlEncode(byte[] input) {
+        return Convert.ToBase64String(input)
+          .TrimEnd('=')
+          .Replace('+', '-')
+          .Replace('/', '_');
+      }
+
+
+      // Load the certificate from PEM format and convert it to DER format
+      var certificate = new X509Certificate2(Encoding.UTF8.GetBytes(certificateCache.Cert));
+      var derEncodedCert = certificate.Export(X509ContentType.Cert);
+      var base64UrlEncodedCert = Base64UrlEncode(derEncodedCert);
+
+      // Convert the certificate to DER format and Base64 encode it
+      var base64Cert = Convert.ToBase64String(certificate.Export(X509ContentType.Cert));
+
+      var revokeRequest = new RevokeRequest {
+        Certificate = certificateCache.Cert,
+        Reason = (int)reason
+      };
+
+      var (revokeResult, domainResult) = await SendAsync<object>(sessionId, HttpMethod.Post, state.Directory.RevokeCert, false, revokeRequest);
+      if (!domainResult.IsSuccess) {
+        return domainResult;
+      }
+
+      // Remove the certificate from the cache after successful revocation
+      state.Cache.CachedCerts.Remove(subject);
+
+      _logger.LogInformation("Certificate revoked successfully");
+      return IDomainResult.Success();
+    }
+    catch (Exception ex) {
+      var message = "Let's Encrypt client unhandled exception";
+      _logger.LogError(ex, message);
+      return IDomainResult.CriticalDependencyError(message);
+    }
   }
+
+
+
 
   #region SendAsync
   /// <summary>
@@ -563,6 +622,7 @@ public class LetsEncryptService : ILetsEncryptService {
         var jwsHeader = CreateJwsHeader(uri, state.Nonce);
         var json = EncodeMessage(isPostAsGet, requestModel, state, jwsHeader);
         PrepareRequestContent(request, json, method);
+
       }
 
       var response = await _httpClient.SendAsync(request);

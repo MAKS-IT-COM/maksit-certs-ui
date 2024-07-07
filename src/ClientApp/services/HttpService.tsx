@@ -212,7 +212,8 @@ class HttpService {
   ): ProblemDetails {
     return {
       Title: title,
-      Detail: detail instanceof Error ? detail.message : String(detail),
+      Detail:
+        detail instanceof Error ? detail.message : JSON.parse(detail)?.detail,
       Status: status
     }
   }
@@ -252,6 +253,8 @@ class HttpService {
   ): Promise<HttpResponse<TResponse>> {
     // Clean the data before sending the patch request
     const cleanedData = this.cleanObject(data)
+
+    console.log('Cleaned patch data:', cleanedData)
     return await this.request<TResponse>('PATCH', url, cleanedData)
   }
 

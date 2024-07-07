@@ -55,10 +55,6 @@ export default function Page() {
     init.current = true
   }, [])
 
-  useEffect(() => {
-    console.log(editingAccount)
-  }, [editingAccount])
-
   const handleAccountUpdate = (updatedAccount: CacheAccount) => {
     setAccounts(
       accounts.map((account) =>
@@ -70,15 +66,8 @@ export default function Page() {
   }
 
   const deleteAccount = (accountId: string) => {
-    httpService
-      .delete(GetApiRoute(ApiRoutes.ACCOUNT_ID, accountId))
-      .then((response) => {
-        if (response.isSuccess) {
-          setAccounts(
-            accounts.filter((account) => account.accountId !== accountId)
-          )
-        }
-      })
+    setAccounts(accounts.filter((account) => account.accountId !== accountId))
+    setEditingAccount(null)
   }
 
   return (

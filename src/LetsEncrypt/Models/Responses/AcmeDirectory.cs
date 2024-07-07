@@ -7,7 +7,7 @@ public class AcmeDirectory {
   public Uri NewNonce { get; set; }
   public Uri NewOrder { get; set; }
   public Uri RenewalInfo { get; set; }
-  public Uri RevokeCertificate { get; set; }  
+  public Uri RevokeCert { get; set; }  
 }
 
 public class AcmeDirectoryMeta {

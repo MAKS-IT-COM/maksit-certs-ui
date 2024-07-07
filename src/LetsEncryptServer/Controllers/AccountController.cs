@@ -42,7 +42,7 @@ public class AccountController : ControllerBase {
     return result.ToActionResult();
   }
 
-  [HttpDelete("account/{accountd:guid}")]
+  [HttpDelete("account/{accountId:guid}")]
   public async Task<IActionResult> DeleteAccount(Guid accountId) {
     var result = await _accountService.DeleteAccountAsync(accountId);
     return result.ToActionResult();

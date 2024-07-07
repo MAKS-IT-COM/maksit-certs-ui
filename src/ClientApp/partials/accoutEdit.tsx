@@ -255,7 +255,18 @@ const AccountEdit: React.FC<AccountEditProps> = (props) => {
   }
 
   const handleDelete = (accountId: string) => {
-    onDelete?.(accountId)
+    httpService
+      .delete(GetApiRoute(ApiRoutes.ACCOUNT_ID, accountId))
+      .then((response) => {
+        if (response.isSuccess) {
+          onDelete?.(accountId)
+        } else {
+          // Optionally, handle the error case, e.g., show an error message
+          dispatch(
+            showToast({ message: 'Failed to detele account.', type: 'error' })
+          )
+        }
+      })
   }
 
   return (
