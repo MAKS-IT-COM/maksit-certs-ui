@@ -3,6 +3,7 @@ using MaksIT.LetsEncrypt.Services;
 using MaksIT.LetsEncryptServer.Services;
 using MaksIT.LetsEncryptServer.BackgroundServices;
 using MaksIT.LetsEncryptServer.Middlewares;
+using MaksIT.LetsEncrypt.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,7 +29,8 @@ builder.Services.AddCors();
 
 builder.Services.AddMemoryCache();
 
-builder.Services.AddHttpClient<ILetsEncryptService, LetsEncryptService>();
+builder.Services.RegisterLetsEncrypt(appSettings);
+
 builder.Services.AddSingleton<ICacheService, CacheService>();
 builder.Services.AddSingleton<ICertsFlowService, CertsFlowService>();
 builder.Services.AddSingleton<IAccountService, AccountService>();

@@ -1,0 +1,34 @@
+{
+    "version": "1.0",
+    "name": "CI/CD Pipeline",
+    "jobs": {
+      "build-and-push": {
+        "steps": [
+          {
+            "agent": "kaniko",
+            
+            "context": "src",
+            "dockerfile-path": "LetsEncryptServer/Dockerfile",
+  
+            "image-name": "${{ env.REGISTRY_URL }}/${{ env.USERNAME }}/certs-ui-server:latest",
+            "username": "${{ env.USERNAME }}",
+            "password": "${{ env.PASSWORD }}"
+          },
+  
+          {
+            "agent": "kaniko",
+  
+            "context": "src",
+            "dockerfile-path": "ClientApp/Dockerfile",
+            
+            "image-name": "${{ env.REGISTRY_URL }}/${{ env.USERNAME }}/certs-ui-clientapp:latest",
+            "username": "${{ env.USERNAME }}",
+            "password": "${{ env.PASSWORD }}"
+          }
+        ]
+      },
+      "deploy": {
+        "steps": []
+      }
+    }
+  }

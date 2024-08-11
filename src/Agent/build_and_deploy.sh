@@ -11,7 +11,7 @@ APPSETTINGS_FILE="appsettings.json"
 NO_NEW_KEY_FLAG="--no-new-key"
 
 # Update package index and install the Microsoft package repository
-sudo rpm -Uvh https://packages.microsoft.com/config/centos/8/packages-microsoft-prod.rpm
+# sudo rpm -Uvh https://packages.microsoft.com/config/centos/8/packages-microsoft-prod.rpm
 sudo dnf install -y dotnet-sdk-8.0
 
 # Check if the service exists and stop it if it does
@@ -33,12 +33,9 @@ if [[ "$1" != "$NO_NEW_KEY_FLAG" ]]; then
     jq --arg newApiKey "$NEW_API_KEY" '.Configuration.ApiKey = $newApiKey' $APPSETTINGS_FILE > tmp.$$.json && mv tmp.$$.json $APPSETTINGS_FILE
 fi
 
-cd 
-
 # Build and publish the .NET application
-cd "$(dirname "$(realpath "$0")")/Agent"
-sudo dotnet build --configuration Release
-sudo dotnet publish -c Release -o $INSTALL_DIR
+sudo dotnet build Agent.csproj --configuration Release
+sudo dotnet publish Agent.csproj -c Release -o $INSTALL_DIR
 
 # Create the systemd service unit file
 sudo bash -c "cat > $SERVICE_FILE <<EOL

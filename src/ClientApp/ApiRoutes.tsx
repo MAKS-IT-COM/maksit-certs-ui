@@ -25,7 +25,9 @@ const GetApiRoute = (route: ApiRoutes, ...args: string[]): string => {
   args.forEach((arg) => {
     result = result.replace(/{.*?}/, arg)
   })
+  // TODO: need env var
   return `http://localhost:8080/${result}`
+  //return `http://websrv0001.corp.maks-it.com:8080/${result}`
 }
 
 export { GetApiRoute, ApiRoutes }

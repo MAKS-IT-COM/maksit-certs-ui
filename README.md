@@ -7,82 +7,36 @@ Simple client to obtain Let's Encrypt HTTPS certificates developed with .net cor
 * 29 Jun, 2019 - V1.0
 * 01 Nov, 2019 - V2.0 (Dependency Injection pattern impelemtation)
 * 31 May, 2024 - V3.0 (Webapi and containerization)
+* 11 Aug, 2024 - V3.1 (Release)
 
 ## Haproxy configuration
 
 ```bash
-# Create the user with a normal shell
-sudo useradd -m -s /bin/bash acme
-
-# Set the user's password
-sudo passwd acme
-```
-
-```bash
-sudo passwd acme
-```
-
-```bash
 sudo mkdir /etc/haproxy/certs
-chown acme:root /etc/haproxy/certs
 ```
 
 ```bash
-#---------------------------------------------------------------------
-# Example configuration for a possible web application.  See the
-# full configuration options online.
-#
-#   https://www.haproxy.org/download/1.8/doc/configuration.txt
-#
-#---------------------------------------------------------------------
+sudo nano /etc/haproxy/haproxy.cfg
+```
 
+```ini
 #---------------------------------------------------------------------
 # Global settings
 #---------------------------------------------------------------------
 global
-    # to have these messages end up in /var/log/haproxy.log you will
-    # need to:
-    #
-    # 1) configure syslog to accept network log events.  This is done
-    #    by adding the '-r' option to the SYSLOGD_OPTIONS in
-    #    /etc/sysconfig/syslog
-    #
-    # 2) configure local2 events to go to the /var/log/haproxy.log
-    #   file. A line like the following can be added to
-    #   /etc/sysconfig/syslog
-    #
-    #    local2.*                       /var/log/haproxy.log
-    #
     log         127.0.0.1 local2
-
     chroot      /var/lib/haproxy
     pidfile     /var/run/haproxy.pid
     maxconn     4000
     user        haproxy
     group       haproxy
     daemon
-
-    # Adjust the maxconn value based on your server\'s capacity
-    maxconn 2048
-
-    # SSL certificates directory
-    # ca-base /etc/ssl/certs
-    #crt-base /etc/ssl/private
-
-    # Default SSL certificate (used if no SNI match)
-    #ssl-default-bind-crt /etc/haproxy/certs/default.pem
-
-    # turn on stats unix socket
-    # stats socket /var/lib/haproxy/stats level admin mode 660
-    #stats socket /var/run/haproxy/admin.sock level admin mode 660 user haproxy group haproxy
-
-    # utilize system-wide crypto-policies
+    stats socket /var/lib/haproxy/stats
     ssl-default-bind-ciphers PROFILE=SYSTEM
     ssl-default-server-ciphers PROFILE=SYSTEM
 
-
 #---------------------------------------------------------------------
-# common defaults that all the \'listen\' and \'backend\' sections will
+# common defaults that all the 'listen' and 'backend' sections will
 # use if not designated in their block
 #---------------------------------------------------------------------
 defaults
@@ -103,83 +57,111 @@ defaults
     timeout check           10s
     maxconn                 3000
 
+#---------------------------------------------------------------------
+# Frontend for HTTP traffic on port 80
+#---------------------------------------------------------------------
+frontend http_frontend
+    bind *:80
+    acl acme_path path_beg /.well-known/acme-challenge/
+
+    # Redirect all HTTP traffic to HTTPS except ACME challenge requests
+    redirect scheme https if !acme_path
+
+    # Use the appropriate backend based on hostname if it's an ACME challenge request
+    use_backend acme_backend if acme_path
 
 #---------------------------------------------------------------------
-# Frontend configuration for handling multiple domains with SNI
+# Backend to handle ACME challenge requests
 #---------------------------------------------------------------------
-frontend web
-    bind :80
-    bind :443 ssl crt /etc/haproxy/certs/ strict-sni
-
-    # Handling for ACME challenge paths
-    acl acme_challenge path_beg /.well-known/acme-challenge/
-    use_backend acme_challenge_backend if acme_challenge
-
-
+backend acme_backend
+    server local_acme 127.0.0.1:8080
 
 #---------------------------------------------------------------------
-# Backend configuration for ACME challenge
+# Frontend for HTTPS traffic (port 443) with SNI and strict-sni
 #---------------------------------------------------------------------
-backend acme_challenge_backend
-    server acme_challenge 127.0.0.1:8080
+frontend https_frontend
+    bind *:443 ssl crt /etc/haproxy/certs strict-sni
+
+    http-request capture req.hdr(host) len 64
+
+    # Define ACLs for routing based on hostname
+    acl host_git hdr(host) -i git.maks-it.com
+    acl host_cr hdr(host) -i cr.maks-it.com
+
+    # Use appropriate backend based on SNI hostname
+    use_backend git_backend if host_git
+    use_backend cr_backend if host_cr
+
+#---------------------------------------------------------------------
+# Backend for git.maks-it.com
+#---------------------------------------------------------------------
+backend git_backend
+    http-request set-header X-Forwarded-Proto https
+    http-request set-header X-Forwarded-Host %[hdr(host)]
+    server git_server gitsrv0002.corp.maks-it.com:3000
+
+#---------------------------------------------------------------------
+# Backend for cr.maks-it.com
+#---------------------------------------------------------------------
+backend cr_backend
+    http-request set-header X-Forwarded-Proto https
+    http-request set-header X-Forwarded-Host %[hdr(host)]
+    server cr_server hcrsrv0001.corp.maks-it.com:80
+
+#---------------------------------------------------------------------
+# letsencrypt load balancer
+#---------------------------------------------------------------------
+frontend letsencrypt
+    bind *:8080
+    mode http
+    acl path_well_known_acme path_beg /.well-known/acme-challenge/
+    acl path_swagger path_beg /swagger/
+    acl path_api path_beg /api/
+
+    use_backend letsencrypt_server if path_well_known_acme
+    use_backend letsencrypt_server if path_swagger
+    use_backend letsencrypt_server if path_api
+    default_backend letsencrypt_app
+
+backend letsencrypt_server
+    mode http
+    server server1 127.0.0.1:9000 check
+
+backend letsencrypt_app
+    mode http
+    server app1 127.0.0.1:3000 check
+
+```
+
+## MaksIT agent installation
+
+From your home directory
+
+```bash
+git clone https://github.com/MAKS-IT-COM/certs-ui.git
+```
+
+```bash
+cd certs-ui/src/Agent
+```
+
+```bash
+sudo sh ./build_and_deploy.sh
 ```
 
 
+## Maks IT LetsEncrypt server installation
 
-
-## MaksIT agent
+From your home directory
 
 ```bash
-openssl rand -base64 32
+git clone https://github.com/MAKS-IT-COM/certs-ui.git
 ```
 
 ```bash
-sudo rpm -Uvh https://packages.microsoft.com/config/centos/8/packages-microsoft-prod.rpm
-sudo dnf install -y dotnet-sdk-8.0
-```
-
-
-Copy sources to
-
-```bash
-sudo mkdir -p /opt/maks-it-agent
-```
-
-
-```bash
-dotnet build --configuration Release
-dotnet publish -c Release -o /opt/maks-it-agent
-```
-
-
-
-
-```bash
-sudo nano /etc/systemd/system/maks-it-agent.service
+cd certs-ui/src
 ```
 
 ```bash
-[Unit]
-Description=Maks-IT Agent
-After=network.target
-
-[Service]
-WorkingDirectory=/opt/maks-it-agent
-ExecStart=/usr/bin/dotnet /opt/maks-it-agent/Agent.dll --urls "http://*:5000"
-Restart=always
-# Restart service after 10 seconds if the dotnet service crashes:
-RestartSec=10
-KillSignal=SIGINT
-SyslogIdentifier=dotnet-servicereloader
-User=root
-Environment=ASPNETCORE_ENVIRONMENT=Production
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now maks-it-agent.service
-sudo systemctl status maks-it-agent.service
+podman-compose -f docker-compose.final.yml up
 ```

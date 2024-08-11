@@ -22,6 +22,7 @@ using MaksIT.LetsEncrypt.Models.Interfaces;
 using MaksIT.LetsEncrypt.Models.Requests;
 using MaksIT.LetsEncrypt.Entities.Jws;
 using MaksIT.LetsEncrypt.Entities.LetsEncrypt;
+using Microsoft.Extensions.Options;
 
 namespace MaksIT.LetsEncrypt.Services;
 
@@ -39,14 +40,18 @@ public interface ILetsEncryptService {
 
 public class LetsEncryptService : ILetsEncryptService {
   private readonly ILogger<LetsEncryptService> _logger;
+  private readonly LetsEncryptConfiguration _appSettings;
   private readonly HttpClient _httpClient;
   private readonly IMemoryCache _memoryCache;
 
   public LetsEncryptService(
       ILogger<LetsEncryptService> logger,
+      LetsEncryptConfiguration appSettings,
       HttpClient httpClient,
-      IMemoryCache cache) {
+      IMemoryCache cache
+   ) {
     _logger = logger;
+    _appSettings = appSettings;
     _httpClient = httpClient;
     _memoryCache = cache;
   }
@@ -66,9 +71,7 @@ public class LetsEncryptService : ILetsEncryptService {
 
       state.IsStaging = isStaging;
       // TODO: need to propagate from Configuration
-      _httpClient.BaseAddress ??= new Uri(isStaging
-        ? "https://acme-staging-v02.api.letsencrypt.org/directory"
-        : "https://acme-v02.api.letsencrypt.org/directory");
+      _httpClient.BaseAddress ??= new Uri(isStaging ? _appSettings.Staging : _appSettings.Production);
 
       if (state.Directory == null) {
           var request = new HttpRequestMessage(HttpMethod.Get, new Uri("directory", UriKind.Relative));

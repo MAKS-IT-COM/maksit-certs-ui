@@ -1,20 +1,18 @@
-version: '3.9'
-
 services:
-  letsencryptapp:
-    image: ${DOCKER_REGISTRY-}letsencryptapp
+  letsencrypt-app:
+    image: ${DOCKER_REGISTRY-}letsencrypt-app
     build:
       context: .
       dockerfile: ClientApp/Dockerfile
 
-  reverseProxy:
-    image: ${DOCKER_REGISTRY-}reverseproxy
+  reverse-proxy:
+    image: ${DOCKER_REGISTRY-}reverse-proxy
     build:
       context: .
       dockerfile: ReverseProxy/Dockerfile
 
-  letsencryptserver:
-    image: ${DOCKER_REGISTRY-}letsencryptserver
+  letsencrypt-server:
+    image: ${DOCKER_REGISTRY-}letsencrypt-server
     build:
       context: .
       dockerfile: LetsEncryptServer/Dockerfile
