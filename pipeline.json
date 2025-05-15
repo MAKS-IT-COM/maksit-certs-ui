@@ -1,34 +1,38 @@
 {
-    "version": "1.0",
-    "name": "CI/CD Pipeline",
-    "jobs": {
-      "build-and-push": {
-        "steps": [
-          {
-            "agent": "kaniko",
-            
-            "context": "src",
-            "dockerfile-path": "LetsEncryptServer/Dockerfile",
+  "version": "1.0",
+  "name": "CI/CD Pipeline",
+
+  "crUrl": "cr.maks-it.com",
+  "crProjectName": "certs-ui",
+  "crSecret": "CR_MAKS_IT",
+
+  "projectContext": "src",
   
-            "image-name": "${{ env.REGISTRY_URL }}/${{ env.USERNAME }}/certs-ui-server:latest",
-            "username": "${{ env.USERNAME }}",
-            "password": "${{ env.PASSWORD }}"
-          },
-  
-          {
-            "agent": "kaniko",
-  
-            "context": "src",
-            "dockerfile-path": "ClientApp/Dockerfile",
-            
-            "image-name": "${{ env.REGISTRY_URL }}/${{ env.USERNAME }}/certs-ui-clientapp:latest",
-            "username": "${{ env.USERNAME }}",
-            "password": "${{ env.PASSWORD }}"
-          }
-        ]
-      },
-      "deploy": {
-        "steps": []
-      }
+  "jobs": {
+    "build-and-push": {
+      "steps": [
+        {
+          "context": ".",
+          "dockerfile-path": "ReverseProxy/Dockerfile",
+          "image-name": "certs-ui-reverseproxy",
+          "image-tags": ["latest", "1.0.0"]
+        },
+        {
+          "context": ".",
+          "dockerfile-path": "LetsEncryptServer/Dockerfile",
+          "image-name": "certs-ui-server",
+          "image-tags":  ["latest", "1.0.0"]
+        },
+        {
+          "context": ".",
+          "dockerfile-path": "ClientApp/Dockerfile",
+          "image-name": "certs-ui-clientapp",
+          "image-tags":  ["latest", "1.0.0"]
+        }
+      ]
+    },
+    "deploy": {
+      "steps": []
     }
   }
+}

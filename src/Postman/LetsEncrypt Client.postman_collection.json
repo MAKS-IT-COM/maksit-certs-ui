@@ -646,6 +646,84 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "agent",
+			"item": [
+				{
+					"name": "reload service",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{agentKey}}"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"serviceName\": {{serviceName}}\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://websrv0001.corp.maks-it.com:5000/Service/Reload",
+							"protocol": "http",
+							"host": [
+								"websrv0001",
+								"corp",
+								"maks-it",
+								"com"
+							],
+							"port": "5000",
+							"path": [
+								"Service",
+								"Reload"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "hello world",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{agentKey}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "http://websrv0001.corp.maks-it.com:5000/HelloWorld",
+							"protocol": "http",
+							"host": [
+								"websrv0001",
+								"corp",
+								"maks-it",
+								"com"
+							],
+							"port": "5000",
+							"path": [
+								"HelloWorld"
+							]
+						}
+					},
+					"response": []
+				}
+			]
 		}
 	]
 }
