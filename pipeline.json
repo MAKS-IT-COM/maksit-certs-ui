@@ -32,6 +32,7 @@
       ]
     },
     "deploy": {
+      "type": "helm",
       "steps": []
     }
   }
