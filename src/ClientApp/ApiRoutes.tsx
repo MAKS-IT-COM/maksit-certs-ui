@@ -20,14 +20,14 @@ enum ApiRoutes {
   // CERTS_FLOW_HOSRS_WITH_UPCOMING_SSL_EXPIRY = `api/CertsFlow/HostsWithUpcomingSslExpiry/{sessionId}`
 }
 
+const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? ''
+
 const GetApiRoute = (route: ApiRoutes, ...args: string[]): string => {
   let result: string = route
   args.forEach((arg) => {
     result = result.replace(/{.*?}/, arg)
   })
-  // TODO: need env var
-  return `http://localhost:8080/${result}`
-  //return `http://websrv0001.corp.maks-it.com:8080/${result}`
+  return `${apiBase.replace(/\/+$/, '')}/${result.replace(/^\/+/, '')}`
 }
 
 export { GetApiRoute, ApiRoutes }

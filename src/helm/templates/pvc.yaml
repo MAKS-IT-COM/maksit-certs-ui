@@ -1,0 +1,23 @@
+{{- $root := . -}}
+{{- range $compName, $comp := .Values.components }}
+{{- $p := default dict $comp.persistence }}
+{{- $vols := default (list) $p.volumes }}
+{{- range $vol := $vols }}
+{{- if and (eq $vol.type "pvc") $vol.pvc.create }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "certs-ui.fullname" $root }}-{{ $compName }}-{{ $vol.name }}
+  labels:
+    {{- include "certs-ui.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $compName }}
+spec:
+  accessModes: {{ toYaml (default (list "ReadWriteOnce") $vol.pvc.accessModes) | nindent 2 }}
+  resources:
+    requests:
+      storage: {{ default "1Gi" $vol.pvc.size }}
+  storageClassName: {{ default "local-path" $vol.pvc.storageClass }}
+{{- end }}
+{{- end }}
+{{- end }}

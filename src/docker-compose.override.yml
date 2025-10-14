@@ -14,8 +14,6 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - LETSENCRYPT_SERVER=http://localhost:8080
-  #   ports:
-  #   - "3000:3000"
     networks:
       - maks-it
 
@@ -31,10 +29,8 @@ services:
       - MAKS-IT_AGENT_KEY=UGnCaElLLJClHgUeet/yr7vNvPf13b1WkDJQMfsiP6I=
       - MAKS-IT_AGENT_SERVICE=haproxy
     volumes:
-      - ./docker-compose/LetsEncryptServer/acme:/app/bin/Debug/net8.0/acme
-      - ./docker-compose/LetsEncryptServer/cache:/app/bin/Debug/net8.0/cache
-    ports:
-      - "5000:5000"
+      - D:\Compose\MaksIT.CertsUI\acme:/app/bin/Debug/net8.0/acme
+      - D:\Compose\MaksIT.CertsUI\cache:/app/bin/Debug/net8.0/cache
     networks:
       - maks-it
 

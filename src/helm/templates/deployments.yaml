@@ -1,0 +1,83 @@
+{{- $root := . -}}
+{{- range $compName, $comp := .Values.components }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "certs-ui.fullname" $root }}-{{ $compName }}
+  labels:
+    {{- include "certs-ui.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $compName }}
+spec:
+  replicas: {{ default 1 $comp.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $root.Release.Name }}
+      app.kubernetes.io/name: {{ include "certs-ui.name" $root }}
+      app.kubernetes.io/component: {{ $compName }}
+  template:
+    metadata:
+      labels:
+        {{- include "certs-ui.labels" $root | nindent 8 }}
+        app.kubernetes.io/component: {{ $compName }}
+      {{- if and $comp.secretsFile $comp.secretsFile.forceUpdate }}
+      annotations:
+        "checksum/secrets-file": {{ (default "" $comp.secretsFile.content) | toString | sha256sum | quote }}
+      {{- end }}
+    spec:
+      {{- include "certs-ui.imagePullSecrets" $root | nindent 6 }}
+      containers:
+        - name: {{ $compName }}
+          image: "{{ $comp.image.registry }}/{{ $comp.image.repository }}:{{ $comp.image.tag }}"
+          imagePullPolicy: {{ default "IfNotPresent" $comp.image.pullPolicy }}
+          {{ $svc := default dict $comp.service }}
+          {{ $tgt := default 8080 $svc.targetPort }}
+          ports:
+            - name: http
+              containerPort: {{ $tgt }}
+          {{- if $comp.env }}
+          env:
+            {{- range $comp.env }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+          {{- end }}
+          {{- $p := default dict $comp.persistence -}}
+          {{- $vols := default (list) $p.volumes -}}
+          {{- $hasVols := gt (len $vols) 0 -}}
+          {{- $hasSecret := (hasKey $comp "secretsFile") -}}
+          {{- if or $hasVols $hasSecret }}
+          volumeMounts:
+            {{- range $vol := $vols }}
+            - name: {{ $compName }}-{{ $vol.name }}
+              mountPath: {{ $vol.mountPath }}
+            {{- end }}
+            {{- if $comp.secretsFile }}
+            - name: {{ $compName }}-secrets
+              mountPath: {{ $comp.secretsFile.mountPath }}
+              subPath: {{ base $comp.secretsFile.mountPath }}
+            {{- end }}
+          {{- end }}
+      {{- if or $hasVols $hasSecret }}
+      volumes:
+        {{- range $vol := $vols }}
+        - name: {{ $compName }}-{{ $vol.name }}
+          {{- if eq $vol.type "pvc" }}
+          persistentVolumeClaim:
+            claimName: {{ include "certs-ui.fullname" $root }}-{{ $compName }}-{{ $vol.name }}
+          {{- else if eq $vol.type "emptyDir" }}
+          emptyDir: {{ toYaml (default dict $vol.emptyDir) | nindent 12 }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- end }}
+        {{- if $comp.secretsFile }}
+        - name: {{ $compName }}-secrets
+          secret:
+            secretName: {{ include "certs-ui.fullname" $root }}-{{ $compName }}-secrets
+            items:
+              - key: {{ $comp.secretsFile.key }}
+                path: {{ base $comp.secretsFile.mountPath }}
+        {{- end }}
+      {{- end }}
+{{- end }}

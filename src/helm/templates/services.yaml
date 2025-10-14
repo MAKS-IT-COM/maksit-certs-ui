@@ -1,0 +1,73 @@
+{{- $root := . -}}
+{{- range $compName, $comp := .Values.components }}
+{{- $svc := default dict $comp.service }}
+{{- if and $svc $svc.enabled }}
+{{- $stype := default "ClusterIP" $svc.type }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "certs-ui.fullname" $root }}-{{ $compName }}
+  labels:
+    {{- include "certs-ui.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $compName }}
+    {{- if $svc.labels }}
+{{ toYaml $svc.labels | nindent 4 }}
+    {{- end }}
+  {{- if $svc.annotations }}
+  annotations:
+{{ toYaml $svc.annotations | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ $stype }}
+  {{- if $svc.clusterIP }}
+  clusterIP: {{ $svc.clusterIP }}
+  {{- end }}
+  {{- if $svc.loadBalancerClass }}
+  loadBalancerClass: {{ $svc.loadBalancerClass }}
+  {{- end }}
+  {{- if and (or (eq $stype "LoadBalancer") (eq $stype "NodePort")) ($svc.allocateLoadBalancerNodePorts | default nil) }}
+  allocateLoadBalancerNodePorts: {{ $svc.allocateLoadBalancerNodePorts }}
+  {{- end }}
+  {{- if and (eq $stype "LoadBalancer") $svc.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+{{ toYaml $svc.loadBalancerSourceRanges | nindent 4 }}
+  {{- end }}
+  {{- if and (eq $stype "LoadBalancer") $svc.ipFamilies }}
+  ipFamilies:
+{{ toYaml $svc.ipFamilies | nindent 4 }}
+  {{- end }}
+  {{- if and (eq $stype "LoadBalancer") $svc.ipFamilyPolicy }}
+  ipFamilyPolicy: {{ $svc.ipFamilyPolicy }}
+  {{- end }}
+  {{- if and (eq $stype "LoadBalancer") $svc.loadBalancerIP }}
+  loadBalancerIP: {{ $svc.loadBalancerIP }}
+  {{- end }}
+  ports:
+    - name: http
+      port: {{ default 80 $svc.port }}
+      targetPort: {{ default 80 $svc.targetPort }}
+      {{- if eq $stype "NodePort" }}
+      {{- if $svc.nodePort }}
+      nodePort: {{ $svc.nodePort }}
+      {{- end }}
+      {{- end }}
+  selector:
+    app.kubernetes.io/instance: {{ $root.Release.Name }}
+    app.kubernetes.io/name: {{ include "certs-ui.name" $root }}
+    app.kubernetes.io/component: {{ $compName }}
+  {{- if and (ne $stype "ClusterIP") $svc.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ $svc.externalTrafficPolicy }}
+  {{- end }}
+  {{- if and (eq $stype "LoadBalancer") $svc.healthCheckNodePort }}
+  healthCheckNodePort: {{ $svc.healthCheckNodePort }}
+  {{- end }}
+  {{- if and (typeIs "string" $svc.sessionAffinity) $svc.sessionAffinity }}
+  sessionAffinity: {{ $svc.sessionAffinity }}
+  {{- if and (eq $svc.sessionAffinity "ClientIP") (typeIs "map" $svc.sessionAffinityConfig) }}
+  sessionAffinityConfig:
+{{ toYaml $svc.sessionAffinityConfig | nindent 4 }}
+  {{- end }}
+  {{- end }}
+{{ end }}
+{{ end }}

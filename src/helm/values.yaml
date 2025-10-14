@@ -1,0 +1,96 @@
+global:
+  imagePullSecrets:
+    - name: cr-maksit-pull
+
+components:
+  server:
+    replicas: 1
+    image:
+      registry: cr.maks-it.com
+      repository: certs-ui/server
+      tag: latest
+      pullPolicy: Always
+    env:
+      - name: ASPNETCORE_ENVIRONMENT
+        value: Development
+      - name: ASPNETCORE_HTTP_PORTS
+        value: "5000"
+    service:
+      enabled: true
+      type: ClusterIP
+      port: 5000
+      targetPort: 5000
+    persistence:
+      volumes:
+        - name: acme
+          mountPath: /acme
+          type: pvc
+          pvc:
+            create: true
+            storageClass: local-path
+            size: 50Mi
+            accessModes: [ReadWriteOnce]
+        - name: cache
+          mountPath: /cache
+          type: pvc
+          pvc:
+            create: true
+            storageClass: local-path
+            size: 50Mi
+            accessModes: [ReadWriteOnce]
+    secretsFile:
+      key: appsecrets.json
+      mountPath: /secrets/appsecrets.json
+      content: |
+        {
+          "Agent": {
+          }
+        }
+      keep: true
+      forceUpdate: false
+
+  client:
+    replicas: 1
+    image:
+      registry: cr.maks-it.com
+      repository: certs-ui/client
+      tag: latest
+      pullPolicy: Always
+    env:
+      - name: ASPNETCORE_ENVIRONMENT
+        value: Development
+      - name: NEXT_PUBLIC_API_BASE_URL
+        value: http://certs-ui-server:5000
+    service:
+      enabled: true
+      type: ClusterIP
+      port: 3000
+      targetPort: 3000
+
+  reverseproxy:
+    replicas: 1
+    image:
+      registry: cr.maks-it.com
+      repository: certs-ui/reverseproxy
+      tag: latest
+      pullPolicy: Always
+    env:
+      - name: ASPNETCORE_ENVIRONMENT
+        value: Development
+      - name: ASPNETCORE_HTTP_PORTS
+        value: "8080"
+    service:
+      enabled: true
+      type: LoadBalancer
+      port: 8080
+      targetPort: 8080
+      loadBalancerIP: "172.16.0.5"
+      annotations:
+        lbipam.cilium.io/ips: "172.16.0.5" 
+      labels:
+        export: "bgp"
+      externalTrafficPolicy: Local
+      sessionAffinity: ClientIP
+      sessionAffinityConfig:
+        clientIP:
+          timeoutSeconds: 10800
