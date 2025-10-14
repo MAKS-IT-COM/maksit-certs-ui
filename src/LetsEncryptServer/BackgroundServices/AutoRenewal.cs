@@ -1,11 +1,9 @@
 ﻿using Microsoft.Extensions.Options;
 
-using DomainResults.Common;
-
 
 using MaksIT.LetsEncryptServer.Services;
 using MaksIT.LetsEncrypt.Entities;
-using MaksIT.Models.LetsEncryptServer.CertsFlow.Requests;
+using MaksIT.Results;
 
 namespace MaksIT.LetsEncryptServer.BackgroundServices {
   public class AutoRenewal : BackgroundService {
@@ -31,11 +29,13 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
       while (!stoppingToken.IsCancellationRequested) {
         _logger.LogInformation("Background service is running.");
 
-        var (accountsResponse, getAccountIdsResult) = await _cacheService.LoadAccountsFromCacheAsync();
-        if (!getAccountIdsResult.IsSuccess || accountsResponse == null) {
-          LogErrors(getAccountIdsResult.Errors);
+        var loadAccountsFromCacheResult = await _cacheService.LoadAccountsFromCacheAsync();
+        if (!loadAccountsFromCacheResult.IsSuccess || loadAccountsFromCacheResult.Value == null) {
+          LogErrors(loadAccountsFromCacheResult.Messages);
           continue;
         }
+
+        var accountsResponse = loadAccountsFromCacheResult.Value;
 
         foreach (var account in accountsResponse.Where(x => !x.IsDisabled)) {
           await ProcessAccountAsync(account);
@@ -45,27 +45,27 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
       }
     }
 
-    private async Task<IDomainResult> ProcessAccountAsync(RegistrationCache cache) {
+    private async Task<Result> ProcessAccountAsync(RegistrationCache cache) {
       
       var hostnames = cache.GetHostsWithUpcomingSslExpiry();
       if (hostnames == null) {
         _logger.LogError("Unexpected hostnames null");
-        return IDomainResult.Success();
+        return Result.Ok();
       }
 
 
       if (!hostnames.Any()) {
         _logger.LogInformation("No hosts found with upcoming SSL expiry");
-        return IDomainResult.Success();
+        return Result.Ok();
       }
 
-      var (_, renewResult) = await _certsFlowService.FullFlow(cache.IsStaging, cache.AccountId, cache.Description, cache.Contacts, cache.ChallengeType, hostnames);
-      if (!renewResult.IsSuccess)
-        return renewResult;
+      var fullFlowResult = await _certsFlowService.FullFlow(cache.IsStaging, cache.AccountId, cache.Description, cache.Contacts, cache.ChallengeType, hostnames);
+      if (!fullFlowResult.IsSuccess)
+        return fullFlowResult;
 
       _logger.LogInformation($"Certificates renewed for account {cache.AccountId}");
 
-      return IDomainResult.Success();
+      return Result.Ok();
     }
 
     

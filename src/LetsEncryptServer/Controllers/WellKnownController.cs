@@ -1,8 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
-using DomainResults.Mvc;
-
 using MaksIT.LetsEncryptServer.Services;
 
 

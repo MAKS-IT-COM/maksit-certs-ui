@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 
-using DomainResults.Mvc;
-
 using MaksIT.LetsEncryptServer.Services;
 using MaksIT.Models.LetsEncryptServer.CertsFlow.Requests;
 

@@ -1,9 +1,9 @@
-﻿using DomainResults.Common;
-
+﻿
 using MaksIT.LetsEncrypt.Entities;
 using MaksIT.Models;
 using MaksIT.Models.LetsEncryptServer.Account.Requests;
 using MaksIT.Models.LetsEncryptServer.Account.Responses;
+using MaksIT.Results;
 
 namespace MaksIT.LetsEncryptServer.Services;
 
@@ -14,11 +14,11 @@ public interface IAccountInternalService {
 
 
 public interface IAccountRestService {
-  Task<(GetAccountResponse[]?, IDomainResult)> GetAccountsAsync();
-  Task<(GetAccountResponse?, IDomainResult)> GetAccountAsync(Guid accountId);
-  Task<(GetAccountResponse?, IDomainResult)> PostAccountAsync(PostAccountRequest requestData);
-  Task<(GetAccountResponse?, IDomainResult)> PatchAccountAsync(Guid accountId, PatchAccountRequest requestData);
-  Task<IDomainResult> DeleteAccountAsync(Guid accountId); 
+  Task<Result<GetAccountResponse[]?>> GetAccountsAsync();
+  Task<Result<GetAccountResponse?>> GetAccountAsync(Guid accountId);
+  Task<Result<GetAccountResponse?>> PostAccountAsync(PostAccountRequest requestData);
+  Task<Result<GetAccountResponse?>> PatchAccountAsync(Guid accountId, PatchAccountRequest requestData);
+  Task<Result> DeleteAccountAsync(Guid accountId);
 }
 
 public interface IAccountService : IAccountInternalService, IAccountRestService { }
@@ -41,34 +41,37 @@ public class AccountService : IAccountService {
 
   #region Accounts
 
-  public async Task<(GetAccountResponse[]?, IDomainResult)> GetAccountsAsync() {
+  public async Task<Result<GetAccountResponse[]?>> GetAccountsAsync() {
 
-    var (caches, result) = await _cacheService.LoadAccountsFromCacheAsync();
-    if (!result.IsSuccess || caches == null) {
-      return (null, result);
+    var accountsFromCacheResult = await _cacheService.LoadAccountsFromCacheAsync();
+    if (!accountsFromCacheResult.IsSuccess || accountsFromCacheResult.Value == null) {
+      return accountsFromCacheResult
+        .ToResultOfType<GetAccountResponse[]?>(_ => null);
     }
 
-    var accounts = caches
+    var accounts = accountsFromCacheResult.Value
       .Select(x => CreateGetAccountResponse(x.AccountId, x))
       .ToArray();
 
-    return IDomainResult.Success(accounts);
+    return Result<GetAccountResponse[]?>.Ok(accounts);
   }
 
-  public async Task<(GetAccountResponse?, IDomainResult)> GetAccountAsync(Guid accountId) {
-    var (cache, result) = await _cacheService.LoadAccountFromCacheAsync(accountId);
-    if (!result.IsSuccess || cache == null) {
-      return (null, result);
+  public async Task<Result<GetAccountResponse?>> GetAccountAsync(Guid accountId) {
+    var loadFromCacheResult = await _cacheService.LoadAccountFromCacheAsync(accountId);
+    if (!loadFromCacheResult.IsSuccess || loadFromCacheResult.Value == null) {
+      return loadFromCacheResult.ToResultOfType<GetAccountResponse?>(_ => null);
     }
 
-    return IDomainResult.Success(CreateGetAccountResponse(accountId, cache));
+    var cache = loadFromCacheResult.Value;
+
+    return Result<GetAccountResponse?>.Ok(CreateGetAccountResponse(accountId, cache));
   }
 
-  public async Task<(GetAccountResponse?, IDomainResult)> PostAccountAsync(PostAccountRequest requestData) {
+  public async Task<Result<GetAccountResponse?>> PostAccountAsync(PostAccountRequest requestData) {
 
     // TODO: check for overlapping hostnames in already existing accounts
 
-    var (accountId, newCertsResult) = await _certsFlowService.FullFlow(
+    var fullFlowResult = await _certsFlowService.FullFlow(
           requestData.IsStaging,
           null,
           requestData.Description,
@@ -77,24 +80,30 @@ public class AccountService : IAccountService {
           requestData.Hostnames
         );
 
-    if (!newCertsResult.IsSuccess || accountId == null)
-      return (null, newCertsResult);
 
 
+    if (!fullFlowResult.IsSuccess || fullFlowResult.Value == null)
+      return fullFlowResult.ToResultOfType<GetAccountResponse?>(_ => null);
 
-    var (cache, loadResult) = await _cacheService.LoadAccountFromCacheAsync(accountId.Value);
-    if (!loadResult.IsSuccess || cache == null) {
-      return (null, loadResult);
+    var accountId = fullFlowResult.Value.Value;
+
+    var loadAccauntFromCacheResult = await _cacheService.LoadAccountFromCacheAsync(accountId);
+    if (!loadAccauntFromCacheResult.IsSuccess || loadAccauntFromCacheResult.Value == null) {
+      return loadAccauntFromCacheResult.ToResultOfType<GetAccountResponse?>(_ => null);
     }
 
-    return IDomainResult.Success(CreateGetAccountResponse(accountId.Value, cache));
+    var cache = loadAccauntFromCacheResult.Value;
+
+    return Result<GetAccountResponse?>.Ok(CreateGetAccountResponse(accountId, cache));
   }
 
-  public async Task<(GetAccountResponse?, IDomainResult)> PatchAccountAsync(Guid accountId, PatchAccountRequest requestData) {
-    var (cache, loadResult) = await _cacheService.LoadAccountFromCacheAsync(accountId);
-    if (!loadResult.IsSuccess || cache == null) {
-      return (null, loadResult);
+  public async Task<Result<GetAccountResponse?>> PatchAccountAsync(Guid accountId, PatchAccountRequest requestData) {
+    var loadAccountResult = await _cacheService.LoadAccountFromCacheAsync(accountId);
+    if (!loadAccountResult.IsSuccess || loadAccountResult.Value == null) {
+      return loadAccountResult.ToResultOfType<GetAccountResponse?>(_ => null);
     }
+
+    var cache = loadAccountResult.Value;
 
     if (requestData.Description != null) {
       switch (requestData.Description.Op) {
@@ -172,11 +181,11 @@ public class AccountService : IAccountService {
 
     var saveResult = await _cacheService.SaveToCacheAsync(accountId, cache);
     if (!saveResult.IsSuccess) {
-      return (null, saveResult);
+      return saveResult.ToResultOfType<GetAccountResponse?>(default);
     }
 
     if (hostnamesToAdd.Count > 0) {
-      var (_, newCertsResult) = await _certsFlowService.FullFlow(
+      var fullFlowResult = await _certsFlowService.FullFlow(
         cache.IsStaging,
         cache.AccountId,
         cache.Description,
@@ -185,8 +194,8 @@ public class AccountService : IAccountService {
         hostnamesToAdd.ToArray()
       );
 
-      if (!newCertsResult.IsSuccess)
-        return (null, newCertsResult);
+      if (!fullFlowResult.IsSuccess)
+        return fullFlowResult.ToResultOfType<GetAccountResponse?>(_ => null);
     }
 
     if (hostnamesToRemove.Count > 0) {
@@ -199,18 +208,18 @@ public class AccountService : IAccountService {
       );
 
       if (!revokeResult.IsSuccess)
-        return (null, revokeResult);
+        return revokeResult.ToResultOfType<GetAccountResponse?>(default);
     }
 
-    (cache, loadResult) = await _cacheService.LoadAccountFromCacheAsync(accountId);
-    if (!loadResult.IsSuccess || cache == null) {
-      return (null, loadResult);
+    loadAccountResult = await _cacheService.LoadAccountFromCacheAsync(accountId);
+    if (!loadAccountResult.IsSuccess || loadAccountResult.Value == null) {
+      return loadAccountResult.ToResultOfType<GetAccountResponse?>(_ => null);
     }
 
-    return IDomainResult.Success(CreateGetAccountResponse(accountId, cache));
+    return Result<GetAccountResponse?>.Ok(CreateGetAccountResponse(accountId, cache));
   }
 
-  public async Task<IDomainResult> DeleteAccountAsync(Guid accountId) {
+  public async Task<Result> DeleteAccountAsync(Guid accountId) {
     // TODO: Revoke all certificates
 
     // Remove from cache

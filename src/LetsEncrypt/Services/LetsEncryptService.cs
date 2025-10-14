@@ -4,37 +4,35 @@
  */
 
 
-using System.Text;
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
-using System.Net.Http.Headers;
-
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging;
-
-using DomainResults.Common;
-
-using MaksIT.LetsEncrypt.Entities;
-using MaksIT.LetsEncrypt.Exceptions;
 using MaksIT.Core.Extensions;
-using MaksIT.LetsEncrypt.Models.Responses;
-using MaksIT.LetsEncrypt.Models.Interfaces;
-using MaksIT.LetsEncrypt.Models.Requests;
+using MaksIT.LetsEncrypt.Entities;
 using MaksIT.LetsEncrypt.Entities.Jws;
 using MaksIT.LetsEncrypt.Entities.LetsEncrypt;
+using MaksIT.LetsEncrypt.Exceptions;
+using MaksIT.LetsEncrypt.Models.Interfaces;
+using MaksIT.LetsEncrypt.Models.Requests;
+using MaksIT.LetsEncrypt.Models.Responses;
+using MaksIT.Results;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
+using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
 
 namespace MaksIT.LetsEncrypt.Services;
 
 public interface ILetsEncryptService {
-  Task<IDomainResult> ConfigureClient(Guid sessionId, bool isStaging);
-  Task<IDomainResult> Init(Guid sessionId,Guid accountId, string description, string[] contacts, RegistrationCache? registrationCache);
-  (RegistrationCache?, IDomainResult) GetRegistrationCache(Guid sessionId);
-  (string?, IDomainResult) GetTermsOfServiceUri(Guid sessionId);
-  Task<(Dictionary<string, string>?, IDomainResult)> NewOrder(Guid sessionId, string[] hostnames, string challengeType);
-  Task<IDomainResult> CompleteChallenges(Guid sessionId);
-  Task<IDomainResult> GetOrder(Guid sessionId, string[] hostnames);
-  Task<IDomainResult> GetCertificate(Guid sessionId, string subject);
-  Task<IDomainResult> RevokeCertificate(Guid sessionId, string subject, RevokeReason reason);
+  Task<Result> ConfigureClient(Guid sessionId, bool isStaging);
+  Task<Result> Init(Guid sessionId,Guid accountId, string description, string[] contacts, RegistrationCache? registrationCache);
+  Result<RegistrationCache?> GetRegistrationCache(Guid sessionId);
+  Result<string?> GetTermsOfServiceUri(Guid sessionId);
+  Task<Result<Dictionary<string, string>?>> NewOrder(Guid sessionId, string[] hostnames, string challengeType);
+  Task<Result> CompleteChallenges(Guid sessionId);
+  Task<Result> GetOrder(Guid sessionId, string[] hostnames);
+  Task<Result> GetCertificate(Guid sessionId, string subject);
+  Task<Result> RevokeCertificate(Guid sessionId, string subject, RevokeReason reason);
 }
 
 public class LetsEncryptService : ILetsEncryptService {
@@ -77,8 +75,8 @@ public class LetsEncryptService : ILetsEncryptService {
   }
 
   // Helper: Poll challenge status until valid or timeout
-  private async Task<IDomainResult> PollChallengeStatus(Guid sessionId, AuthorizationChallengeChallenge challenge, State state) {
-    if (challenge?.Url == null) return IDomainResult.Failed("Challenge URL is null");
+  private async Task<Result> PollChallengeStatus(Guid sessionId, AuthorizationChallengeChallenge challenge, State state) {
+    if (challenge?.Url == null) return Result.InternalServerError("Challenge URL is null");
     var start = DateTime.UtcNow;
     while (true) {
       var pollRequest = new HttpRequestMessage(HttpMethod.Post, challenge.Url);
@@ -94,15 +92,15 @@ public class LetsEncryptService : ILetsEncryptService {
       HandleProblemResponseAsync(pollResponse, pollResponseText);
       var authChallenge = ProcessResponseContent<AuthorizationChallengeResponse>(pollResponse, pollResponseText);
       if (authChallenge.Result?.Status != "pending")
-        return authChallenge.Result?.Status == "valid" ? IDomainResult.Success() : IDomainResult.Failed();
+        return authChallenge.Result?.Status == "valid" ? Result.Ok() : Result.InternalServerError();
       if ((DateTime.UtcNow - start).Seconds > 120)
-        return IDomainResult.Failed("Timeout");
+        return Result.InternalServerError("Timeout");
       await Task.Delay(1000);
     }
   }
 
   #region ConfigureClient
-  public async Task<IDomainResult> ConfigureClient(Guid sessionId, bool isStaging) {
+  public async Task<Result> ConfigureClient(Guid sessionId, bool isStaging) {
     try {
       var state = GetOrCreateState(sessionId);
       state.IsStaging = isStaging;
@@ -113,29 +111,29 @@ public class LetsEncryptService : ILetsEncryptService {
         var directory = await SendAcmeRequest<AcmeDirectory>(request, state, HttpMethod.Get);
         state.Directory = directory.Result ?? throw new InvalidOperationException("Directory response is null");
       }
-      return IDomainResult.Success();
+      return Result.Ok();
     } catch (Exception ex) {
       const string message = "Let's Encrypt client unhandled exception";
       _logger.LogError(ex, message);
-      return IDomainResult.CriticalDependencyError(message);
+      return Result.InternalServerError(message);
     }
   }
   #endregion
 
   #region Init
-  public async Task<IDomainResult> Init(Guid sessionId, Guid accountId, string description, string[] contacts, RegistrationCache? cache) {
+  public async Task<Result> Init(Guid sessionId, Guid accountId, string description, string[] contacts, RegistrationCache? cache) {
     if (sessionId == Guid.Empty) {
       _logger.LogError("Invalid sessionId");
-      return IDomainResult.Failed();
+      return Result.InternalServerError();
     }
     if (contacts == null || contacts.Length == 0) {
       _logger.LogError("Contacts are null or empty");
-      return IDomainResult.Failed();
+      return Result.InternalServerError();
     }
     var state = GetOrCreateState(sessionId);
     if (state.Directory == null) {
       _logger.LogError("State directory is null");
-      return IDomainResult.Failed();
+      return Result.InternalServerError();
     }
     _logger.LogInformation($"Executing {nameof(Init)}...");
     try {
@@ -162,7 +160,7 @@ public class LetsEncryptService : ILetsEncryptService {
         state.JwsService.SetKeyId(result.Result?.Location?.ToString() ?? string.Empty);
         if (result.Result?.Status != "valid") {
           _logger.LogError($"Account status is not valid, was: {result.Result?.Status} \r\n {result.ResponseText}");
-          return IDomainResult.Failed();
+          return Result.InternalServerError();
         }
         state.Cache = new RegistrationCache {
           AccountId = accountId,
@@ -175,41 +173,41 @@ public class LetsEncryptService : ILetsEncryptService {
           Key = result.Result.Key
         };
       }
-      return IDomainResult.Success();
+      return Result.Ok();
     } catch (Exception ex) {
       const string message = "Let's Encrypt client unhandled exception";
       _logger.LogError(ex, message);
-      return IDomainResult.CriticalDependencyError(message);
+      return Result.InternalServerError(message);
     }
   }
   #endregion
 
-  public (RegistrationCache?, IDomainResult) GetRegistrationCache(Guid sessionId) {
+  public Result<RegistrationCache?> GetRegistrationCache(Guid sessionId) {
     var state = GetOrCreateState(sessionId);
     if(state?.Cache == null)
-      return IDomainResult.Failed<RegistrationCache?>();
-    return IDomainResult.Success(state.Cache);
+      return Result<RegistrationCache?>.InternalServerError(null);
+    return Result<RegistrationCache?>.Ok(state.Cache);
   }
 
   #region GetTermsOfService
-  public (string?, IDomainResult) GetTermsOfServiceUri(Guid sessionId) {
+  public Result<string?> GetTermsOfServiceUri(Guid sessionId) {
     try {
       var state = GetOrCreateState(sessionId);
       _logger.LogInformation($"Executing {nameof(GetTermsOfServiceUri)}...");
       if (state.Directory?.Meta?.TermsOfService == null) {
-        return IDomainResult.Failed<string?>();
+        return Result<string?>.Ok(null);
       }
-      return IDomainResult.Success(state.Directory.Meta.TermsOfService);
+      return Result<string?>.Ok(state.Directory.Meta.TermsOfService);
     } catch (Exception ex) {
       var message = "Let's Encrypt client unhandled exception";
       _logger.LogError(ex, message);
-      return IDomainResult.CriticalDependencyError<string?>(message);
+      return Result<string?>.InternalServerError(message);
     }
   }
   #endregion
 
   #region NewOrder
-  public async Task<(Dictionary<string, string>?, IDomainResult)> NewOrder(Guid sessionId, string[] hostnames, string challengeType) {
+  public async Task<Result<Dictionary<string, string>?>> NewOrder(Guid sessionId, string[] hostnames, string challengeType) {
     try {
       var state = GetOrCreateState(sessionId);
       _logger.LogInformation($"Executing {nameof(NewOrder)}...");
@@ -222,7 +220,7 @@ public class LetsEncryptService : ILetsEncryptService {
         }).ToArray() ?? Array.Empty<OrderIdentifier>()
       };
       if (state.Directory == null || state.Directory.NewOrder == null)
-        return (null, IDomainResult.Failed());
+        return Result<Dictionary<string, string>?>.InternalServerError(null);
       var request = new HttpRequestMessage(HttpMethod.Post, state.Directory.NewOrder);
       await HandleNonceAsync(sessionId, state.Directory.NewOrder, state);
       var json = EncodeMessage(false, letsEncryptOrder, state, new JwsHeader {
@@ -232,10 +230,10 @@ public class LetsEncryptService : ILetsEncryptService {
       PrepareRequestContent(request, json, HttpMethod.Post);
       var order = await SendAcmeRequest<Order>(request, state, HttpMethod.Post);
       if (StatusEquals(order.Result?.Status, OrderStatus.Ready))
-        return (new Dictionary<string, string>(), IDomainResult.Success());
+        return Result<Dictionary<string, string>?>.Ok(new Dictionary<string, string>());
       if (!StatusEquals(order.Result?.Status, OrderStatus.Pending)) {
         _logger.LogError($"Created new order and expected status '{OrderStatus.Pending.GetDisplayName()}', but got: {order.Result?.Status} \r\n {order.Result}");
-        return (null, IDomainResult.Failed());
+        return Result<Dictionary<string, string>?>.InternalServerError(null);
       }
       state.CurrentOrder = order.Result;
       var results = new Dictionary<string, string>();
@@ -253,12 +251,12 @@ public class LetsEncryptService : ILetsEncryptService {
           continue;
         if (!StatusEquals(challengeResponse.Result?.Status, OrderStatus.Pending)) {
           _logger.LogError($"Expected authorization status '{OrderStatus.Pending.GetDisplayName()}', but got: {state.CurrentOrder?.Status} \r\n {challengeResponse.ResponseText}");
-          return (null, IDomainResult.Failed());
+          return Result<Dictionary<string, string>?>.InternalServerError(null);
         }
         var challenge = challengeResponse.Result?.Challenges?.FirstOrDefault(x => x?.Type == challengeType);
         if (challenge == null || challenge.Token == null) {
           _logger.LogError("Challenge or token is null");
-          return (null, IDomainResult.Failed());
+          return Result<Dictionary<string, string>?>.InternalServerError(null);
         }
         state.Challenges.Add(challenge);
         if (state.Cache != null) state.Cache.ChallengeType = challengeType;
@@ -277,28 +275,29 @@ public class LetsEncryptService : ILetsEncryptService {
             throw new NotImplementedException();
         }
       }
-      return (results, IDomainResult.Success());
+
+      return Result<Dictionary<string, string>?>.Ok(results);
     } catch (Exception ex) {
       var message = "Let's Encrypt client unhandled exception";
       _logger.LogError(ex, message);
-      return (null, IDomainResult.CriticalDependencyError(message));
+      return Result<Dictionary<string, string>?>.InternalServerError(null, message);
     }
   }
   #endregion
 
   #region CompleteChallenges
-  public async Task<IDomainResult> CompleteChallenges(Guid sessionId) {
+  public async Task<Result> CompleteChallenges(Guid sessionId) {
     try {
       var state = GetOrCreateState(sessionId);
       _logger.LogInformation($"Executing {nameof(CompleteChallenges)}...");
       if (state.CurrentOrder?.Identifiers == null) {
-        return IDomainResult.Failed("Current order identifiers are null");
+        return Result.InternalServerError("Current order identifiers are null");
       }
       for (var index = 0; index < state.Challenges.Count; index++) {
         var challenge = state.Challenges[index];
         if (challenge?.Url == null) {
           _logger.LogError("Challenge URL is null");
-          return IDomainResult.Failed();
+          return Result.InternalServerError();
         }
         var request = new HttpRequestMessage(HttpMethod.Post, challenge.Url);
         await HandleNonceAsync(sessionId, challenge.Url, state);
@@ -312,17 +311,17 @@ public class LetsEncryptService : ILetsEncryptService {
         if (!result.IsSuccess)
           return result;
       }
-      return IDomainResult.Success();
+      return Result.Ok();
     } catch (Exception ex) {
       var message = "Let's Encrypt client unhandled exception";
       _logger.LogError(ex, message);
-      return IDomainResult.CriticalDependencyError(message);
+      return Result.InternalServerError(message);
     }
   }
   #endregion
 
   #region GetOrder
-  public async Task<IDomainResult> GetOrder(Guid sessionId, string[] hostnames) {
+  public async Task<Result> GetOrder(Guid sessionId, string[] hostnames) {
     try {
       _logger.LogInformation($"Executing {nameof(GetOrder)}");
       var state = GetOrCreateState(sessionId);
@@ -342,22 +341,22 @@ public class LetsEncryptService : ILetsEncryptService {
       PrepareRequestContent(request, json, HttpMethod.Post);
       var order = await SendAcmeRequest<Order>(request, state, HttpMethod.Post);
       state.CurrentOrder = order.Result;
-      return IDomainResult.Success();
+      return Result.Ok();
     } catch (Exception ex) {
       var message = "Let's Encrypt client unhandled exception";
       _logger.LogError(ex, message);
-      return IDomainResult.CriticalDependencyError(message);
+      return Result.InternalServerError(message);
     }
   }
   #endregion
 
   #region GetCertificates
-  public async Task<IDomainResult> GetCertificate(Guid sessionId, string subject) {
+  public async Task<Result> GetCertificate(Guid sessionId, string subject) {
     try {
       var state = GetOrCreateState(sessionId);
       _logger.LogInformation($"Executing {nameof(GetCertificate)}...");
       if (state.CurrentOrder?.Identifiers == null) {
-        return IDomainResult.Failed();
+        return Result.InternalServerError();
       }
       var key = new RSACryptoServiceProvider(4096);
       var csr = new CertificateRequest("CN=" + subject,
@@ -417,7 +416,7 @@ public class LetsEncryptService : ILetsEncryptService {
       var pem = await SendAcmeRequest<string>(finalRequest, state, HttpMethod.Post);
       if (state.Cache == null) {
         _logger.LogError($"{nameof(state.Cache)} is null");
-        return IDomainResult.Failed();
+        return Result.InternalServerError();
       }
       state.Cache.CachedCerts ??= new Dictionary<string, CertificateCache>();
       state.Cache.CachedCerts[subject] = new CertificateCache {
@@ -429,31 +428,31 @@ public class LetsEncryptService : ILetsEncryptService {
       if (!string.IsNullOrEmpty(certPem)) {
         var cert = new X509Certificate2(Encoding.UTF8.GetBytes(certPem));
       }
-      return IDomainResult.Success();
+      return Result.Ok();
     } catch (Exception ex) {
       var message = "Let's Encrypt client unhandled exception";
       _logger.LogError(ex, message);
-      return IDomainResult.CriticalDependencyError(message);
+      return Result.InternalServerError(message);
     }
   }
   #endregion
 
-  public Task<IDomainResult> KeyChange(Guid sessionId) {
+  public Task<Result> KeyChange(Guid sessionId) {
     throw new NotImplementedException();
   }
 
-  public async Task<IDomainResult> RevokeCertificate(Guid sessionId, string subject, RevokeReason reason) {
+  public async Task<Result> RevokeCertificate(Guid sessionId, string subject, RevokeReason reason) {
     try {
       var state = GetOrCreateState(sessionId);
       _logger.LogInformation($"Executing {nameof(RevokeCertificate)}...");
       if (state.Cache?.CachedCerts == null || !state.Cache.CachedCerts.TryGetValue(subject, out var certificateCache) || certificateCache == null) {
         _logger.LogError("Certificate not found in cache");
-        return IDomainResult.Failed("Certificate not found");
+        return Result.InternalServerError("Certificate not found");
       }
       var certPem = certificateCache.Cert ?? string.Empty;
       if (string.IsNullOrEmpty(certPem)) {
         _logger.LogError("Certificate PEM is null or empty");
-        return IDomainResult.Failed("Certificate PEM is null or empty");
+        return Result.InternalServerError("Certificate PEM is null or empty");
       }
       var certificate = new X509Certificate2(Encoding.UTF8.GetBytes(certPem));
       var derEncodedCert = certificate.Export(X509ContentType.Cert);
@@ -478,14 +477,14 @@ public class LetsEncryptService : ILetsEncryptService {
         var erroObj = responseText.ToObject<Problem>();
       }
       if (!response.IsSuccessStatusCode)
-        IDomainResult.CriticalDependencyError(responseText);
+        Result.InternalServerError(responseText);
       state.Cache.CachedCerts.Remove(subject);
       _logger.LogInformation("Certificate revoked successfully");
-      return IDomainResult.Success();
+      return Result.Ok();
     } catch (Exception ex) {
       var message = "Let's Encrypt client unhandled exception";
       _logger.LogError(ex, message);
-      return IDomainResult.CriticalDependencyError($"{message}: {ex.Message}");
+      return Result.InternalServerError($"{message}: {ex.Message}");
     }
   }
 
@@ -493,31 +492,31 @@ public class LetsEncryptService : ILetsEncryptService {
   private async Task HandleNonceAsync(Guid sessionId, Uri uri, State state) {
     if (uri == null) throw new ArgumentNullException(nameof(uri));
     if (uri.OriginalString != "directory") {
-      var (nonce, newNonceResult) = await NewNonce(sessionId);
-      if (!newNonceResult.IsSuccess || nonce == null) {
+      var newNonceResult = await NewNonce(sessionId);
+      if (!newNonceResult.IsSuccess || newNonceResult.Value == null) {
         throw new InvalidOperationException("Failed to retrieve nonce.");
       }
-      state.Nonce = nonce;
+      state.Nonce = newNonceResult.Value;
     }
     else {
       state.Nonce = default;
     }
   }
 
-  private async Task<(string?, IDomainResult)> NewNonce(Guid sessionId) {
+  private async Task<Result<string?>> NewNonce(Guid sessionId) {
     try {
       var state = GetOrCreateState(sessionId);
       _logger.LogInformation($"Executing {nameof(NewNonce)}...");
       if (state.Directory?.NewNonce == null)
-        return (null, IDomainResult.Failed());
+        return Result<string?>.InternalServerError(null);
       var result = await _httpClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, state.Directory.NewNonce));
       var nonce = result.Headers.GetValues("Replay-Nonce").FirstOrDefault();
-      return (nonce, IDomainResult.Success());
+      return Result<string?>.Ok(nonce);
     }
     catch (Exception ex) {
       var message = "Let's Encrypt client unhandled exception";
       _logger.LogError(ex, message);
-      return (null, IDomainResult.CriticalDependencyError(message));
+      return Result<string?>.InternalServerError(null, message);
     }
   }
 

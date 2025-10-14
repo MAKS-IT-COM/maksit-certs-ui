@@ -1,18 +1,17 @@
 ﻿using System.Text.Json;
 
-using DomainResults.Common;
 
 using MaksIT.Core.Extensions;
 using MaksIT.LetsEncrypt.Entities;
-using MaksIT.Models;
+using MaksIT.Results;
 
 namespace MaksIT.LetsEncryptServer.Services;
 
 public interface ICacheService {
-  Task<(RegistrationCache[]?, IDomainResult)> LoadAccountsFromCacheAsync();
-  Task<(RegistrationCache?, IDomainResult)> LoadAccountFromCacheAsync(Guid accountId);
-  Task<IDomainResult> SaveToCacheAsync(Guid accountId, RegistrationCache cache);
-  Task<IDomainResult> DeleteFromCacheAsync(Guid accountId);
+  Task<Result<RegistrationCache[]?>> LoadAccountsFromCacheAsync();
+  Task<Result<RegistrationCache?>> LoadAccountFromCacheAsync(Guid accountId);
+  Task<Result> SaveToCacheAsync(Guid accountId, RegistrationCache cache);
+  Task<Result> DeleteFromCacheAsync(Guid accountId);
 }
 
 public class CacheService : ICacheService, IDisposable {
@@ -47,63 +46,58 @@ public class CacheService : ICacheService, IDisposable {
 
   #region Cache Operations
 
-  public async Task<(RegistrationCache[]?, IDomainResult)> LoadAccountsFromCacheAsync() {
+  public async Task<Result<RegistrationCache[]?>> LoadAccountsFromCacheAsync() {
     return await _lockManager.ExecuteWithLockAsync(async () => {
       var accountIds = GetCachedAccounts();
       var cacheLoadTasks = accountIds.Select(accountId => LoadFromCacheInternalAsync(accountId)).ToList();
 
       var caches = new List<RegistrationCache>();
       foreach (var task in cacheLoadTasks) {
-        var (registrationCache, getRegistrationCacheResult) = await task;
-        if (!getRegistrationCacheResult.IsSuccess || registrationCache == null) {
+        var taskResult = await task;
+        if (!taskResult.IsSuccess || taskResult.Value == null) {
           // Depending on how you want to handle partial failures, you might want to return here
           // or continue loading other caches. For now, let's continue.
           continue;
         }
 
+        var registrationCache = taskResult.Value;
+
         caches.Add(registrationCache);
       }
 
-      return IDomainResult.Success(caches.ToArray());
+      return Result<RegistrationCache[]?>.Ok(caches.ToArray());
     });
   }
 
-
-
-
-  private async Task<(RegistrationCache?, IDomainResult)> LoadFromCacheInternalAsync(Guid accountId) {
+  private async Task<Result<RegistrationCache?>> LoadFromCacheInternalAsync(Guid accountId) {
     var cacheFilePath = GetCacheFilePath(accountId);
 
     if (!File.Exists(cacheFilePath)) {
       var message = $"Cache file not found for account {accountId}";
       _logger.LogWarning(message);
-      return IDomainResult.Failed<RegistrationCache>(message);
+      return Result<RegistrationCache?>.InternalServerError(null, message);
     }
 
     var json = await File.ReadAllTextAsync(cacheFilePath);
     if (string.IsNullOrEmpty(json)) {
       var message = $"Cache file is empty for account {accountId}";
       _logger.LogWarning(message);
-      return IDomainResult.Failed<RegistrationCache>(message);
+      return Result<RegistrationCache?>.InternalServerError(null, message);
     }
 
     var cache = JsonSerializer.Deserialize<RegistrationCache>(json);
-    return IDomainResult.Success(cache);
+    return Result<RegistrationCache?>.Ok(cache);
   }
 
-
-
-  private async Task<IDomainResult> SaveToCacheInternalAsync(Guid accountId, RegistrationCache cache) {
+  private async Task<Result> SaveToCacheInternalAsync(Guid accountId, RegistrationCache cache) {
     var cacheFilePath = GetCacheFilePath(accountId);
     var json = JsonSerializer.Serialize(cache);
     await File.WriteAllTextAsync(cacheFilePath, json);
     _logger.LogInformation($"Cache file saved for account {accountId}");
-    return DomainResult.Success();
+    return Result.Ok();
   }
 
-
-
-  private IDomainResult DeleteFromCacheInternal(Guid accountId) {
+  private Result DeleteFromCacheInternal(Guid accountId) {
     var cacheFilePath = GetCacheFilePath(accountId);
     if (File.Exists(cacheFilePath)) {
       File.Delete(cacheFilePath);
@@ -112,22 +106,22 @@ public class CacheService : ICacheService, IDisposable {
     else {
       _logger.LogWarning($"Cache file not found for account {accountId}");
     }
-    return DomainResult.Success();
+    return Result.Ok();
   }
 
   #endregion
 
+  public async Task<Result<RegistrationCache?>> LoadAccountFromCacheAsync(Guid accountId) {
+    return await _lockManager.ExecuteWithLockAsync(() => LoadFromCacheInternalAsync(accountId));
 
-  public Task<(RegistrationCache?, IDomainResult)> LoadAccountFromCacheAsync(Guid accountId) {
-    return _lockManager.ExecuteWithLockAsync(() => LoadFromCacheInternalAsync(accountId));
   }
 
-  public Task<IDomainResult> SaveToCacheAsync(Guid accountId, RegistrationCache cache) {
-    return _lockManager.ExecuteWithLockAsync(() => SaveToCacheInternalAsync(accountId, cache));
+  public async Task<Result> SaveToCacheAsync(Guid accountId, RegistrationCache cache) {
+    return await _lockManager.ExecuteWithLockAsync(() => SaveToCacheInternalAsync(accountId, cache));
   }
 
-  public Task<IDomainResult> DeleteFromCacheAsync(Guid accountId) {
-    return _lockManager.ExecuteWithLockAsync(() => DeleteFromCacheInternal(accountId));
+  public async Task<Result> DeleteFromCacheAsync(Guid accountId) {
+    return await _lockManager.ExecuteWithLockAsync(() => DeleteFromCacheInternal(accountId));
   }
 
   public void Dispose() {
