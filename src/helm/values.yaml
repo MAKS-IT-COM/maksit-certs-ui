@@ -49,6 +49,34 @@ components:
       keep: true
       forceUpdate: false
 
+    configMapFile:
+      key: appsettings.json
+      mountPath: /configMap/appsettings.json
+      content: |
+        {
+          "Logging": {
+            "LogLevel": {
+              "Default": "Information",
+              "Microsoft.AspNetCore": "Warning"
+            }
+          },
+          "Configuration": {
+            "Production": "https://acme-v02.api.letsencrypt.org/directory",
+            "Staging": "https://acme-staging-v02.api.letsencrypt.org/directory",
+
+            "CacheFolder": "/cache",
+            "AcmeFolder": "/acme",
+
+            "Agent": {
+              "AgentHostname": "http://websrv0001.corp.maks-it.com",
+              "AgentPort": 9000,
+              "ServiceToReload": "haproxy"
+            }
+          }
+        }
+      keep: true
+      forceUpdate: false
+
   client:
     replicas: 1
     image:

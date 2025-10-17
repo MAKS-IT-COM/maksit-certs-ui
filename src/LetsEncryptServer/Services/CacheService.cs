@@ -4,6 +4,7 @@
 using MaksIT.Core.Extensions;
 using MaksIT.LetsEncrypt.Entities;
 using MaksIT.Results;
+using Microsoft.Extensions.Options;
 
 namespace MaksIT.LetsEncryptServer.Services;
 
@@ -19,14 +20,13 @@ public class CacheService : ICacheService, IDisposable {
   private readonly string _cacheDirectory;
   private readonly LockManager _lockManager;
 
-  public CacheService(ILogger<CacheService> logger) {
+  public CacheService(
+    ILogger<CacheService> logger,
+    IOptions<Configuration> appsettings
+  ) {
     _logger = logger;
-    _cacheDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "cache");
+    _cacheDirectory = appsettings.Value.CacheFolder;
     _lockManager = new LockManager();
-
-    if (!Directory.Exists(_cacheDirectory)) {
-      Directory.CreateDirectory(_cacheDirectory);
-    }
   }
 
   /// <summary>

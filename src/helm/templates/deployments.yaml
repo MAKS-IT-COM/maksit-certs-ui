@@ -1,3 +1,5 @@
+{{- $roll := ((.Values.rollme | default (now | unixEpoch)) | toString) -}}
+
 {{- $root := . -}}
 {{- range $compName, $comp := .Values.components }}
 ---
@@ -22,7 +24,7 @@ spec:
         app.kubernetes.io/component: {{ $compName }}
       {{- if and $comp.secretsFile $comp.secretsFile.forceUpdate }}
       annotations:
-        "checksum/secrets-file": {{ (default "" $comp.secretsFile.content) | toString | sha256sum | quote }}
+        rollme: "{{$roll}}"
       {{- end }}
     spec:
       {{- include "certs-ui.imagePullSecrets" $root | nindent 6 }}
@@ -37,6 +39,8 @@ spec:
               containerPort: {{ $tgt }}
           {{- if $comp.env }}
           env:
+            - name: ROLLOUT_TOKEN
+              value: "{{$roll}}"
             {{- range $comp.env }}
             - name: {{ .name }}
               value: {{ .value | quote }}
@@ -56,6 +60,14 @@ spec:
             - name: {{ $compName }}-secrets
               mountPath: {{ $comp.secretsFile.mountPath }}
               subPath: {{ base $comp.secretsFile.mountPath }}
+            {{- end }}
+            {{- if $comp.configMapFile }}
+            - name: {{ $compName }}-configmap
+              configMap:
+                name: {{ include "certs-ui.fullname" $root }}-{{ $compName }}-configmap
+                items:
+                  - key: {{ $comp.configMapFile.key }}
+                    path: {{ base $comp.configMapFile.mountPath }}
             {{- end }}
           {{- end }}
       {{- if or $hasVols $hasSecret }}
@@ -78,6 +90,14 @@ spec:
             items:
               - key: {{ $comp.secretsFile.key }}
                 path: {{ base $comp.secretsFile.mountPath }}
+        {{- end }}
+        {{- if $comp.configMapFile }}
+        - name: {{ $compName }}-configmap
+          configMap:
+            name: {{ include "certs-ui.fullname" $root }}-{{ $compName }}-configmap
+            items:
+              - key: {{ $comp.configMapFile.key }}
+                path: {{ base $comp.configMapFile.mountPath }}
         {{- end }}
       {{- end }}
 {{- end }}

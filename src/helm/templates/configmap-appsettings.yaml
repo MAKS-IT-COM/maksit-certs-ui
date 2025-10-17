@@ -1,0 +1,27 @@
+{{- $root := . -}}
+{{- range $compName, $comp := .Values.components }}
+{{- if $comp.configMapFile }}
+{{- $cf := $comp.configMapFile -}}
+{{- $cmName := printf "%s-%s-configmap" (include "certs-ui.fullname" $root) $compName -}}
+{{- $existing := lookup "v1" "ConfigMap" $root.Release.Namespace $cmName -}}
+{{- if and $cf.keep $existing }}
+{{/* keep=true and ConfigMap exists -> render nothing */}}
+{{- else }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $cmName }}
+  labels:
+    {{- include "certs-ui.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $compName }}
+  {{- if $cf.keep }}
+  annotations:
+    "helm.sh/resource-policy": keep
+  {{- end }}
+data:
+  {{ $cf.key }}: |
+{{ $cf.content | indent 4 }}
+{{- end }}
+{{- end }}
+{{- end }}

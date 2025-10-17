@@ -3,12 +3,16 @@
 {{- end }}
 
 {{- define "certs-ui.fullname" -}}
-{{- $name := .Chart.Name -}}
-{{- $rel  := .Release.Name -}}
-{{- if or (hasPrefix (printf "%s-" $name) $rel) (eq $rel $name) -}}
+{{- if .Values.fullnameOverride -}}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- $name := default .Chart.Name .Values.nameOverride -}}
+{{- $rel := .Release.Name -}}
+{{- if contains $name $rel -}}
 {{- $rel | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
 {{- printf "%s-%s" $rel $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
 {{- end -}}
 {{- end }}
 

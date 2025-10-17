@@ -1,0 +1,39 @@
+Thank you for installing **{{ .Chart.Name }}**!
+
+This chart deploys the MaksIT CertsUI tool for automated Let's Encrypt HTTPS certificate renewal.
+
+------------------------------------------------------------
+## Components
+
+- **Server**: Handles certificate requests and renewal logic.
+- **Client**: Web UI for managing and viewing certificate status.
+- **Reverse Proxy**: Exposes the UI and API endpoints.
+
+------------------------------------------------------------
+## Configuration
+
+- **Secrets**:  
+  The server uses a Kubernetes Secret (`appsecrets.json`) for sensitive data.
+
+- **ConfigMap**:  
+  The server uses a ConfigMap (`appsettings.json`) for application settings.
+
+- **Persistence**:  
+  PVCs are created for `/acme` and `/cache` directories.
+
+------------------------------------------------------------
+## Uninstall
+
+To remove all resources created by this chart:
+```
+helm uninstall {{ .Release.Name }}
+```
+
+------------------------------------------------------------
+## Notes
+
+- Certificates are renewed automatically using Let's Encrypt.
+- You can customize settings in `values.yaml` before installation.
+- For advanced configuration, see the chart documentation and templates.
+
+------------------------------------------------------------

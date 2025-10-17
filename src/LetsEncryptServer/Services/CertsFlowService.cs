@@ -64,9 +64,7 @@ public class CertsFlowService : ICertsFlowService {
     _letsEncryptService = letsEncryptService;
     _cacheService = cashService;
     _agentService = agentService;
-    _acmePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "acme");
-    if (!Directory.Exists(_acmePath))
-      Directory.CreateDirectory(_acmePath);
+    _acmePath = _appSettings.AcmeFolder;
   }
 
   #region Common methods

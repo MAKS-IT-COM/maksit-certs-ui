@@ -10,6 +10,16 @@ var builder = WebApplication.CreateBuilder(args);
 // Extract configuration
 var configuration = builder.Configuration;
 
+var configMapPath = Path.Combine(Path.DirectorySeparatorChar.ToString(), "configMap", "appsettings.json");
+if (File.Exists(configMapPath)) {
+  configuration.AddJsonFile(configMapPath, optional: false, reloadOnChange: true);
+}
+
+var secretsPath = Path.Combine(Path.DirectorySeparatorChar.ToString(), "secrets", "appsecrets.json");
+if (File.Exists(secretsPath)) {
+  configuration.AddJsonFile(secretsPath, optional: false, reloadOnChange: true);
+}
+
 // Configure strongly typed settings objects
 var configurationSection = configuration.GetSection("Configuration");
 var appSettings = configurationSection.Get<Configuration>() ?? throw new ArgumentNullException();

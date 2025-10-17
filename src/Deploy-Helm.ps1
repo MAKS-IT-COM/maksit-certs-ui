@@ -50,11 +50,15 @@ helm lint $chartPath
 Write-Output "Rendering Helm chart for validation..."
 helm template $projectName $chartPath -n $namespace | Out-Null
 
+# Generate a unique rollout value (current Unix timestamp)
+$rollme = [int][double]::Parse((Get-Date -UFormat %s))
+
 # Deploy Helm release
 Write-Output "Deploying Helm release '$projectName'..."
 helm upgrade --install $projectName $chartPath -n $namespace `
     --set imagePullSecret.create=false `
     --set imagePullSecrets[0].name=cr-maksit-pull `
+    --set-string "rollme=$rollme"
 
 # Check deployment status
 Write-Output "Waiting for deployment rollout..."
