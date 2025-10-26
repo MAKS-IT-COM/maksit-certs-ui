@@ -8,6 +8,8 @@ EXPOSE 5000
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
+COPY ["Models/Models.csproj", "Models/"]
+COPY ["LetsEncrypt/LetsEncrypt.csproj", "LetsEncrypt/"]
 COPY ["LetsEncryptServer/LetsEncryptServer.csproj", "LetsEncryptServer/"]
 RUN dotnet restore "./LetsEncryptServer/LetsEncryptServer.csproj"
 COPY . .

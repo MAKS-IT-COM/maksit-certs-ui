@@ -1,13 +1,15 @@
 ﻿using MaksIT.Models.Agent.Requests;
 using MaksIT.Results;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Models.Agent.Responses;
 using System.Text;
 using System.Text.Json;
 
 namespace MaksIT.LetsEncryptServer.Services {
 
   public interface IAgentService {
-    Task<Result> GetHelloWorld();
+    Task<Result<HelloWorldResponse?>> GetHelloWorld();
     Task<Result> UploadCerts(Dictionary<string, string> certs);
     Task<Result> ReloadService(string serviceName);
   }
@@ -28,8 +30,42 @@ namespace MaksIT.LetsEncryptServer.Services {
       _httpClient = httpClient;
     }
 
-    public Task<Result> GetHelloWorld() {
-      throw new NotImplementedException();
+    public async Task<Result<HelloWorldResponse?>> GetHelloWorld() {
+      try {
+        var endpoint = $"/HelloWorld";
+
+        var fullAddress = $"{_appSettings.Agent.AgentHostname}:{_appSettings.Agent.AgentPort}{endpoint}";
+
+        var request = new HttpRequestMessage(HttpMethod.Get, fullAddress);
+        request.Headers.Add("x-api-key", _appSettings.Agent.AgentKey);
+
+        _logger.LogInformation($"Sending GET request to {fullAddress}");
+
+        var response = await _httpClient.SendAsync(request);
+
+        if (response.IsSuccessStatusCode) {
+
+          var content = await response.Content.ReadAsStringAsync();
+
+          return Result<HelloWorldResponse?>.Ok(new HelloWorldResponse {
+            Message = content
+          });
+        }
+        else {
+          _logger.LogError($"Request to {endpoint} failed with status code: {response.StatusCode}");
+          return Result<HelloWorldResponse?>.InternalServerError(null, $"Request to {endpoint} failed with status code: {response.StatusCode}");
+        }
+
+      }
+      catch (Exception ex) {
+        List<string> messages = new() { "Something went wrong" };
+
+        _logger.LogError(ex, messages.FirstOrDefault());
+
+        messages.Add(ex.Message);
+
+        return Result<HelloWorldResponse?>.InternalServerError(null, [.. messages]);
+      }
     }
 
     public async Task<Result> ReloadService(string serviceName) {
@@ -64,8 +100,13 @@ namespace MaksIT.LetsEncryptServer.Services {
         }
       }
       catch (Exception ex) {
-        _logger.LogError(ex, "Something went wrong");
-        return Result.InternalServerError("Something went wrong");
+        List<string> messages = new() { "Something went wrong" };
+
+        _logger.LogError(ex, messages.FirstOrDefault());
+
+        messages.Add(ex.Message);
+
+        return Result.InternalServerError([.. messages]);
       }
     }
   }

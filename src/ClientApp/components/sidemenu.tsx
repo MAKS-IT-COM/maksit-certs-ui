@@ -1,5 +1,11 @@
 import React, { FC } from 'react'
-import { FaHome, FaUserPlus, FaBars, FaSyncAlt } from 'react-icons/fa'
+import {
+  FaHome,
+  FaUserPlus,
+  FaBars,
+  FaSyncAlt,
+  FaThermometerHalf
+} from 'react-icons/fa'
 import Link from 'next/link'
 
 interface SideMenuProps {
@@ -9,7 +15,8 @@ interface SideMenuProps {
 
 const menuItems = [
   { icon: <FaSyncAlt />, label: 'Auto Renew', path: '/' },
-  { icon: <FaUserPlus />, label: 'Register', path: '/register' }
+  { icon: <FaUserPlus />, label: 'Register', path: '/register' },
+  { icon: <FaThermometerHalf />, label: 'Test', path: '/test' }
 ]
 
 const SideMenu: FC<SideMenuProps> = ({ isCollapsed, toggleSidebar }) => {

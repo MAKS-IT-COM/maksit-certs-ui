@@ -1,4 +1,6 @@
 enum ApiRoutes {
+  AGENT_TEST = 'api/agent/test',
+
   ACCOUNTS = 'api/accounts',
 
   ACCOUNT = 'api/account',

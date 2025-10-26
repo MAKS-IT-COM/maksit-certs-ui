@@ -69,7 +69,7 @@ components:
 
             "Agent": {
               "AgentHostname": "http://websrv0001.corp.maks-it.com",
-              "AgentPort": 9000,
+              "AgentPort": 5000,
               "ServiceToReload": "haproxy"
             }
           }

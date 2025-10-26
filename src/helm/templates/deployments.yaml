@@ -50,7 +50,7 @@ spec:
           {{- $vols := default (list) $p.volumes -}}
           {{- $hasVols := gt (len $vols) 0 -}}
           {{- $hasSecret := (hasKey $comp "secretsFile") -}}
-          {{- if or $hasVols $hasSecret }}
+          {{- if or $hasVols $hasSecret $comp.configMapFile }}
           volumeMounts:
             {{- range $vol := $vols }}
             - name: {{ $compName }}-{{ $vol.name }}
@@ -63,14 +63,11 @@ spec:
             {{- end }}
             {{- if $comp.configMapFile }}
             - name: {{ $compName }}-configmap
-              configMap:
-                name: {{ include "certs-ui.fullname" $root }}-{{ $compName }}-configmap
-                items:
-                  - key: {{ $comp.configMapFile.key }}
-                    path: {{ base $comp.configMapFile.mountPath }}
+              mountPath: {{ $comp.configMapFile.mountPath }}
+              subPath: {{ base $comp.configMapFile.mountPath }}
             {{- end }}
           {{- end }}
-      {{- if or $hasVols $hasSecret }}
+      {{- if or $hasVols $hasSecret $comp.configMapFile }}
       volumes:
         {{- range $vol := $vols }}
         - name: {{ $compName }}-{{ $vol.name }}

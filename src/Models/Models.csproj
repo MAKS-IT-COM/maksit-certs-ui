@@ -7,7 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Agent\Responses\" />
     <Folder Include="LetsEncryptServer\CertsFlow\Responses\" />
   </ItemGroup>
 
