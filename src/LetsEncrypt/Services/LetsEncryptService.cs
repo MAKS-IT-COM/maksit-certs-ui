@@ -138,15 +138,10 @@ public class LetsEncryptService : ILetsEncryptService {
       return Result.Ok("Client configured successfully.");
     }
     catch (LetsEncrytException ex) {
-      List<string> messages = ["Let's Encrypt client encountered a problem"];
-      _logger.LogError(ex, messages.FirstOrDefault());
-      messages.Add(ex.Message);
-      return Result.InternalServerError([.. messages]);
+      return HandleUnhandledException(ex, "Let's Encrypt client encountered a problem");
     }
     catch (Exception ex) {
-      const string message = "Let's Encrypt client unhandled exception";
-      _logger.LogError(ex, message);
-      return Result.InternalServerError(message);
+      return HandleUnhandledException(ex);
     }
   }
   #endregion
@@ -231,15 +226,10 @@ public class LetsEncryptService : ILetsEncryptService {
       return Result.Ok("Initialization successful.");
     }
     catch (LetsEncrytException ex) {
-      List<string> messages = ["Let's Encrypt client encountered a problem"];
-      _logger.LogError(ex, messages.FirstOrDefault());
-      messages.Add(ex.Message);
-      return Result.InternalServerError([.. messages]);
+      return HandleUnhandledException(ex, "Let's Encrypt client encountered a problem");
     }
     catch (Exception ex) {
-      const string message = "Let's Encrypt client unhandled exception";
-      _logger.LogError(ex, message);
-      return Result.InternalServerError(message);
+      return HandleUnhandledException(ex);
     }
   }
   #endregion
@@ -267,10 +257,7 @@ public class LetsEncryptService : ILetsEncryptService {
       return Result<string?>.Ok(state.Directory.Meta.TermsOfService);
     }
     catch (Exception ex) {
-      List<string> messages = new List<string> { "Let's Encrypt client unhandled exception" };
-      _logger.LogError(ex, messages.FirstOrDefault());
-      messages.Add(ex.Message);
-      return Result<string?>.InternalServerError(null, [.. messages]);
+      return HandleUnhandledException<string?>(ex);
     }
   }
   #endregion
@@ -383,10 +370,7 @@ public class LetsEncryptService : ILetsEncryptService {
       return Result<Dictionary<string, string>?>.Ok(results);
     }
     catch (Exception ex) {
-      List<string> messages = new List<string> { "Let's Encrypt client unhandled exception" };
-      _logger.LogError(ex, messages.FirstOrDefault());
-      messages.Add(ex.Message);
-      return Result<Dictionary<string, string>?>.InternalServerError(null, [.. messages]);
+      return HandleUnhandledException<Dictionary<string, string>?>(ex);
     }
   }
   #endregion
@@ -431,10 +415,7 @@ public class LetsEncryptService : ILetsEncryptService {
       return Result.Ok();
     }
     catch (Exception ex) {
-      List<string> messages = new List<string> { "Let's Encrypt client unhandled exception" };
-      _logger.LogError(ex, messages.FirstOrDefault());
-      messages.Add(ex.Message);
-      return Result.InternalServerError([.. messages]);
+      return HandleUnhandledException(ex);
     }
   }
   #endregion
@@ -472,10 +453,7 @@ public class LetsEncryptService : ILetsEncryptService {
       return Result.Ok();
     }
     catch (Exception ex) {
-      List<string> messages = new List<string> { "Let's Encrypt client unhandled exception" };
-      _logger.LogError(ex, messages.FirstOrDefault());
-      messages.Add(ex.Message);
-      return Result.InternalServerError([.. messages]);
+      return HandleUnhandledException(ex);
     }
   }
   #endregion
@@ -596,10 +574,7 @@ public class LetsEncryptService : ILetsEncryptService {
       return Result.Ok();
     }
     catch (Exception ex) {
-      List<string> messages = new List<string> { "Let's Encrypt client unhandled exception" };
-      _logger.LogError(ex, messages.FirstOrDefault());
-      messages.Add(ex.Message);
-      return Result.InternalServerError([.. messages]);
+      return HandleUnhandledException(ex);
     }
   }
   #endregion
@@ -672,10 +647,7 @@ public class LetsEncryptService : ILetsEncryptService {
 
     }
     catch (Exception ex) {
-      List<string> messages = new List<string> { "Let's Encrypt client unhandled exception" };
-      _logger.LogError(ex, messages.FirstOrDefault());
-      messages.Add(ex.Message);
-      return Result.InternalServerError([.. messages]);
+      return HandleUnhandledException(ex);
     }
   }
 
@@ -714,10 +686,7 @@ public class LetsEncryptService : ILetsEncryptService {
       return Result<string?>.Ok(nonce);
     }
     catch (Exception ex) {
-      List<string> messages = new List<string> { "Let's Encrypt client unhandled exception" };
-      _logger.LogError(ex, messages.FirstOrDefault());
-      messages.Add(ex.Message);
-      return Result<string?>.InternalServerError(null, [.. messages]);
+      return HandleUnhandledException<string?>(ex);
     }
   }
 
@@ -770,4 +739,16 @@ public class LetsEncryptService : ILetsEncryptService {
 
   // Helper for status comparison
   private static bool StatusEquals(string? status, OrderStatus expected) => status == expected.GetDisplayName();
+
+  private Result HandleUnhandledException(Exception ex, string defaultMessage = "Let's Encrypt client unhandled exception") {
+    List<string> messages = new() { defaultMessage };
+    _logger.LogError(ex, messages.FirstOrDefault());
+    return Result.InternalServerError([.. messages]);
+  }
+
+  private Result<T?> HandleUnhandledException<T>(Exception ex, T? defaultValue = default, string defaultMessage = "Let's Encrypt client unhandled exception") {
+    List<string> messages = new() { defaultMessage };
+    _logger.LogError(ex, messages.FirstOrDefault());
+    return Result<T?>.InternalServerError(defaultValue, [.. messages]);
+  }
 }
