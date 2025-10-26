@@ -743,12 +743,14 @@ public class LetsEncryptService : ILetsEncryptService {
   private Result HandleUnhandledException(Exception ex, string defaultMessage = "Let's Encrypt client unhandled exception") {
     List<string> messages = new() { defaultMessage };
     _logger.LogError(ex, messages.FirstOrDefault());
+    messages.Add(ex.Message);
     return Result.InternalServerError([.. messages]);
   }
 
   private Result<T?> HandleUnhandledException<T>(Exception ex, T? defaultValue = default, string defaultMessage = "Let's Encrypt client unhandled exception") {
     List<string> messages = new() { defaultMessage };
     _logger.LogError(ex, messages.FirstOrDefault());
+    messages.Add(ex.Message);
     return Result<T?>.InternalServerError(defaultValue, [.. messages]);
   }
 }
