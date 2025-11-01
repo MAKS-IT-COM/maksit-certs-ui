@@ -23,7 +23,11 @@ public class WellKnownController : ControllerBase {
   [HttpGet("acme-challenge/{fileName}")]
   public IActionResult AcmeChallenge(string fileName) {
     var result = _certsFlowService.AcmeChallenge(fileName);
-    return result.ToActionResult();
+    if (!result.IsSuccess || result.Value == null)
+      return NotFound();
+
+    // Return as plain text, not as JSON
+    return Content(result.Value, "text/plain");
   }
 
 }
