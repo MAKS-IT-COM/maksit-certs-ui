@@ -4,21 +4,21 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - letsencrypt-app
-      - letsencrypt-server
+      - certs-ui-client
+      - certs-ui-server
     networks:
       - maks-it
 
-  letsencrypt-app:
-    container_name: letsencrypt-app
+  certs-ui-client:
+    container_name: certs-ui-client
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - LETSENCRYPT_SERVER=http://localhost:8080
     networks:
       - maks-it
 
-  letsencrypt-server:
-    container_name: letsencrypt-server
+  certs-ui-server:
+    container_name: certs-ui-server
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=5000

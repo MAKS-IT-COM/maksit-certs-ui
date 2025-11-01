@@ -1,18 +1,18 @@
 services:
-  letsencrypt-app:
-    image: ${DOCKER_REGISTRY-}letsencrypt-app
-    build:
-      context: .
-      dockerfile: ClientApp/Dockerfile
-
   reverse-proxy:
     image: ${DOCKER_REGISTRY-}reverse-proxy
     build:
       context: .
       dockerfile: ReverseProxy/Dockerfile
 
-  letsencrypt-server:
-    image: ${DOCKER_REGISTRY-}letsencrypt-server
+  certs-ui-client:
+    image: ${DOCKER_REGISTRY-}certs-ui-client
+    build:
+      context: .
+      dockerfile: ClientApp/Dockerfile
+
+  certs-ui-server:
+    image: ${DOCKER_REGISTRY-}certs-ui-server
     build:
       context: .
       dockerfile: LetsEncryptServer/Dockerfile

@@ -1,9 +1,10 @@
-using MaksIT.LetsEncryptServer;
-using MaksIT.LetsEncrypt.Services;
-using MaksIT.LetsEncryptServer.Services;
-using MaksIT.LetsEncryptServer.BackgroundServices;
-using MaksIT.LetsEncryptServer.Middlewares;
+using MaksIT.Core.Webapi.Middlewares;
+using MaksIT.Core.Logging;
 using MaksIT.LetsEncrypt.Extensions;
+using MaksIT.LetsEncrypt.Services;
+using MaksIT.LetsEncryptServer;
+using MaksIT.LetsEncryptServer.BackgroundServices;
+using MaksIT.LetsEncryptServer.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +24,9 @@ if (File.Exists(secretsPath)) {
 // Configure strongly typed settings objects
 var configurationSection = configuration.GetSection("Configuration");
 var appSettings = configurationSection.Get<Configuration>() ?? throw new ArgumentNullException();
+
+// Add logging
+builder.Logging.AddConsoleLogger();
 
 // Allow configurations to be available through IOptions<Configuration>
 builder.Services.Configure<Configuration>(configurationSection);
@@ -55,11 +59,8 @@ if (app.Environment.IsDevelopment()) {
   app.UseSwaggerUI();
   app.UseCors(builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 }
-else {
-  // app.UseMiddleware<GlobalExceptionMiddleware>();
-}
 
-app.UseMiddleware<GlobalExceptionMiddleware>();
+app.UseMiddleware<ErrorHandlingMiddleware>();
 
 app.UseAuthorization();
 

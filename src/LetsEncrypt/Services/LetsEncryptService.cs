@@ -391,7 +391,7 @@ public class LetsEncryptService : ILetsEncryptService {
 
         if (challenge?.Url == null) {
           _logger.LogError("Challenge URL is null");
-          return Result.InternalServerError();
+          return Result.InternalServerError("Challenge URL is null");
         }
 
         var request = new HttpRequestMessage(HttpMethod.Post, challenge.Url);
@@ -712,6 +712,18 @@ public class LetsEncryptService : ILetsEncryptService {
 
       throw new LetsEncrytException(problem, response);
     }
+
+    if (response.Content.Headers.ContentType?.MediaType == GetContentType(ContentType.Json)) {
+      var authorizationChallengeChallenge = responseText.ToObject<AuthorizationChallengeChallenge>();
+
+      if (authorizationChallengeChallenge?.Status == "invalid") {
+        throw new LetsEncrytException(new Problem {
+          Type = authorizationChallengeChallenge.Error.Type,
+          Detail = authorizationChallengeChallenge.Error.Detail,
+          RawJson = responseText
+        }, response);
+      }
+    }
   }
 
   private SendResult<TResult> ProcessResponseContent<TResult>(HttpResponseMessage response, string responseText) {
@@ -743,14 +755,14 @@ public class LetsEncryptService : ILetsEncryptService {
   private Result HandleUnhandledException(Exception ex, string defaultMessage = "Let's Encrypt client unhandled exception") {
     List<string> messages = new() { defaultMessage };
     _logger.LogError(ex, messages.FirstOrDefault());
-    messages.Add(ex.Message);
+    ex.ExtractMessages().ForEach(m => messages.Add(m));
     return Result.InternalServerError([.. messages]);
   }
 
   private Result<T?> HandleUnhandledException<T>(Exception ex, T? defaultValue = default, string defaultMessage = "Let's Encrypt client unhandled exception") {
     List<string> messages = new() { defaultMessage };
     _logger.LogError(ex, messages.FirstOrDefault());
-    messages.Add(ex.Message);
+    ex.ExtractMessages().ForEach(m => messages.Add(m));
     return Result<T?>.InternalServerError(defaultValue, [.. messages]);
   }
 }

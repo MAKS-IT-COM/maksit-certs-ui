@@ -81,9 +81,11 @@ public class CertsFlowService : ICertsFlowService {
   #region Internal methods
   public async Task<Result<Guid?>> ConfigureClientAsync(bool isStaging) {
     var sessionId = Guid.NewGuid();
+
     var result = await _letsEncryptService.ConfigureClient(sessionId, isStaging);
     if (!result.IsSuccess)
       return result.ToResultOfType<Guid?>(default);
+
     return Result<Guid?>.Ok(sessionId);
   }
 
@@ -91,17 +93,22 @@ public class CertsFlowService : ICertsFlowService {
     RegistrationCache? cache = null;
     if (accountId == null) {
       accountId = Guid.NewGuid();
-    } else {
+    }
+    else {
       var cacheResult = await _cacheService.LoadAccountFromCacheAsync(accountId.Value);
+
       if (!cacheResult.IsSuccess || cacheResult.Value == null) {
         accountId = Guid.NewGuid();
-      } else {
+      }
+      else {
         cache = cacheResult.Value;
       }
+
     }
     var result = await _letsEncryptService.Init(sessionId, accountId.Value, description, contacts, cache);
     if (!result.IsSuccess)
       return result.ToResultOfType<Guid?>(default);
+
     return Result<Guid?>.Ok(accountId.Value);
   }
 
@@ -109,12 +116,15 @@ public class CertsFlowService : ICertsFlowService {
     var orderResult = await _letsEncryptService.NewOrder(sessionId, hostnames, challengeType);
     if (!orderResult.IsSuccess || orderResult.Value == null)
       return orderResult.ToResultOfType<List<string>?>(_ => null);
+
     var challenges = new List<string>();
+
     foreach (var kvp in orderResult.Value) {
       string[] splitToken = kvp.Value.Split('.');
       File.WriteAllText(Path.Combine(_acmePath, splitToken[0]), kvp.Value);
       challenges.Add(splitToken[0]);
     }
+
     return Result<List<string>?>.Ok(challenges);
   }
 
@@ -125,12 +135,15 @@ public class CertsFlowService : ICertsFlowService {
         return result;
       Thread.Sleep(1000);
     }
+
     var cacheResult = _letsEncryptService.GetRegistrationCache(sessionId);
     if (!cacheResult.IsSuccess || cacheResult.Value == null)
       return cacheResult;
+
     var saveResult = await _cacheService.SaveToCacheAsync(cacheResult.Value.AccountId, cacheResult.Value);
     if (!saveResult.IsSuccess)
       return saveResult;
+
     return Result.Ok();
   }
 
@@ -142,20 +155,25 @@ public class CertsFlowService : ICertsFlowService {
     var cacheResult = _letsEncryptService.GetRegistrationCache(sessionId);
     if (!cacheResult.IsSuccess || cacheResult.Value?.CachedCerts == null)
       return cacheResult.ToResultOfType<Dictionary<string, string>?>(_ => null);
+
     var results = new Dictionary<string, string>();
     foreach (var hostname in hostnames) {
       CertificateCache? cert;
+
       if (cacheResult.Value.TryGetCachedCertificate(hostname, out cert)) {
         var content = $"{cert.Cert}\n{cert.PrivatePem}";
         results.Add(hostname, content);
       }
     }
+
     var uploadResult = await _agentService.UploadCerts(results);
     if (!uploadResult.IsSuccess)
       return uploadResult.ToResultOfType<Dictionary<string, string>?>(default);
+
     var reloadResult = await _agentService.ReloadService(_appSettings.Agent.ServiceToReload);
     if (!reloadResult.IsSuccess)
       return reloadResult.ToResultOfType<Dictionary<string, string>?>(default);
+
     return Result<Dictionary<string, string>?>.Ok(results);
   }
 
@@ -165,12 +183,15 @@ public class CertsFlowService : ICertsFlowService {
       if (!result.IsSuccess)
         return result;
     }
+
     var cacheResult = _letsEncryptService.GetRegistrationCache(sessionId);
     if (!cacheResult.IsSuccess || cacheResult.Value == null)
       return cacheResult;
+
     var saveResult = await _cacheService.SaveToCacheAsync(cacheResult.Value.AccountId, cacheResult.Value);
     if (!saveResult.IsSuccess)
       return saveResult;
+
     return Result.Ok();
   }
 
@@ -194,6 +215,7 @@ public class CertsFlowService : ICertsFlowService {
       if (!challengeResult.IsSuccess)
         return challengeResult.ToResultOfType<Guid?>(default);
     }
+
     var getOrderResult = await GetOrderAsync(sessionId, hostnames);
     if (!getOrderResult.IsSuccess)
       return getOrderResult.ToResultOfType<Guid?>(default);
@@ -203,10 +225,10 @@ public class CertsFlowService : ICertsFlowService {
       return certsResult.ToResultOfType<Guid?>(default);
 
     // Bypass applying certificates in staging mode
-    if (!isStaging) { 
-        var applyCertsResult = await ApplyCertificatesAsync(sessionId, hostnames);
-        if (!applyCertsResult.IsSuccess)
-            return applyCertsResult.ToResultOfType<Guid?>(_ => null);
+    if (!isStaging) {
+      var applyCertsResult = await ApplyCertificatesAsync(sessionId, hostnames);
+      if (!applyCertsResult.IsSuccess)
+        return applyCertsResult.ToResultOfType<Guid?>(_ => null);
     }
 
     return Result<Guid?>.Ok(initResult.Value);
@@ -222,9 +244,11 @@ public class CertsFlowService : ICertsFlowService {
     var initResult = await InitAsync(sessionId, accountId, description, contacts);
     if (!initResult.IsSuccess)
       return initResult;
+
     var revokeResult = await RevokeCertificatesAsync(sessionId, hostnames);
     if (!revokeResult.IsSuccess)
       return revokeResult;
+
     return Result.Ok();
   }
   #endregion
@@ -255,9 +279,11 @@ public class CertsFlowService : ICertsFlowService {
   #region Acme Challenge REST methods
   public Result<string?> AcmeChallenge(string fileName) {
     DeleteExporedChallenges();
+
     var challengePath = Path.Combine(_acmePath, fileName);
-    if(!File.Exists(challengePath))
+    if (!File.Exists(challengePath))
       return Result<string?>.NotFound(null);
+
     var fileContent = File.ReadAllText(Path.Combine(_acmePath, fileName));
     return Result<string?>.Ok(fileContent);
   }
@@ -268,6 +294,7 @@ public class CertsFlowService : ICertsFlowService {
       try {
         var creationTime = File.GetCreationTime(file);
         var timeDifference = currentDate - creationTime;
+
         if (timeDifference.TotalDays > 1) {
           File.Delete(file);
           _logger.LogInformation($"Deleted file: {file}");
