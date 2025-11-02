@@ -4,6 +4,7 @@ import { CustomCheckbox } from './customCheckbox'
 import { CustomSelect } from './customSelect'
 import { CustomEnumSelect } from './customEnumSelect'
 import { CustomRadioGroup } from './customRadioGroup'
+import { CustomFileUploader } from './customFileUploader'
 
 export {
   CustomButton,
@@ -11,5 +12,6 @@ export {
   CustomCheckbox,
   CustomSelect,
   CustomEnumSelect,
-  CustomRadioGroup
+  CustomRadioGroup,
+  CustomFileUploader
 }

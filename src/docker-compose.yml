@@ -9,7 +9,7 @@ services:
     image: ${DOCKER_REGISTRY-}certs-ui-client
     build:
       context: .
-      dockerfile: ClientApp/Dockerfile
+      dockerfile: MaksIT.WebUI/Dockerfile
 
   certs-ui-server:
     image: ${DOCKER_REGISTRY-}certs-ui-server

@@ -30,7 +30,7 @@ if ($LASTEXITCODE -ne 0 -or ($loginResult -notmatch "Login Succeeded")) {
 $services = @{
     "reverseproxy" = "ReverseProxy/Dockerfile"
     "server" = "LetsEncryptServer/Dockerfile"
-    "client" = "ClientApp/Dockerfile"
+    "client" = "ClientApp/Dockerfile.prod"
 }
 
 $contextPath = "."

@@ -16,7 +16,7 @@ interface SideMenuProps {
 const menuItems = [
   { icon: <FaSyncAlt />, label: 'Auto Renew', path: '/' },
   { icon: <FaUserPlus />, label: 'Register', path: '/register' },
-  { icon: <FaThermometerHalf />, label: 'Test', path: '/test' }
+  { icon: <FaThermometerHalf />, label: 'Utils', path: '/utils' }
 ]
 
 const SideMenu: FC<SideMenuProps> = ({ isCollapsed, toggleSidebar }) => {

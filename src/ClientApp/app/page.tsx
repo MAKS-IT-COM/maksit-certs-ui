@@ -38,13 +38,13 @@ export default function Page() {
 
     const fetchAccounts = async () => {
       const newAccounts: CacheAccount[] = []
-      const gatAccountsResult = await httpService.get<GetAccountResponse[]>(
+      const getAccountsResult = await httpService.get<GetAccountResponse[]>(
         GetApiRoute(ApiRoutes.ACCOUNTS)
       )
 
-      if (!gatAccountsResult.isSuccess) return
+      if (!getAccountsResult.isSuccess) return
 
-      gatAccountsResult.data?.forEach((account) => {
+      getAccountsResult.data?.forEach((account) => {
         newAccounts.push(toCacheAccount(account))
       })
 
