@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react'
 import { ButtonComponent } from './ButtonComponent'
+import { TrashIcon } from 'lucide-react'
 
 interface FileUploadComponentProps {
   label?: string
@@ -124,17 +125,18 @@ const FileUploadComponent: React.FC<FileUploadComponentProps> = ({
 
       {/* Clear selection button */}
       <ButtonComponent
-        label={'Clear selection'}
         buttonHierarchy={'secondary'}
         onClick={handleClear}
         disabled={disabled || selectedFiles.length === 0}
         colspan={1}
-      />
+      >
+        <TrashIcon />
+      </ButtonComponent>
 
       {/* Select files button */}
       <ButtonComponent
         colspan={2}        
-        label={label}
+        children={label}
         buttonHierarchy={'primary'}
         onClick={handleSelectFiles}
         disabled={disabled}

@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { FieldContainer } from './FieldContainer'
 
 interface DualListboxComponentProps {
   label?: string; 
@@ -44,10 +45,7 @@ const DualListboxComponent: React.FC<DualListboxComponentProps> = (props) => {
   }
 
   return (
-    <div className={`col-span-${colspan}`}>
-      <label className={'block text-gray-700 text-sm font-bold mb-2'}>
-        {label}
-      </label>
+    <FieldContainer colspan={colspan} label={label} errorText={errorText}>
       <div className={'flex justify-center items-center gap-4 w-full h-full'}>
         <div className={'flex flex-col'}>
           <h3>{availableItemsLabel}</h3>
@@ -92,12 +90,7 @@ const DualListboxComponent: React.FC<DualListboxComponentProps> = (props) => {
           </ul>
         </div>
       </div>
-      {errorText && (
-        <p className={'text-red-500 text-xs italic mt-2'}>
-          {errorText}
-        </p>
-      )}
-    </div>
+    </FieldContainer>
   )
 }
 

@@ -1,6 +1,7 @@
 import { debounce } from 'lodash'
 import { CircleX } from 'lucide-react'
 import { ChangeEvent, FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { FieldContainer } from './FieldContainer'
 
 export interface SelectBoxComponentOption {
   value: string | number
@@ -167,53 +168,53 @@ const SelectBoxComponent: FC<SelectBoxComponentProps> = (props) => {
   }
 
   return (
-    <div className={`relative mb-4 ${colspan ? `col-span-${colspan}` : 'w-full'}`}>
-      {/* Label for the select input */}
-      <label className={'block text-gray-700 text-sm font-bold mb-2'}>{label}</label>
+    <FieldContainer colspan={colspan} label={label} errorText={errorText}>
       <div className={'relative'}>
-        <input
-          type={'text'}
-          value={filterValue}
-          onChange={handleFilterChange}
-          placeholder={placeholder}
-          className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline
+
+        <div className={'relative'}>
+          <input
+            type={'text'}
+            value={filterValue}
+            onChange={handleFilterChange}
+            placeholder={placeholder}
+            className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline
         ${errorText ? 'border-red-500' : ''}
         ${disabled ? 'bg-gray-100 text-gray-500 cursor-default' : 'bg-white'}
         ${readOnly && !disabled ? 'text-gray-500 cursor-default' : ''}`}
-          disabled={readOnly || disabled}
-          // Open dropdown when input is focused.
-          onFocus={() => { if (!disabled) setShowDropdown(true) }}
-          // Delay closing dropdown to allow click events on options.
-          onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-        />
+            disabled={readOnly || disabled}
+            // Open dropdown when input is focused.
+            onFocus={() => { if (!disabled) setShowDropdown(true) }}
+            // Delay closing dropdown to allow click events on options.
+            onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+          />
 
-        {/* Action Buttons */}
-        <div
-          className={'absolute top-0 bottom-0 right-2 flex items-center gap-1 pointer-events-auto'}
-        >
-          {actionButtons()}
+          {/* Action Buttons */}
+          <div
+            className={'absolute top-0 bottom-0 right-2 flex items-center gap-1 pointer-events-auto'}
+          >
+            {actionButtons()}
+          </div>
         </div>
+
+        {showDropdown && !disabled && (
+          <div className={'absolute left-0 right-0 bg-white border border-gray-300 rounded mt-1 w-full shadow-lg z-10'}>
+            {options.length > 0 ? (
+              options.map((option) => (
+                <div
+                  key={option.value}
+                  className={'px-4 py-2 cursor-pointer hover:bg-gray-200'}
+                  onMouseDown={() => handleOptionClick(option.value)}
+                >
+                  {option.label}
+                </div>
+              ))
+            ) : (
+              <div className={'px-4 py-2 text-gray-500'}>No options found</div>
+            )}
+          </div>
+        )}
       </div>
-
-      {showDropdown && !disabled && (
-        <div className={'absolute left-0 right-0 bg-white border border-gray-300 rounded mt-1 w-full shadow-lg z-10'}>
-          {options.length > 0 ? (
-            options.map((option) => (
-              <div
-                key={option.value}
-                className={'px-4 py-2 cursor-pointer hover:bg-gray-200'}
-                onMouseDown={() => handleOptionClick(option.value)}
-              >
-                {option.label}
-              </div>
-            ))
-          ) : (
-            <div className={'px-4 py-2 text-gray-500'}>No options found</div>
-          )}
-        </div>
-      )}
-      {errorText && <p className={'text-red-500 text-xs italic mt-2'}>{errorText}</p>}
-    </div>
+    </FieldContainer>
   )
 }
 

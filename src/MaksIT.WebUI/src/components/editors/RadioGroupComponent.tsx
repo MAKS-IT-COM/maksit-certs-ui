@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { FieldContainer } from './FieldContainer'
 
 interface RadioOption {
   value: string
@@ -45,8 +46,7 @@ const RadioGroupComponent: React.FC<RadioGroupComponentProps> = (props) => {
   }
 
   return (
-    <div className={`mb-4 ${colspan ? `col-span-${colspan}` : 'w-full'}`}>
-      {label && <label className={'block text-gray-700 text-sm font-bold mb-2'}>{label}</label>}
+    <FieldContainer colspan={colspan} label={label} errorText={errorText}>
       <div className={'flex flex-col'}>
         {options.map(option => {
           // Use default cursor (arrow) if disabled or readOnly, else pointer
@@ -70,10 +70,7 @@ const RadioGroupComponent: React.FC<RadioGroupComponentProps> = (props) => {
           )
         })}
       </div>
-      {errorText && (
-        <p className={'text-red-500 text-xs italic mt-2'}>{errorText}</p>
-      )}
-    </div>
+    </FieldContainer>
   )
 }
 

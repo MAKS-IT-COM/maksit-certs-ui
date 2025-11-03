@@ -86,13 +86,13 @@ public class CacheService : ICacheService, IDisposable {
       return Result<RegistrationCache?>.InternalServerError(null, message);
     }
 
-    var cache = JsonSerializer.Deserialize<RegistrationCache>(json);
+    var cache = json.ToObject<RegistrationCache>();
     return Result<RegistrationCache?>.Ok(cache);
   }
 
   private async Task<Result> SaveToCacheInternalAsync(Guid accountId, RegistrationCache cache) {
     var cacheFilePath = GetCacheFilePath(accountId);
-    var json = JsonSerializer.Serialize(cache);
+    var json = cache.ToJson();
     await File.WriteAllTextAsync(cacheFilePath, json);
     _logger.LogInformation($"Cache file saved for account {accountId}");
     return Result.Ok();
@@ -114,7 +114,6 @@ public class CacheService : ICacheService, IDisposable {
 
   public async Task<Result<RegistrationCache?>> LoadAccountFromCacheAsync(Guid accountId) {
     return await _lockManager.ExecuteWithLockAsync(() => LoadFromCacheInternalAsync(accountId));
-
   }
 
   public async Task<Result> SaveToCacheAsync(Guid accountId, RegistrationCache cache) {

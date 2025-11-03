@@ -4,6 +4,11 @@ import { ApiRoutes, GetApiRoute } from './AppMap'
 import { store } from './redux/store'
 import { refreshJwt } from './redux/slices/identitySlice'
 import { hideLoader, showLoader } from './redux/slices/loaderSlice'
+import { addToast } from './components/Toast/addToast'
+import { de } from 'zod/v4/locales'
+import { deepPatternMatch } from './functions'
+import { ProblemDetails, ProblemDetailsProto } from './models/ProblemDetails'
+import { add } from 'lodash'
 
 // Create an Axios instance
 const axiosInstance = axios.create({
@@ -73,19 +78,35 @@ axiosInstance.interceptors.response.use(
   error => {
     // Handle response error
     store.dispatch(hideLoader())
-    if (error.response && error.response.status === 401) {
+    if (error.response) {
+      if (error.response.status === 401) {
       // Handle unauthorized error (e.g., redirect to login)
+      }
+      else {
+        const contentType = error.response.headers['content-type']
+
+        if (contentType && contentType.includes('application/problem+json')) {
+          const problem = error.response.data as ProblemDetails
+          addToast(`${problem.title}: ${problem.detail}`, 'error')
+        }
+      }
     }
     return Promise.reject(error)
   }
 )
 
-const getData = async <TResponse>(url: string): Promise<TResponse | undefined> => {
+/**
+ * Performs a GET request and returns the response data.
+ * @param url The endpoint URL.
+ * @param timeout Optional timeout in milliseconds to override the default.
+ */
+const getData = async <TResponse>(url: string, timeout?: number): Promise<TResponse | undefined> => {
   try {
     const response = await axiosInstance.get<TResponse>(url, {
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      ...(timeout ? { timeout } : {})
     })
     return response.data
   } catch {
@@ -94,13 +115,21 @@ const getData = async <TResponse>(url: string): Promise<TResponse | undefined> =
   }
 }
 
-const postData = async <TRequest, TResponse>(url: string, data: TRequest): Promise<TResponse | undefined> => {
+/**
+ * Performs a POST request with the given data and returns the response data.
+ * @param url The endpoint URL.
+ * @param data The request payload.
+ * @param timeout Optional timeout in milliseconds to override the default.
+ */
+const postData = async <TRequest, TResponse>(url: string, data?: TRequest, timeout?: number): Promise<TResponse | undefined> => {
   try {
     const response = await axiosInstance.post<TResponse>(url, data, {
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      ...(timeout ? { timeout } : {})
     })
+
     return response.data
   } catch {
     // Error is already handled by interceptors, so just return undefined
@@ -108,12 +137,19 @@ const postData = async <TRequest, TResponse>(url: string, data: TRequest): Promi
   }
 }
 
-const patchData = async <TRequest, TResponse>(url: string, data: TRequest): Promise<TResponse | undefined> => {
+/**
+ * Performs a PATCH request with the given data and returns the response data.
+ * @param url The endpoint URL.
+ * @param data The request payload.
+ * @param timeout Optional timeout in milliseconds to override the default.
+ */
+const patchData = async <TRequest, TResponse>(url: string, data: TRequest, timeout?: number): Promise<TResponse | undefined> => {
   try {
     const response = await axiosInstance.patch<TResponse>(url, data, {
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      ...(timeout ? { timeout } : {})
     })
     return response.data
   } catch {
@@ -122,12 +158,19 @@ const patchData = async <TRequest, TResponse>(url: string, data: TRequest): Prom
   }
 }
   
-const putData = async <TRequest, TResponse>(url: string, data: TRequest): Promise<TResponse | undefined> => {
+/**
+ * Performs a PUT request with the given data and returns the response data.
+ * @param url The endpoint URL.
+ * @param data The request payload.
+ * @param timeout Optional timeout in milliseconds to override the default.
+ */
+const putData = async <TRequest, TResponse>(url: string, data: TRequest, timeout?: number): Promise<TResponse | undefined> => {
   try {
     const response = await axiosInstance.put<TResponse>(url, data, {
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      ...(timeout ? { timeout } : {})
     })
     return response.data
   } catch {
@@ -136,12 +179,18 @@ const putData = async <TRequest, TResponse>(url: string, data: TRequest): Promis
   }
 }
   
-const deleteData = async <TResponse>(url: string): Promise<TResponse | undefined> => {
+/**
+ * Performs a DELETE request and returns the response data.
+ * @param url The endpoint URL.
+ * @param timeout Optional timeout in milliseconds to override the default.
+ */
+const deleteData = async <TResponse>(url: string, timeout?: number): Promise<TResponse | undefined> => {
   try {
     const response = await axiosInstance.delete<TResponse>(url, {
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      ...(timeout ? { timeout } : {})
     })
     return response.data
   } catch {

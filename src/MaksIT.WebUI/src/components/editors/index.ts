@@ -1,3 +1,7 @@
+import {
+  FieldContainer,
+} from './FieldContainer'
+
 import { ButtonComponent  } from './ButtonComponent'
 import { CheckBoxComponent } from './CheckBoxComponent'
 import { TextBoxComponent  } from './TextBoxComponent'
@@ -13,6 +17,7 @@ import { FileUploadComponent } from './FileUploadComponent'
 
 
 export {
+  FieldContainer as EditorWrapper,
   ButtonComponent,
   CheckBoxComponent,
   DateTimePickerComponent,

@@ -11,7 +11,7 @@ namespace MaksIT.LetsEncryptServer.BackgroundServices {
     private readonly IOptions<Configuration> _appSettings;
     private readonly ILogger<AutoRenewal> _logger;
     private readonly ICacheService _cacheService;
-    private readonly ICertsInternalService _certsFlowService;
+    private readonly ICertsFlowService _certsFlowService;
 
     public AutoRenewal(
         IOptions<Configuration> appSettings,

@@ -9,6 +9,7 @@ import {
   deltaHasOperations,
   deepEqual,
   deepMerge,
+  deepPatternMatch
 } from './deep'
 
 import {
@@ -39,6 +40,7 @@ export {
   deltaHasOperations,
   deepEqual,
   deepMerge,
+  deepPatternMatch,
 
   enumToArr,
   enumToObj,

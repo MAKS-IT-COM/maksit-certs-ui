@@ -1,5 +1,6 @@
 import { Eye, EyeOff } from 'lucide-react'
 import { ChangeEvent, FC, useEffect, useRef, useState } from 'react'
+import { FieldContainer } from './FieldContainer'
 
 interface TextBoxComponentProps {
   label: string
@@ -48,7 +49,7 @@ const TextBoxComponent: FC<TextBoxComponentProps> = (props) => {
   // Se il type è "textarea", comportamento invariato
   if (type === 'textarea') {
     return (
-      <div className={`mb-4 ${colspan ? `col-span-${colspan}` : 'w-full'}`}>
+      <div className={`${colspan ? `col-span-${colspan}` : 'w-full'}`}>
         <label className={'block text-gray-700 text-sm font-bold mb-2'}>{label}</label>
         <textarea
           value={value}
@@ -69,9 +70,7 @@ const TextBoxComponent: FC<TextBoxComponentProps> = (props) => {
   const hasContent = String(value).length > 0
 
   return (
-    <div className={`mb-4 ${colspan ? `col-span-${colspan}` : 'w-full'}`}>
-      <label className={'block text-gray-700 text-sm font-bold mb-2'}>{label}</label>
-
+    <FieldContainer colspan={colspan} label={label} errorText={errorText}>
       {type === 'password' ? (
         // Wrapper che contiene input e bottone show/hide, ma bottone solo se c'è contenuto
         <div className={'relative'}>
@@ -111,9 +110,7 @@ const TextBoxComponent: FC<TextBoxComponentProps> = (props) => {
           disabled={disabled}
         />
       )}
-
-      {errorText && <p className={'text-red-500 text-xs italic mt-2'}>{errorText}</p>}
-    </div>
+    </FieldContainer>
   )
 }
 

@@ -3,6 +3,7 @@ import { parseISO, formatISO, format, getDaysInMonth, addMonths, subMonths } fro
 import { ButtonComponent } from './ButtonComponent'
 import { TextBoxComponent } from './TextBoxComponent'
 import { CircleX } from 'lucide-react'
+import { FieldContainer } from './FieldContainer'
 
 const DISPLAY_FORMAT = 'yyyy-MM-dd HH:mm'
 
@@ -119,9 +120,8 @@ const DateTimePickerComponent: FC<DateTimePickerComponentProps> = ({
   }, [showDropdown])
 
   return (
-    <div className={`relative mb-4 ${colspan ? `col-span-${colspan}` : 'w-full'}`} ref={dropdownRef}>
-      <label className={'block text-gray-700 text-sm font-bold mb-2'}>{label}</label>
-      <div className={'relative'}>
+    <FieldContainer colspan={colspan} label={label} errorText={errorText}>
+      <div className={'relative'} ref={dropdownRef}>
         <input
           type={'text'}
           value={value ? formatForDisplay(parsedValue!) : ''}
@@ -138,54 +138,53 @@ const DateTimePickerComponent: FC<DateTimePickerComponentProps> = ({
         <div className={'absolute top-0 bottom-0 right-2 flex items-center gap-1 pointer-events-auto'}>
           {actionButtons()}
         </div>
-      </div>
 
-      {showDropdown && !readOnly && !disabled && (
-        <div className={'absolute left-0 right-0 bg-white border border-gray-300 rounded mt-1 w-full shadow-lg z-10'}>
-          <div className={'flex justify-between items-center px-3 py-2'}>
-            <button onClick={handlePrevMonth} type={'button'}>
-              &lt;
-            </button>
-            <span>{format(currentViewDate, 'MMMM yyyy')}</span>
-            <button onClick={handleNextMonth} type={'button'}>
-              &gt;
-            </button>
+        {showDropdown && !readOnly && !disabled && (
+          <div className={'absolute left-0 right-0 bg-white border border-gray-300 rounded mt-1 w-full shadow-lg z-10'}>
+            <div className={'flex justify-between items-center px-3 py-2'}>
+              <button onClick={handlePrevMonth} type={'button'}>
+                &lt;
+              </button>
+              <span>{format(currentViewDate, 'MMMM yyyy')}</span>
+              <button onClick={handleNextMonth} type={'button'}>
+                &gt;
+              </button>
+            </div>
+            <div className={'grid grid-cols-7 gap-1 px-3 py-2'}>
+              {daysArray.map((day) => (
+                <div
+                  key={day}
+                  onClick={() => handleDayClick(day)}
+                  className={`p-2 cursor-pointer text-center ${
+                    tempDate.getDate() === day &&
+                    tempDate.getMonth() === currentViewDate.getMonth() &&
+                    tempDate.getFullYear() === currentViewDate.getFullYear()
+                      ? 'bg-blue-500 text-white rounded'
+                      : 'hover:bg-gray-200 rounded'
+                  }`}
+                >
+                  {day}
+                </div>
+              ))}
+            </div>
+            <div className={'px-3 py-2'}>
+              <TextBoxComponent
+                label={'Time'}
+                type={'time'}
+                value={format(tempDate, 'HH:mm')}
+                onChange={handleTimeChange}
+                placeholder={'HH:MM'}
+                readOnly={readOnly}
+              />
+            </div>
+            <div className={'px-3 py-2 gap-2 flex justify-between'}>
+              <ButtonComponent label={'Clear'} buttonHierarchy={'secondary'} onClick={handleClear} />
+              <ButtonComponent label={'Confirm'} buttonHierarchy={'primary'} onClick={handleConfirm} />
+            </div>
           </div>
-          <div className={'grid grid-cols-7 gap-1 px-3 py-2'}>
-            {daysArray.map((day) => (
-              <div
-                key={day}
-                onClick={() => handleDayClick(day)}
-                className={`p-2 cursor-pointer text-center ${
-                  tempDate.getDate() === day &&
-                  tempDate.getMonth() === currentViewDate.getMonth() &&
-                  tempDate.getFullYear() === currentViewDate.getFullYear()
-                    ? 'bg-blue-500 text-white rounded'
-                    : 'hover:bg-gray-200 rounded'
-                }`}
-              >
-                {day}
-              </div>
-            ))}
-          </div>
-          <div className={'px-3 py-2'}>
-            <TextBoxComponent
-              label={'Time'}
-              type={'time'}
-              value={format(tempDate, 'HH:mm')}
-              onChange={handleTimeChange}
-              placeholder={'HH:MM'}
-              readOnly={readOnly}
-            />
-          </div>
-          <div className={'px-3 py-2 gap-2 flex justify-between'}>
-            <ButtonComponent label={'Clear'} buttonHierarchy={'secondary'} onClick={handleClear} />
-            <ButtonComponent label={'Confirm'} buttonHierarchy={'primary'} onClick={handleConfirm} />
-          </div>
-        </div>
-      )}
-      {errorText && <p className={'text-red-500 text-xs italic mt-2'}>{errorText}</p>}
-    </div>
+        )}
+      </div>
+    </FieldContainer>
   )
 }
 

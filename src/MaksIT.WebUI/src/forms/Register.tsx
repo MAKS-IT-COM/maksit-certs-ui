@@ -11,6 +11,8 @@ import { enumToArr } from '../functions'
 import { PostAccountRequest, PostAccountRequestSchema } from '../models/letsEncryptServer/account/requests/PostAccountRequest'
 import { addToast } from '../components/Toast/addToast'
 import { useNavigate } from 'react-router-dom'
+import { PlusIcon, TrashIcon } from 'lucide-react'
+import { FieldContainer } from '../components/editors/FieldContainer'
 
 
 interface RegisterFormProps {
@@ -90,7 +92,7 @@ const Register: FC<RegisterProps> = () => {
       return
     }
 
-    postData<PostAccountRequest, GetAccountResponse>(GetApiRoute(ApiRoutes.ACCOUNT_POST).route, request.data)
+    postData<PostAccountRequest, GetAccountResponse>(GetApiRoute(ApiRoutes.ACCOUNT_POST).route, request.data, 120000)
       .then(response => {
         if (!response) return
 
@@ -115,14 +117,16 @@ const Register: FC<RegisterProps> = () => {
           {formState.contacts.map((contact) => (
             <li key={contact} className={'grid grid-cols-12 gap-4 w-full pb-2'}> 
               <span className={'col-span-10'}>{contact}</span>
-              <ButtonComponent
-                colspan={2}
-                label={'TRASH'}
-                onClick={() => {
-                  const updatedContacts = formState.contacts.filter(c => c !== contact)
-                  handleInputChange('contacts', updatedContacts)
-                }}
-              />
+              <FieldContainer colspan={2}>
+                <ButtonComponent
+                  onClick={() => {
+                    const updatedContacts = formState.contacts.filter(c => c !== contact)
+                    handleInputChange('contacts', updatedContacts)
+                  }}
+                >
+                  <TrashIcon />
+                </ButtonComponent>
+              </FieldContainer>
             </li>
           ))}
         </ul>
@@ -140,19 +144,23 @@ const Register: FC<RegisterProps> = () => {
           type={'text'}
           errorText={errors.contact}
         />
-        <ButtonComponent
-          colspan={2}
-          label={'PLUS'}
-          onClick={() => {
-            handleInputChange('contacts', [...formState.contacts, formState.contact])
-            handleInputChange('contact', '')
-          }}
-          disabled={formState.contact.trim() === ''}
-        />
+        <FieldContainer colspan={2}>
+          <ButtonComponent
+            onClick={() => {
+              handleInputChange('contacts', [...formState.contacts, formState.contact])
+              handleInputChange('contact', '')
+            }}
+            disabled={formState.contact.trim() === ''}
+          >
+            <PlusIcon />
+          </ButtonComponent>
+        </FieldContainer>
         <div className={'col-span-12'}>
           <SelectBoxComponent
             label={'Challenge Type'}
-            options={enumToArr(ChallengeType).map(ct => ({ value: ct.value, label: ct.displayValue }))}
+            options={enumToArr(ChallengeType)
+              .map(ct => ({ value: ct.value, label: ct.displayValue }))
+              .filter(ct => ct.value !== ChallengeType.dns01)}
             value={formState.challengeType}
             placeholder={'Select Challenge Type'}
             onChange={(e) => handleInputChange('challengeType', e.target.value)}
@@ -164,14 +172,16 @@ const Register: FC<RegisterProps> = () => {
           {formState.hostnames.map((hostname) => (
             <li key={hostname} className={'grid grid-cols-12 gap-4 w-full'}>
               <span className={'col-span-10'}>{hostname}</span>
-              <ButtonComponent
-                colspan={2}
-                label={'TRASH'}
-                onClick={() => {
-                  const updatedHostnames = formState.hostnames.filter(h => h !== hostname)
-                  handleInputChange('hostnames', updatedHostnames)
-                }}
-              />
+              <FieldContainer colspan={2}>
+                <ButtonComponent
+                  onClick={() => {
+                    const updatedHostnames = formState.hostnames.filter(h => h !== hostname)
+                    handleInputChange('hostnames', updatedHostnames)
+                  }}
+                >
+                  <TrashIcon />
+                </ButtonComponent>
+              </FieldContainer>
             </li>
           ))}
         </ul>
@@ -189,15 +199,17 @@ const Register: FC<RegisterProps> = () => {
           type={'text'}
           errorText={errors.hostname}
         />
-        <ButtonComponent
-          colspan={2}
-          label={'PLUS'}
-          onClick={() => {
-            handleInputChange('hostnames', [...formState.hostnames, formState.hostname])
-            handleInputChange('hostname', '')
-          }}
-          disabled={formState.hostname.trim() === ''}
-        />
+        <FieldContainer colspan={2}>
+          <ButtonComponent
+            onClick={() => {
+              handleInputChange('hostnames', [...formState.hostnames, formState.hostname])
+              handleInputChange('hostname', '')
+            }}
+            disabled={formState.hostname.trim() === ''}
+          >
+            <PlusIcon />
+          </ButtonComponent>
+        </FieldContainer>
         <RadioGroupComponent
           colspan={12}
           label={'LetsEncrypt Environment'}

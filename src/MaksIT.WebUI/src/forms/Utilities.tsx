@@ -1,10 +1,22 @@
 import { FC, useState } from 'react'
 import { FormContainer, FormContent, FormFooter, FormHeader } from '../components/FormLayout'
-import { ButtonComponent, FileUploadComponent } from '../components/editors'
+import { ButtonComponent, DateTimePickerComponent, FileUploadComponent } from '../components/editors'
+import { ApiRoutes, GetApiRoute } from '../AppMap'
+import { getData } from '../axiosConfig'
+import { addToast } from '../components/Toast/addToast'
 
 const Utilities: FC = () => {
 
   const [files, setFiles] = useState<File[]>([])
+
+  const hadnleTestAgent = () => {
+    getData(GetApiRoute(ApiRoutes.AGENT_TEST).route)
+      .then((response) => {
+        if (!response) return
+
+        addToast(response?.message, 'info')
+      })
+  }
 
   return <FormContainer>
     <FormHeader>Utilities</FormHeader>
@@ -13,15 +25,8 @@ const Utilities: FC = () => {
         <ButtonComponent
           colspan={3}
           label={'Test agent'}
-          buttonHierarchy={'primary'}
-          onClick={() => {}}
-        />
-      
-        <ButtonComponent
-          colspan={3}
-          label={'Download cache files'}
-          buttonHierarchy={'secondary'}
-          onClick={() => {}}
+          buttonHierarchy={'warning'}
+          onClick={hadnleTestAgent}
         />
 
         <FileUploadComponent
@@ -31,9 +36,20 @@ const Utilities: FC = () => {
           onChange={setFiles}
         />
 
-        <span className={'col-span-12'}></span>
+        <ButtonComponent
+          colspan={3}
+          children={'Download cache files'}
+          buttonHierarchy={'secondary'}
+          onClick={() => {}}
+        />
+
+        <ButtonComponent
+          colspan={3}
+          children={'Destroy cache files'}
+          buttonHierarchy={'error'}
+          onClick={() => {}}
+        />
       </div>
-     
     </FormContent>
     <FormFooter />
   </FormContainer>

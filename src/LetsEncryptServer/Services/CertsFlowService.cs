@@ -1,52 +1,31 @@
 ﻿using Microsoft.Extensions.Options;
-using MaksIT.LetsEncrypt.Entities;
-using MaksIT.LetsEncrypt.Services;
-using MaksIT.Models.LetsEncryptServer.CertsFlow.Requests;
-using MaksIT.LetsEncrypt.Entities.LetsEncrypt;
 using MaksIT.Results;
+using MaksIT.LetsEncrypt.Entities;
+using MaksIT.LetsEncrypt.Entities.LetsEncrypt;
+using MaksIT.LetsEncrypt.Services;
 
 
 namespace MaksIT.LetsEncryptServer.Services;
 
-public interface ICertsCommonService {
+public interface ICertsFlowService {
   Result<string?> GetTermsOfService(Guid sessionId);
   Task<Result> CompleteChallengesAsync(Guid sessionId);
-}
-
-public interface ICertsInternalService : ICertsCommonService {
   Task<Result<Guid?>> ConfigureClientAsync(bool isStaging);
   Task<Result<Guid?>> InitAsync(Guid sessionId, Guid? accountId, string description, string[] contacts);
   Task<Result<List<string>?>> NewOrderAsync(Guid sessionId, string[] hostnames, string challengeType);
   Task<Result> GetOrderAsync(Guid sessionId, string[] hostnames);
   Task<Result> GetCertificatesAsync(Guid sessionId, string[] hostnames);
-  Task<Result<Dictionary<string, string>?>> ApplyCertificatesAsync(Guid sessionId, string[] hostnames);
+  Task<Result<Dictionary<string, string>?>> ApplyCertificatesAsync(Guid accountId);
   Task<Result> RevokeCertificatesAsync(Guid sessionId, string[] hostnames);
   Task<Result<Guid?>> FullFlow(bool isStaging, Guid? accountId, string description, string[] contacts, string challengeType, string[] hostnames);
   Task<Result> FullRevocationFlow(bool isStaging, Guid accountId, string description, string[] contacts, string[] hostnames);
-}
-
-public interface ICertsRestService : ICertsCommonService {
-  Task<Result<Guid?>> ConfigureClientAsync(ConfigureClientRequest requestData);
-  Task<Result<Guid?>> InitAsync(Guid sessionId, Guid? accountId, InitRequest requestData);
-  Task<Result<List<string>?>> NewOrderAsync(Guid sessionId, NewOrderRequest requestData);
-  Task<Result> GetOrderAsync(Guid sessionId, GetOrderRequest requestData);
-  Task<Result> GetCertificatesAsync(Guid sessionId, GetCertificatesRequest requestData);
-  Task<Result<Dictionary<string, string>?>> ApplyCertificatesAsync(Guid sessionId, GetCertificatesRequest requestData);
-  Task<Result> RevokeCertificatesAsync(Guid sessionId, RevokeCertificatesRequest requestData);
-}
-
-public interface ICertsRestChallengeService {
   Result<string?> AcmeChallenge(string fileName);
 }
-
-public interface ICertsFlowService
-  : ICertsInternalService,
-    ICertsRestService,
-    ICertsRestChallengeService { }
 
 public class CertsFlowService : ICertsFlowService {
   private readonly Configuration _appSettings;
   private readonly ILogger<CertsFlowService> _logger;
+  private readonly HttpClient _httpClient;
   private readonly ILetsEncryptService _letsEncryptService;
   private readonly ICacheService _cacheService;
   private readonly IAgentService _agentService;
@@ -55,42 +34,55 @@ public class CertsFlowService : ICertsFlowService {
   public CertsFlowService(
     IOptions<Configuration> appSettings,
     ILogger<CertsFlowService> logger,
+    HttpClient httpClient,
     ILetsEncryptService letsEncryptService,
     ICacheService cashService,
     IAgentService agentService
   ) {
     _appSettings = appSettings.Value;
     _logger = logger;
+    _httpClient = httpClient;
     _letsEncryptService = letsEncryptService;
     _cacheService = cashService;
     _agentService = agentService;
     _acmePath = _appSettings.AcmeFolder;
   }
 
-  #region Common methods
   public Result<string?> GetTermsOfService(Guid sessionId) {
     var result = _letsEncryptService.GetTermsOfServiceUri(sessionId);
-    return result;
+    if (!result.IsSuccess || result.Value == null)
+      return result;
+
+    var termsOfServiceUrl = result.Value;
+
+    try {
+      var pdfBytesTask = _httpClient.GetByteArrayAsync(termsOfServiceUrl);
+      pdfBytesTask.Wait();
+      var pdfBytes = pdfBytesTask.Result;
+      var base64 = Convert.ToBase64String(pdfBytes);
+      return Result<string?>.Ok(base64);
+    }
+    catch (Exception ex) {
+      _logger.LogError(ex, "Failed to download or convert Terms of Service PDF");
+      return Result<string?>.InternalServerError(null, $"Failed to download or convert Terms of Service PDF: {ex.Message}");
+    }
   }
 
   public async Task<Result> CompleteChallengesAsync(Guid sessionId) {
     return await _letsEncryptService.CompleteChallenges(sessionId);
   }
-  #endregion
 
-  #region Internal methods
   public async Task<Result<Guid?>> ConfigureClientAsync(bool isStaging) {
     var sessionId = Guid.NewGuid();
-
     var result = await _letsEncryptService.ConfigureClient(sessionId, isStaging);
     if (!result.IsSuccess)
       return result.ToResultOfType<Guid?>(default);
-
     return Result<Guid?>.Ok(sessionId);
   }
 
   public async Task<Result<Guid?>> InitAsync(Guid sessionId, Guid? accountId, string description, string[] contacts) {
     RegistrationCache? cache = null;
+
     if (accountId == null) {
       accountId = Guid.NewGuid();
     }
@@ -103,8 +95,8 @@ public class CertsFlowService : ICertsFlowService {
       else {
         cache = cacheResult.Value;
       }
-
     }
+
     var result = await _letsEncryptService.Init(sessionId, accountId.Value, description, contacts, cache);
     if (!result.IsSuccess)
       return result.ToResultOfType<Guid?>(default);
@@ -151,20 +143,20 @@ public class CertsFlowService : ICertsFlowService {
     return await _letsEncryptService.GetOrder(sessionId, hostnames);
   }
 
-  public async Task<Result<Dictionary<string, string>?>> ApplyCertificatesAsync(Guid sessionId, string[] hostnames) {
-    var cacheResult = _letsEncryptService.GetRegistrationCache(sessionId);
+  public async Task<Result<Dictionary<string, string>?>> ApplyCertificatesAsync(Guid accountId) {
+    var cacheResult = await _cacheService.LoadAccountFromCacheAsync(accountId);
     if (!cacheResult.IsSuccess || cacheResult.Value?.CachedCerts == null)
       return cacheResult.ToResultOfType<Dictionary<string, string>?>(_ => null);
 
-    var results = new Dictionary<string, string>();
-    foreach (var hostname in hostnames) {
-      CertificateCache? cert;
+    var cache = cacheResult.Value;
+    var results = cache.GetCertsPemPerHostname();
 
-      if (cacheResult.Value.TryGetCachedCertificate(hostname, out cert)) {
-        var content = $"{cert.Cert}\n{cert.PrivatePem}";
-        results.Add(hostname, content);
-      }
-    }
+
+    if (cache.IsDisabled)
+      return Result<Dictionary<string, string>?>.BadRequest(null, $"Account {accountId} is disabled");
+
+    if (cache.IsStaging)
+      return Result<Dictionary<string, string>?>.UnprocessableEntity(null, $"Found certs for {string.Join(',', results.Keys)} (staging environment)");
 
     var uploadResult = await _agentService.UploadCerts(results);
     if (!uploadResult.IsSuccess)
@@ -224,9 +216,8 @@ public class CertsFlowService : ICertsFlowService {
     if (!certsResult.IsSuccess)
       return certsResult.ToResultOfType<Guid?>(default);
 
-    // Bypass applying certificates in staging mode
     if (!isStaging) {
-      var applyCertsResult = await ApplyCertificatesAsync(sessionId, hostnames);
+      var applyCertsResult = await ApplyCertificatesAsync(accountId ?? Guid.Empty);
       if (!applyCertsResult.IsSuccess)
         return applyCertsResult.ToResultOfType<Guid?>(_ => null);
     }
@@ -251,32 +242,7 @@ public class CertsFlowService : ICertsFlowService {
 
     return Result.Ok();
   }
-  #endregion
 
-  #region REST methods
-  public async Task<Result<Guid?>> ConfigureClientAsync(ConfigureClientRequest requestData) {
-    return await ConfigureClientAsync(requestData.IsStaging);
-  }
-  public async Task<Result<Guid?>> InitAsync(Guid sessionId, Guid? accountId, InitRequest requestData) {
-    return await InitAsync(sessionId, accountId, requestData.Description, requestData.Contacts);
-  }
-  public async Task<Result<List<string>>> NewOrderAsync(Guid sessionId, NewOrderRequest requestData) {
-    return await NewOrderAsync(sessionId, requestData.Hostnames, requestData.ChallengeType);
-  }
-  public async Task<Result> GetCertificatesAsync(Guid sessionId, GetCertificatesRequest requestData) {
-    return await GetCertificatesAsync(sessionId, requestData.Hostnames);
-  }
-  public async Task<Result> GetOrderAsync(Guid sessionId, GetOrderRequest requestData) {
-    return await GetOrderAsync(sessionId, requestData.Hostnames);
-  }
-
-  public async Task<Result<Dictionary<string, string>>> ApplyCertificatesAsync(Guid sessionId, GetCertificatesRequest requestData) =>
-    await ApplyCertificatesAsync(sessionId, requestData.Hostnames);
-  public async Task<Result> RevokeCertificatesAsync(Guid sessionId, RevokeCertificatesRequest requestData) =>
-    await RevokeCertificatesAsync(sessionId, requestData.Hostnames);
-  #endregion
-
-  #region Acme Challenge REST methods
   public Result<string?> AcmeChallenge(string fileName) {
     DeleteExporedChallenges();
 
@@ -295,6 +261,7 @@ public class CertsFlowService : ICertsFlowService {
         var creationTime = File.GetCreationTime(file);
         var timeDifference = currentDate - creationTime;
 
+
         if (timeDifference.TotalDays > 1) {
           File.Delete(file);
           _logger.LogInformation($"Deleted file: {file}");
@@ -305,5 +272,4 @@ public class CertsFlowService : ICertsFlowService {
       }
     }
   }
-  #endregion
 }

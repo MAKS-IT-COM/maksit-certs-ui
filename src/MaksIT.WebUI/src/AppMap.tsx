@@ -9,6 +9,7 @@ import { UserButton } from './components/UserButton'
 import { Toast } from './components/Toast'
 import { UtilitiesPage } from './pages/UtilitiesPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { LetsEncryptTermsOfServicePage } from './pages/LetsEncryptTermsOfServicePage'
 
 
 interface LayoutWrapperProps {
@@ -83,6 +84,12 @@ const AppMap: AppMapType[] = [
     routes: ['/utilities'],
     page: UtilitiesPage,
     linkArea: [LinkArea.SideMenu]
+  },
+  {
+    title: 'Terms of Service',
+    routes: ['/terms-of-service'],
+    page: LetsEncryptTermsOfServicePage,
+    linkArea: [LinkArea.SideMenu]
   }
 
   // {
@@ -152,6 +159,15 @@ enum ApiRoutes {
 
   // ACCOUNT_ID_HOSTNAMES = 'GET|/account/{accountId}/hostnames',
   // ACCOUNT_ID_HOSTNAME_ID = 'GET|/account/{accountId}/hostname/{index}',
+
+  // Agents
+  AGENT_TEST = 'GET|/agent/test',
+
+  // Certs flow
+  CERTS_FLOW_CONFIGURE_CLIENT = 'POST|/certs/configure-client',
+  CERTS_FLOW_TERMS_OF_SERVICE = 'GET|/certs/{sessionId}/terms-of-service',
+  CERTS_FLOW_CERTIFICATES_APPLY = 'POST|/certs/{accountId}/certificates/apply',
+
 
   // Secrets
   generateSecret = 'GET|/secret/generatesecret',

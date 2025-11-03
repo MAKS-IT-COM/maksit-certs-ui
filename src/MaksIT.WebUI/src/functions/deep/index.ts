@@ -5,7 +5,7 @@ import {
 } from './deepDelta'
 import { deepEqualArrays, deepEqual } from './deepEqual'
 import { deepMerge } from './deepMerge'
-
+import { deepPatternMatch } from './deepPatternMatch'
 
 
 export {
@@ -14,5 +14,6 @@ export {
   deltaHasOperations,
   deepEqualArrays,
   deepEqual,
-  deepMerge
+  deepMerge,
+  deepPatternMatch
 }

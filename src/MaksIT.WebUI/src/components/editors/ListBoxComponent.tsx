@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { FieldContainer } from './FieldContainer'
 
 interface ListboxComponentProps {
   label?: string;
@@ -35,10 +36,7 @@ const ListboxComponent: React.FC<ListboxComponentProps> = (props) => {
   }
 
   return (
-    <div className={`col-span-${colspan}`}>
-      <label className={'block text-gray-700 text-sm font-bold mb-2'}>
-        {label}
-      </label>
+    <FieldContainer colspan={colspan} label={label} errorText={errorText}>
       <div className={'flex flex-col'}>
         <h3>{itemsLabel}</h3>
         <ul className={'border p-2 w-40 h-64 overflow-auto'}>
@@ -53,12 +51,7 @@ const ListboxComponent: React.FC<ListboxComponentProps> = (props) => {
           ))}
         </ul>
       </div>
-      {errorText && (
-        <p className={'text-red-500 text-xs italic mt-2'}>
-          {errorText}
-        </p>
-      )}
-    </div>
+    </FieldContainer>
   )
 }
 

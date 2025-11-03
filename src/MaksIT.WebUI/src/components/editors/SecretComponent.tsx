@@ -3,6 +3,7 @@ import { ChangeEvent, FC, useRef, useState } from 'react'
 import { TrngResponse } from '../../models/TrngResponse'
 import { getData } from '../../axiosConfig'
 import { ApiRoutes, GetApiRoute } from '../../AppMap'
+import { FieldContainer } from './FieldContainer'
 
 
 interface PasswordGeneratorProps {
@@ -114,9 +115,7 @@ const SecretComponent: FC<PasswordGeneratorProps> = (props) => {
   
 
   return (
-    <div className={`mb-4 ${colspan ? `col-span-${colspan}` : 'w-full'}`}>
-      <label className={'block text-gray-700 text-sm font-bold mb-2'}>{label}</label>
-
+    <FieldContainer colspan={colspan} label={label} errorText={errorText}>
       <div className={'relative'}>
         <input
           type={showPassword ? 'text' : 'password'}
@@ -138,9 +137,7 @@ const SecretComponent: FC<PasswordGeneratorProps> = (props) => {
           {actionButtons()}
         </div>
       </div>
-
-      {errorText && <p className={'text-red-500 text-xs italic mt-2'}>{errorText}</p>}
-    </div>
+    </FieldContainer>
   )
 }
 

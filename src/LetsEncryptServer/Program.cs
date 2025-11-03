@@ -46,7 +46,7 @@ builder.Services.AddMemoryCache();
 builder.Services.RegisterLetsEncrypt(appSettings);
 
 builder.Services.AddSingleton<ICacheService, CacheService>();
-builder.Services.AddSingleton<ICertsFlowService, CertsFlowService>();
+builder.Services.AddHttpClient<ICertsFlowService, CertsFlowService>();
 builder.Services.AddSingleton<IAccountService, AccountService>();
 builder.Services.AddHttpClient<IAgentService, AgentService>();
 builder.Services.AddHostedService<AutoRenewal>();

@@ -118,4 +118,23 @@ public class RegistrationCache {
       foreach (var host in hostsToRemove)
         CachedCerts.Remove(host);
   }
+
+  /// <summary>
+  /// 
+  /// </summary>
+  /// <returns></returns>
+  public Dictionary<string, string> GetCertsPemPerHostname() {
+    var result = new Dictionary<string, string>();
+    if (CachedCerts == null)
+      return result;
+
+    foreach (var kvp in CachedCerts) {
+      var hostname = kvp.Key;
+      var cert = kvp.Value;
+      if (!string.IsNullOrEmpty(cert.Cert) && !string.IsNullOrEmpty(cert.PrivatePem)) {
+        result[hostname] = $"{cert.Cert}\n{cert.PrivatePem}";
+      }
+    }
+    return result;
+  }
 }

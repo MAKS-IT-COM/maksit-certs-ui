@@ -10,7 +10,7 @@ namespace MaksIT.LetsEncryptServer.Controllers;
 [Route(".well-known")]
 public class WellKnownController : ControllerBase {
 
-  private readonly ICertsRestChallengeService _certsFlowService;
+  private readonly ICertsFlowService _certsFlowService;
 
   public WellKnownController(
     IOptions<Configuration> appSettings,

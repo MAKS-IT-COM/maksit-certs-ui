@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { FieldContainer } from './FieldContainer'
 
 interface CheckBoxComponentProps {
     colspan?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
@@ -36,23 +37,15 @@ const CheckBoxComponent: React.FC<CheckBoxComponentProps> = (props) => {
   }
 
   return (
-    <div className={`mb-4 col-span-${colspan}`}>
-      <label className={'block text-gray-700 text-sm font-bold mb-2'}>
-        <input
-          type={'checkbox'}
-          checked={value}
-          onChange={handleOnChange}
-          className={`mr-2 leading-tight ${errorText ? 'border-red-500' : ''}`}
-          disabled={disabled}
-        />
-        {label}
-      </label>
-      {errorText && (
-        <p className={'text-red-500 text-xs italic mt-2'}>
-          {errorText}
-        </p>
-      )}
-    </div>
+    <FieldContainer colspan={colspan} label={label} errorText={errorText}>
+      <input
+        type={'checkbox'}
+        checked={value}
+        onChange={handleOnChange}
+        className={`mr-2 leading-tight ${errorText ? 'border-red-500' : ''}`}
+        disabled={disabled}
+      />
+    </FieldContainer>
   )
 }
 

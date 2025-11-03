@@ -1,8 +1,7 @@
-import React from 'react'
+import { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
-interface ConditionalButtonProps {
-  label: string;
+interface CommonButtonProps {
   colspan?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
   route?: string;
   buttonHierarchy?: 'primary' | 'secondary' | 'success' | 'error' | 'warning';
@@ -10,16 +9,21 @@ interface ConditionalButtonProps {
   disabled?: boolean;
 }
 
-const ButtonComponent: React.FC<ConditionalButtonProps> = (props) => {
+type ButtonComponentProps =
+  | ({ label: string; children?: never } & CommonButtonProps)
+  | ({ children: ReactNode; label?: never } & CommonButtonProps);
 
+const ButtonComponent: React.FC<ButtonComponentProps> = (props) => {
   const {
-    label,
     colspan,
     route,
     buttonHierarchy,
     onClick,
     disabled = false
   } = props
+
+  const isChildren = 'children' in props && props.children !== undefined
+  const content = 'label' in props ? props.label : props.children
 
   const handleClick = (e?: React.MouseEvent) => {
     if (disabled) {
@@ -53,25 +57,27 @@ const ButtonComponent: React.FC<ConditionalButtonProps> = (props) => {
 
   const disabledClass = disabled ? 'opacity-50 cursor-default' : 'cursor-pointer'
 
+  const centeringClass = isChildren ? 'flex justify-center items-center' : 'text-center'
+
   return route
     ? (
       <Link
         to={route}
-        className={`${buttonClass} px-4 py-2 rounded ${colspan ? `col-span-${colspan}` : 'w-full'} text-center ${disabledClass}`}
+        className={`${buttonClass} px-4 py-2 rounded ${colspan ? `col-span-${colspan}` : 'w-full'} ${centeringClass} ${disabledClass}`}
         onClick={handleClick}
         tabIndex={disabled ? -1 : undefined}
         aria-disabled={disabled}
         style={disabled ? { pointerEvents: 'none' } : undefined}
       >
-        {label}
+        {content}
       </Link>
     ) : (
       <button
-        className={`${buttonClass} px-4 py-2 rounded ${colspan ? `col-span-${colspan}` : 'w-full'} ${disabledClass}`}
+        className={`${buttonClass} px-4 py-2 rounded ${colspan ? `col-span-${colspan}` : 'w-full'} ${centeringClass} ${disabledClass}`}
         onClick={handleClick}
         disabled={disabled}
       >
-        {label}
+        {content}
       </button>
     )
 }

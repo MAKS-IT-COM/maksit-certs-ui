@@ -27,7 +27,7 @@ public class AccountService : IAccountService {
 
   private readonly ILogger<CacheService> _logger;
   private readonly ICacheService _cacheService;
-  private readonly ICertsInternalService _certsFlowService;
+  private readonly ICertsFlowService _certsFlowService;
 
   public AccountService(
     ILogger<CacheService> logger,

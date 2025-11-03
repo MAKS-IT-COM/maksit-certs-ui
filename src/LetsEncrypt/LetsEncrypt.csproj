@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="MaksIT.Core" Version="1.5.1" />
-    <PackageReference Include="MaksIT.Results" Version="1.1.0" />
+    <PackageReference Include="MaksIT.Results" Version="1.1.1" />
     <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="9.0.10" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.10" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.10" />
