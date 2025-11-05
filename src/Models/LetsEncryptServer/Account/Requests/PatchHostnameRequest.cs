@@ -1,9 +1,10 @@
-﻿
+﻿using MaksIT.Core.Abstractions.Webapi;
+
 
 namespace MaksIT.Models.LetsEncryptServer.Account.Requests;
-public class PatchHostnameRequest {
-  public PatchAction<string>? Hostname { get; set; }
+public class PatchHostnameRequest : PatchRequestModelBase {
+  public string? Hostname { get; set; }
 
-  public PatchAction<bool>? IsDisabled { get; set; }
+  public bool? IsDisabled { get; set; }
 }
 

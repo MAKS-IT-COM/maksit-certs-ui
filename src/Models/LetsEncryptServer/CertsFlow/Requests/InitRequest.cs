@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MaksIT.Core.Abstractions.Webapi;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -6,11 +7,11 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace MaksIT.Models.LetsEncryptServer.CertsFlow.Requests {
-    public class InitRequest: IValidatableObject {
+    public class InitRequest : RequestModelBase {
       public required string Description { get; set; }
       public required string[] Contacts { get; set; }
 
-    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext) {
+    public override IEnumerable<ValidationResult> Validate(ValidationContext validationContext) {
       if (string.IsNullOrWhiteSpace(Description))
         yield return new ValidationResult("Description is required", new[] { nameof(Description) });
 

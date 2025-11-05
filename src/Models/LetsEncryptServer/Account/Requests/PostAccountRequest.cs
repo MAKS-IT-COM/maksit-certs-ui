@@ -1,14 +1,15 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using MaksIT.Core.Abstractions.Webapi;
+using System.ComponentModel.DataAnnotations;
 
 namespace MaksIT.Models.LetsEncryptServer.Account.Requests;
-public class PostAccountRequest : IValidatableObject {
+public class PostAccountRequest : RequestModelBase {
   public required string Description { get; set; }
   public required string[] Contacts { get; set; }
   public required string ChallengeType { get; set; }
   public required string[] Hostnames { get; set; }
   public required bool IsStaging { get; set; }
 
-  public IEnumerable<ValidationResult> Validate(ValidationContext validationContext) {
+  public override IEnumerable<ValidationResult> Validate(ValidationContext validationContext) {
     if (string.IsNullOrWhiteSpace(Description))
       yield return new ValidationResult("Description is required", new[] { nameof(Description) });
 

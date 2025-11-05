@@ -10,4 +10,8 @@
     <Folder Include="LetsEncryptServer\CertsFlow\Responses\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="MaksIT.Core" Version="1.5.1" />
+  </ItemGroup>
+
 </Project>

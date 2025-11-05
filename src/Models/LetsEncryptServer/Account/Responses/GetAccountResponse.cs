@@ -1,11 +1,12 @@
-﻿using System;
+﻿using MaksIT.Core.Abstractions.Webapi;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace MaksIT.Models.LetsEncryptServer.Account.Responses {
-  public class GetAccountResponse {
+  public class GetAccountResponse : ResponseModelBase {
     public Guid AccountId { get; set; }
     public required bool IsDisabled { get; set; }
 

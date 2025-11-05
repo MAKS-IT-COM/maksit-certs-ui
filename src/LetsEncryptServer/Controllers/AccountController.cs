@@ -27,6 +27,11 @@ public class AccountController : ControllerBase {
   #endregion
 
   #region Account
+  [HttpGet("account/{accountId:guid}")]
+  public async Task<IActionResult> GetAccount(Guid accountId) {
+    var result = await _accountService.GetAccountAsync(accountId);
+    return result.ToActionResult();
+  }
 
   [HttpPost("account")]
   public async Task<IActionResult> PostAccount([FromBody] PostAccountRequest requestData) {
