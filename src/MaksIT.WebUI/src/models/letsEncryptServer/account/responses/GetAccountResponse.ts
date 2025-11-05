@@ -1,7 +1,8 @@
 import { CacheAccount } from '../../../../entities/CacheAccount'
+import { ResponseModelBase } from '../../../ResponseModelBase'
 import { GetHostnameResponse } from './GetHostnameResponse'
 
-export interface GetAccountResponse {
+export interface GetAccountResponse extends ResponseModelBase {
   accountId: string
   isDisabled: boolean
   description: string

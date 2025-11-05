@@ -137,13 +137,14 @@ const Home: FC = () => {
                               : 'Not Upcoming'}
                           </span>
                         </span>
-                        <CheckBoxComponent
-                          colspan={3}
-                          value={hostname.isDisabled}
-                          label={'Disabled'}
-                          disabled={true}
-                        />
-                      
+                        <span className={'col-span-3'}>
+                          <label className={'mr-2'}>Disabled:</label>
+                          <input
+                            type={'checkbox'}
+                            checked={hostname.isDisabled}
+                            disabled={true}
+                          />
+                        </span>
                       </li>
                     ))}
                   </ul>

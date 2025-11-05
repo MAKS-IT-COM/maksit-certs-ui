@@ -1,24 +1,64 @@
-import { FC } from 'react'
+import { FC, useCallback, useEffect, useState } from 'react'
 import { FormContainer, FormContent, FormFooter, FormHeader } from '../components/FormLayout'
 import { ButtonComponent, CheckBoxComponent, TextBoxComponent } from '../components/editors'
 import { GetAccountResponse } from '../models/letsEncryptServer/account/responses/GetAccountResponse'
 import { useFormState } from '../hooks/useFormState'
-import { boolean, object, Schema, string } from 'zod'
+import { array, boolean, object, Schema, string } from 'zod'
+import { PlusIcon, TrashIcon } from 'lucide-react'
+import { getData, patchData } from '../axiosConfig'
+import { ApiRoutes, GetApiRoute } from '../AppMap'
+import { FieldContainer } from '../components/editors/FieldContainer'
+import { deepCopy, deepDelta, deltaHasOperations } from '../functions'
+import { PatchAccountRequest, PatchAccountRequestSchema } from '../models/letsEncryptServer/account/requests/PatchAccountRequest'
+import { addToast } from '../components/Toast/addToast'
 
+
+interface EditAccountHostnameFormProps {
+  isDisabled: boolean
+  hostname: string
+}
+
+const EditAccountHostnameFormProto = (): EditAccountHostnameFormProps => ({
+  isDisabled: false,
+  hostname: ''
+})
+
+const EditAccountHostnameFormSchema: Schema<EditAccountHostnameFormProps> = object({
+  hostname: string(),
+  isDisabled: boolean()
+})
 
 interface EditAccountFormProps {
+  isDisabled: boolean
   description: string
-  disabled: boolean
+
+  contact: string
+  contacts: string[]
+  
+  hostname: string,
+  hostnames: EditAccountHostnameFormProps[]
 }
 
 const RegisterFormProto = (): EditAccountFormProps => ({
+  isDisabled: false,
   description: '',
-  disabled: false
+
+  contact: '',
+  contacts: [],
+
+  hostname: '',
+  hostnames: [],
 })
 
 const RegisterFormSchema: Schema<EditAccountFormProps> = object({
+  isDisabled: boolean(),
   description: string(),
-  disabled: boolean()
+  
+  contact: string(),
+  contacts: array(string()),
+
+  hostname: string(),
+  hostnames: array(EditAccountHostnameFormSchema)
 })
 
 interface EditAccountProps {
@@ -41,14 +81,88 @@ const EditAccount: FC<EditAccountProps> = (props) => {
     formState,
     errors,
     formIsValid,
-    handleInputChange
+    handleInputChange,
+    setInitialState
   } = useFormState<EditAccountFormProps>({
     initialState: RegisterFormProto(),
     validationSchema: RegisterFormSchema
   })
 
+  const [backupState, setBackupState] = useState<EditAccountFormProps>(RegisterFormProto())
+
+  const handleInitialization = useCallback((response: GetAccountResponse) => {
+    const newState = {
+      ...RegisterFormProto(),
+      isDisabled: response.isDisabled,
+      description: response.description,
+      contacts: response.contacts,
+      hostnames: (response.hostnames ?? []).map(h => ({
+        ...EditAccountHostnameFormProto(),
+        isDisabled: h.isDisabled,
+        hostname: h.hostname
+      }))
+    }
+    
+    setInitialState(newState)
+    setBackupState(deepCopy(newState))
+  }, [setInitialState])
+
+  useEffect(() => {
+    getData<GetAccountResponse>(GetApiRoute(ApiRoutes.ACCOUNT_GET).route
+      .replace('{accountId}', accountId)
+    ).then((response) => {
+      if (!response) return
+
+      handleInitialization(response)
+    })
+  }, [accountId, handleInitialization])
+
+
+  const mapFormStateToPatchRequest = (formState: EditAccountFormProps) : PatchAccountRequest => {
+    const formStateCopy = deepCopy(formState)
+
+    const patchRequest: PatchAccountRequest = {
+      isDisabled: formStateCopy.isDisabled,
+      description: formStateCopy.description,
+      contacts: formStateCopy.contacts,
+      hostnames: formStateCopy.hostnames.map(h => ({
+        hostname: h.hostname
+      }))
+    }
+
+    return patchRequest
+  }
+
   const handleSubmit = () => {
-    // onSubmitted && onSubmitted(updatedEntity)
+    if (!formIsValid) return
+
+    const fromFormState = mapFormStateToPatchRequest(formState)
+    const fromBackupState = mapFormStateToPatchRequest(backupState)
+
+    const delta = deepDelta(fromBackupState, fromFormState)
+
+    if (!deltaHasOperations(delta)) {
+      addToast('No changes detected', 'info')
+      return
+    }
+
+    const request = PatchAccountRequestSchema.safeParse(delta)
+    if (!request.success) {
+      request.error.issues.forEach(error => {
+        addToast(error.message, 'error')
+      })
+
+      return
+    }
+
+    patchData<PatchAccountRequest, GetAccountResponse>(GetApiRoute(ApiRoutes.ACCOUNT_PATCH).route
+      .replace('{accountId}', accountId), delta
+    ).then((response) => {
+      if (!response) return
+
+      handleInitialization(response)
+      onSubmitted?.(response)
+    })
   }
 
   const handleCancel = () => {
@@ -70,13 +184,100 @@ const EditAccount: FC<EditAccountProps> = (props) => {
         <CheckBoxComponent
           colspan={12}
           label={'Disabled'}
-          value={formState.disabled}
-          onChange={(e) => handleInputChange('disabled', e.target.checked)}
-          errorText={errors.disabled}
+          value={formState.isDisabled}
+          onChange={(e) => handleInputChange('isDisabled', e.target.checked)}
+          errorText={errors.isDisabled}
         />
 
         <h3 className={'col-span-12'}>Contacts:</h3>
-        
+        <ul className={'col-span-12'}>
+          {formState.contacts
+            .map((contact) => (
+              <li key={contact} className={'grid grid-cols-12 gap-4 w-full pb-2'}> 
+                <div className={'col-span-10'}>
+                  {contact}
+                </div>
+                <ButtonComponent
+                  colspan={2}
+                  onClick={() => {
+                    const updatedContacts = formState.contacts.filter(c => c !== contact)
+                    handleInputChange('contacts', updatedContacts)
+                  }}
+             
+                >
+                  <TrashIcon />
+                </ButtonComponent>
+              </li>
+            ))}
+        </ul>
+        <TextBoxComponent
+          colspan={10}
+          label={'New Contact'}
+          value={formState.contact}
+          onChange={(e) => {
+            if (formState.contacts.includes(e.target.value))
+              return
+
+            handleInputChange('contact', e.target.value)
+          }}
+          placeholder={'Add contact'}
+          type={'text'}
+          errorText={errors.contact}
+        />
+        <FieldContainer colspan={2}>
+          <ButtonComponent
+            onClick={() => {
+              handleInputChange('contacts', [...formState.contacts, formState.contact])
+              handleInputChange('contact', '')
+            }}
+            disabled={formState.contact.trim() === ''}
+          >
+            <PlusIcon />
+          </ButtonComponent>
+        </FieldContainer>
+        <h3 className={'col-span-12'}>Hostnames:</h3>
+        <ul className={'col-span-12'}>
+          {formState.hostnames.map((hostname) => (
+            <li key={hostname.hostname} className={'grid grid-cols-12 gap-4 w-full'}>
+              <span className={'col-span-10'}>{hostname.hostname}</span>
+              <ButtonComponent
+                colspan={2}
+                onClick={() => {
+                  const updatedHostnames = formState.hostnames.filter(h => h !== hostname)
+                  handleInputChange('hostnames', updatedHostnames)
+                }}
+              >
+                <TrashIcon />
+              </ButtonComponent>
+              
+            </li>
+          ))}
+        </ul>
+        <TextBoxComponent
+          colspan={10}
+          label={'New Hostname'}
+          value={formState.hostname}
+          onChange={(e) => {
+            if (formState.hostnames.find(h => h.hostname === e.target.value))
+              return
+
+            handleInputChange('hostname', e.target.value)
+          }}
+          placeholder={'Add hostname'}
+          type={'text'}
+          errorText={errors.hostname}
+        />
+        <FieldContainer colspan={2}>
+          <ButtonComponent
+            onClick={() => {
+              handleInputChange('hostnames', [...formState.hostnames, formState.hostname])
+              handleInputChange('hostname', '')
+            }}
+            disabled={formState.hostname.trim() === ''}
+          >
+            <PlusIcon />
+          </ButtonComponent>
+        </FieldContainer>
       </div>
     </FormContent>
     <FormFooter
