@@ -31,10 +31,20 @@ import {
   parseAclEntries
 } from './acl'
 
+import {
+  saveBinaryToDisk
+} from './file'
+
+import {
+  extractFilenameFromHeaders
+} from './headers'
+
 export {
+  // date
   isValidISODateString,
   formatISODateString,
 
+  // deep
   deepCopy,
   deepDelta,
   deltaHasOperations,
@@ -42,6 +52,7 @@ export {
   deepMerge,
   deepPatternMatch,
 
+  // enum
   enumToArr,
   enumToObj,
   enumToString,
@@ -50,8 +61,16 @@ export {
   hasFlag,
   hasAnyFlag,
 
+  // isGuid
   isGuid,
 
+  // acl
   parseAclEntry,
-  parseAclEntries
+  parseAclEntries,
+
+  // file
+  saveBinaryToDisk,
+
+  // headers
+  extractFilenameFromHeaders
 }

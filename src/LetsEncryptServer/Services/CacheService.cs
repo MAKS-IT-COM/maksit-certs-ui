@@ -19,7 +19,7 @@ public interface ICacheService {
   Task<Result<byte[]?>> DownloadAccountCacheZipAsync(Guid accountId);
   Task<Result> UploadCacheZipAsync(byte[] zipBytes);
   Task<Result> UploadAccountCacheZipAsync(Guid accountId, byte[] zipBytes);
-  Task<Result> ClearCacheAsync();
+  Result DeleteCacheAsync();
 }
 
 public class CacheService : ICacheService, IDisposable {
@@ -222,11 +222,18 @@ public class CacheService : ICacheService, IDisposable {
     }
   }
 
-  public async Task<Result> ClearCacheAsync() {
+  public Result DeleteCacheAsync() {
     try {
       if (Directory.Exists(_cacheDirectory)) {
-        Directory.Delete(_cacheDirectory, true);
-        _logger.LogInformation("Cache directory cleared.");
+        // Delete all files
+        foreach (var file in Directory.GetFiles(_cacheDirectory)) {
+          File.Delete(file);
+        }
+        // Delete all subdirectories
+        foreach (var dir in Directory.GetDirectories(_cacheDirectory)) {
+          Directory.Delete(dir, true);
+        }
+        _logger.LogInformation("Cache directory contents cleared.");
       }
       else {
         _logger.LogWarning("Cache directory not found to clear.");
@@ -234,7 +241,7 @@ public class CacheService : ICacheService, IDisposable {
       return Result.Ok();
     }
     catch (Exception ex) {
-      var message = "Error clearing cache directory.";
+      var message = "Error clearing cache directory contents.";
       _logger.LogError(ex, message);
       return Result.InternalServerError([message, .. ex.ExtractMessages()]);
     }

@@ -1,9 +1,13 @@
 ﻿
+using LetsEncryptServer.Abstractions;
+using MaksIT.Core.Webapi.Models;
 using MaksIT.LetsEncrypt.Entities;
 using MaksIT.Models;
 using MaksIT.Models.LetsEncryptServer.Account.Requests;
 using MaksIT.Models.LetsEncryptServer.Account.Responses;
 using MaksIT.Results;
+using System;
+using static System.Collections.Specialized.BitVector32;
 
 namespace MaksIT.LetsEncryptServer.Services;
 
@@ -23,7 +27,7 @@ public interface IAccountRestService {
 
 public interface IAccountService : IAccountInternalService, IAccountRestService { }
 
-public class AccountService : IAccountService {
+public class AccountService : ServiceBase, IAccountService {
 
   private readonly ILogger<CacheService> _logger;
   private readonly ICacheService _cacheService;
@@ -69,8 +73,6 @@ public class AccountService : IAccountService {
 
   public async Task<Result<GetAccountResponse?>> PostAccountAsync(PostAccountRequest requestData) {
 
-    // TODO: check for overlapping hostnames in already existing accounts
-
     var fullFlowResult = await _certsFlowService.FullFlow(
           requestData.IsStaging,
           null,
@@ -80,19 +82,17 @@ public class AccountService : IAccountService {
           requestData.Hostnames
         );
 
-
-
     if (!fullFlowResult.IsSuccess || fullFlowResult.Value == null)
       return fullFlowResult.ToResultOfType<GetAccountResponse?>(_ => null);
 
     var accountId = fullFlowResult.Value.Value;
 
-    var loadAccauntFromCacheResult = await _cacheService.LoadAccountFromCacheAsync(accountId);
-    if (!loadAccauntFromCacheResult.IsSuccess || loadAccauntFromCacheResult.Value == null) {
-      return loadAccauntFromCacheResult.ToResultOfType<GetAccountResponse?>(_ => null);
+    var loadAccountFromCacheResult = await _cacheService.LoadAccountFromCacheAsync(accountId);
+    if (!loadAccountFromCacheResult.IsSuccess || loadAccountFromCacheResult.Value == null) {
+      return loadAccountFromCacheResult.ToResultOfType<GetAccountResponse?>(_ => null);
     }
 
-    var cache = loadAccauntFromCacheResult.Value;
+    var cache = loadAccountFromCacheResult.Value;
 
     return Result<GetAccountResponse?>.Ok(CreateGetAccountResponse(accountId, cache));
   }
@@ -105,76 +105,60 @@ public class AccountService : IAccountService {
 
     var cache = loadAccountResult.Value;
 
-    if (requestData.Description != null) {
-      switch (requestData.Description.Op) {
-        case PatchOperation.Replace:
-          cache.Description = requestData.Description.Value;
+    if (requestData.TryGetOperation(nameof(requestData.Description), out var patchOperation)) {
+      switch (patchOperation) {
+        case PatchOperation.SetField:
+          if (requestData.Description == null)
+            return PatchFieldIsNotDefined<GetAccountResponse?>(nameof(requestData.Description));
+
+            cache.Description = requestData.Description;
           break;
+        default:
+          return UnsupportedPatchOperationResponse<GetAccountResponse?>();
       }
     }
 
-    if (requestData.IsDisabled != null) {
-      switch (requestData.IsDisabled.Op) { 
-        case PatchOperation.Replace:
+    if (requestData.TryGetOperation(nameof(requestData.IsDisabled), out patchOperation)) {
+      switch (patchOperation) {
+        case PatchOperation.SetField:
+          if (requestData.IsDisabled == null)
+            return PatchFieldIsNotDefined<GetAccountResponse?>(nameof(requestData.IsDisabled));
+
           cache.IsDisabled = requestData.IsDisabled.Value;
           break;
+        default:
+          return UnsupportedPatchOperationResponse<GetAccountResponse?>();
       }
     }
 
-    if (requestData.Contacts?.Any() == true) {
-      var contacts = cache.Contacts?.ToList() ?? new List<string>();
-      foreach (var action in requestData.Contacts) {
-        switch (action.Op)
-        {
-          case PatchOperation.Add:
-            if (action.Value != null) contacts.Add(action.Value);
-            break;
-          case PatchOperation.Replace:
-            if (action.Index != null && action.Index >= 0 && action.Index < contacts.Count)
-              contacts[action.Index.Value] = action.Value;
-            break;
-          case PatchOperation.Remove:
-            if (action.Index != null && action.Index >= 0 && action.Index < contacts.Count)
-              contacts.RemoveAt(action.Index.Value);
-            break;
-        }
+    if (requestData.TryGetOperation(nameof(requestData.Contacts), out patchOperation)) {
+      switch (patchOperation) {
+        case PatchOperation.SetField:
+          if (requestData.Contacts == null)
+            return PatchFieldIsNotDefined<GetAccountResponse?>(nameof(requestData.Contacts));
+          cache.Contacts = requestData.Contacts.ToArray();
+          break;
       }
-      cache.Contacts = contacts.ToArray();
     }
 
+    #region Patch Hostnames
     var hostnamesToAdd = new List<string>();
     var hostnamesToRemove = new List<string>();
 
-    if (requestData.Hostnames?.Any() == true) {
-      var hostnames = cache.GetHosts().ToList();
-      foreach (var action in requestData.Hostnames) {
+    foreach (var hostnameRequestData in requestData.Hostnames ?? []) {
+      if (hostnameRequestData.TryGetOperation("collectionItemOperation", out patchOperation)) {
 
-        if (action.Hostname != null) {
-          switch (action.Hostname.Op) {
-            case PatchOperation.Add:
-              hostnamesToAdd.Add(action.Hostname.Value);
+        if (hostnameRequestData.Hostname == null)
+          return PatchFieldIsNotDefined<GetAccountResponse?>(nameof(hostnameRequestData.Hostname));
 
-              break;
+        switch (patchOperation) {
+          case PatchOperation.AddToCollection:
+            hostnamesToAdd.Add(hostnameRequestData.Hostname);
+            break;
 
-            case PatchOperation.Replace:
-              if (action.Hostname.Index != null && action.Hostname.Index >= 0 && action.Hostname.Index < hostnames.Count)
-                hostnames[action.Hostname.Index.Value].Hostname = action.Hostname.Value;
-              break;
-
-            case PatchOperation.Remove:
-              hostnamesToRemove.Add(action.Hostname.Value);
-
-            
-              break;
-          }
-        }
-
-        if (action.IsDisabled != null) {
-          switch (action.IsDisabled.Op) {
-            case PatchOperation.Replace:
-              
-              break;
-          }
+          case PatchOperation.RemoveFromCollection:
+            hostnamesToRemove.Add(hostnameRequestData.Hostname);
+            break;
         }
       }
     }
@@ -210,6 +194,7 @@ public class AccountService : IAccountService {
       if (!revokeResult.IsSuccess)
         return revokeResult.ToResultOfType<GetAccountResponse?>(default);
     }
+    #endregion
 
     loadAccountResult = await _cacheService.LoadAccountFromCacheAsync(accountId);
     if (!loadAccountResult.IsSuccess || loadAccountResult.Value == null) {

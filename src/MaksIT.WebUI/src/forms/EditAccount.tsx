@@ -24,8 +24,8 @@ const EditAccountHostnameFormProto = (): EditAccountHostnameFormProps => ({
 })
 
 const EditAccountHostnameFormSchema: Schema<EditAccountHostnameFormProps> = object({
-  hostname: string(),
-  isDisabled: boolean()
+  isDisabled: boolean(),
+  hostname: string()
 })
 
 interface EditAccountFormProps {
@@ -95,7 +95,7 @@ const EditAccount: FC<EditAccountProps> = (props) => {
       ...RegisterFormProto(),
       isDisabled: response.isDisabled,
       description: response.description,
-      contacts: response.contacts,
+      contacts: [...response.contacts],
       hostnames: (response.hostnames ?? []).map(h => ({
         ...EditAccountHostnameFormProto(),
         isDisabled: h.isDisabled,
@@ -124,9 +124,10 @@ const EditAccount: FC<EditAccountProps> = (props) => {
     const patchRequest: PatchAccountRequest = {
       isDisabled: formStateCopy.isDisabled,
       description: formStateCopy.description,
-      contacts: formStateCopy.contacts,
+      contacts: [...formStateCopy.contacts],
       hostnames: formStateCopy.hostnames.map(h => ({
-        hostname: h.hostname
+        hostname: h.hostname,
+        isDisabled: h.isDisabled
       }))
     }
 
@@ -139,7 +140,11 @@ const EditAccount: FC<EditAccountProps> = (props) => {
     const fromFormState = mapFormStateToPatchRequest(formState)
     const fromBackupState = mapFormStateToPatchRequest(backupState)
 
-    const delta = deepDelta(fromBackupState, fromFormState)
+    const delta = deepDelta(fromFormState, fromBackupState, {
+      arrays: {
+        hostnames: { identityKey: 'hostname' }
+      }
+    })
 
     if (!deltaHasOperations(delta)) {
       addToast('No changes detected', 'info')
@@ -147,6 +152,7 @@ const EditAccount: FC<EditAccountProps> = (props) => {
     }
 
     const request = PatchAccountRequestSchema.safeParse(delta)
+
     if (!request.success) {
       request.error.issues.forEach(error => {
         addToast(error.message, 'error')
@@ -156,7 +162,7 @@ const EditAccount: FC<EditAccountProps> = (props) => {
     }
 
     patchData<PatchAccountRequest, GetAccountResponse>(GetApiRoute(ApiRoutes.ACCOUNT_PATCH).route
-      .replace('{accountId}', accountId), delta
+      .replace('{accountId}', accountId), delta, 120000
     ).then((response) => {
       if (!response) return
 
@@ -215,9 +221,6 @@ const EditAccount: FC<EditAccountProps> = (props) => {
           label={'New Contact'}
           value={formState.contact}
           onChange={(e) => {
-            if (formState.contacts.includes(e.target.value))
-              return
-
             handleInputChange('contact', e.target.value)
           }}
           placeholder={'Add contact'}
@@ -227,6 +230,9 @@ const EditAccount: FC<EditAccountProps> = (props) => {
         <FieldContainer colspan={2}>
           <ButtonComponent
             onClick={() => {
+              if (formState.contacts.includes(formState.contact))
+                return
+            
               handleInputChange('contacts', [...formState.contacts, formState.contact])
               handleInputChange('contact', '')
             }}
@@ -238,12 +244,31 @@ const EditAccount: FC<EditAccountProps> = (props) => {
         <h3 className={'col-span-12'}>Hostnames:</h3>
         <ul className={'col-span-12'}>
           {formState.hostnames.map((hostname) => (
-            <li key={hostname.hostname} className={'grid grid-cols-12 gap-4 w-full'}>
-              <span className={'col-span-10'}>{hostname.hostname}</span>
+            <li key={hostname.hostname} className={'grid grid-cols-12 gap-4 w-full pb-2'}>
+              <span className={'col-span-7'}>{hostname.hostname}</span>
+              <span className={'col-span-3'}>
+                <label className={'mr-2'}>Disabled:</label>
+                <input
+                  type={'checkbox'}
+                  checked={hostname.isDisabled}
+                  onChange={(e) => {
+                    const updatedHostnames = formState.hostnames.map(h => {
+                      if (h.hostname === hostname.hostname) {
+                        return {  
+                          ...h,
+                          isDisabled: e.target.checked
+                        }
+                      }
+                      return h
+                    })
+                    handleInputChange('hostnames', updatedHostnames)
+                  }}
+                />
+              </span>
               <ButtonComponent
                 colspan={2}
                 onClick={() => {
-                  const updatedHostnames = formState.hostnames.filter(h => h !== hostname)
+                  const updatedHostnames = formState.hostnames.filter(h => h.hostname !== hostname.hostname)
                   handleInputChange('hostnames', updatedHostnames)
                 }}
               >
@@ -258,9 +283,6 @@ const EditAccount: FC<EditAccountProps> = (props) => {
           label={'New Hostname'}
           value={formState.hostname}
           onChange={(e) => {
-            if (formState.hostnames.find(h => h.hostname === e.target.value))
-              return
-
             handleInputChange('hostname', e.target.value)
           }}
           placeholder={'Add hostname'}
@@ -270,7 +292,15 @@ const EditAccount: FC<EditAccountProps> = (props) => {
         <FieldContainer colspan={2}>
           <ButtonComponent
             onClick={() => {
-              handleInputChange('hostnames', [...formState.hostnames, formState.hostname])
+              if (formState.hostnames.find(h => h.hostname === formState.hostname))
+                return
+            
+              handleInputChange('hostnames', [ ...formState.hostnames, {
+                ...EditAccountHostnameFormProto(),
+                hostname: formState.hostname
+              }
+              ])
+
               handleInputChange('hostname', '')
             }}
             disabled={formState.hostname.trim() === ''}

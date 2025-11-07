@@ -18,7 +18,7 @@ public class RegistrationCache {
   public required string Description { get; set; }
   public required string[] Contacts { get; set; }
   public required bool IsStaging { get; set; }
-  public string? ChallengeType { get; set; }
+  public required string ChallengeType { get; set; }
   #endregion
 
 

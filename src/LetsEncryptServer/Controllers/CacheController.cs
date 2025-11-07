@@ -8,8 +8,8 @@ namespace LetsEncryptServer.Controllers;
 public class CacheController(ICacheService cacheService) : ControllerBase {
   private readonly ICacheService _cacheService = cacheService;
 
-  [HttpGet("caches/download")]
-  public async Task<IActionResult> GetCaches() {
+  [HttpGet("cache/download")]
+  public async Task<IActionResult> GetCache() {
     var result = await _cacheService.DownloadCacheZipAsync();
     if (!result.IsSuccess || result.Value == null) {
       return result.ToActionResult();
@@ -17,12 +17,23 @@ public class CacheController(ICacheService cacheService) : ControllerBase {
 
     var bytes = result.Value;
 
-    return File(bytes, "application/zip", "caches.zip");
+    return File(bytes, "application/zip", "cache.zip");
   }
 
-  [HttpPost("caches/upload")]
-  public async Task<IActionResult> PostCaches([FromBody] byte[] zipBytes) {
-    var result = await _cacheService.UploadCacheZipAsync(zipBytes);
+  [HttpPost("cache/upload")]
+  //[RequestSizeLimit(200_000_000)]
+  public async Task<IActionResult> PostCache([FromForm] IFormFile file) {
+    if (file is null || file.Length == 0) return BadRequest("No file.");
+
+    using var ms = new MemoryStream();
+    await file.CopyToAsync(ms);
+    var result = await _cacheService.UploadCacheZipAsync(ms.ToArray());
+    return result.ToActionResult();
+  }
+
+  [HttpDelete("cache")]
+  public IActionResult DeleteCache() {
+    var result = _cacheService.DeleteCacheAsync();
     return result.ToActionResult();
   }
 
@@ -43,4 +54,6 @@ public class CacheController(ICacheService cacheService) : ControllerBase {
     var result = await _cacheService.UploadAccountCacheZipAsync(accountId, zipBytes);
     return result.ToActionResult();
   }
+
+
 }

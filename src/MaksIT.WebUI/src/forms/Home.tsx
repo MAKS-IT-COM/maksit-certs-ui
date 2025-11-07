@@ -16,7 +16,7 @@ const Home: FC = () => {
   const [accountId, setAccountId] = useState<string | undefined>(undefined)
   
   const loadData = useCallback(() => {
-    getData<GetAccountResponse[]>(GetApiRoute(ApiRoutes.ACCOUNTS).route).then((response) => {
+    getData<GetAccountResponse[]>(GetApiRoute(ApiRoutes.ACCOUNTS_GET).route).then((response) => {
       if (!response) return
       setRawd(response)
     })

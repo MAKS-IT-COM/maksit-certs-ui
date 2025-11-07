@@ -5,10 +5,8 @@ import { store } from './redux/store'
 import { refreshJwt } from './redux/slices/identitySlice'
 import { hideLoader, showLoader } from './redux/slices/loaderSlice'
 import { addToast } from './components/Toast/addToast'
-import { de } from 'zod/v4/locales'
-import { deepPatternMatch } from './functions'
-import { ProblemDetails, ProblemDetailsProto } from './models/ProblemDetails'
-import { add } from 'lodash'
+import { ProblemDetails } from './models/ProblemDetails'
+
 
 // Create an Axios instance
 const axiosInstance = axios.create({
@@ -99,6 +97,7 @@ axiosInstance.interceptors.response.use(
  * Performs a GET request and returns the response data.
  * @param url The endpoint URL.
  * @param timeout Optional timeout in milliseconds to override the default.
+ * @returns The response data, or undefined if an error occurs.
  */
 const getData = async <TResponse>(url: string, timeout?: number): Promise<TResponse | undefined> => {
   try {
@@ -120,6 +119,7 @@ const getData = async <TResponse>(url: string, timeout?: number): Promise<TRespo
  * @param url The endpoint URL.
  * @param data The request payload.
  * @param timeout Optional timeout in milliseconds to override the default.
+ * @returns The response data, or undefined if an error occurs.
  */
 const postData = async <TRequest, TResponse>(url: string, data?: TRequest, timeout?: number): Promise<TResponse | undefined> => {
   try {
@@ -142,6 +142,7 @@ const postData = async <TRequest, TResponse>(url: string, data?: TRequest, timeo
  * @param url The endpoint URL.
  * @param data The request payload.
  * @param timeout Optional timeout in milliseconds to override the default.
+ * @returns The response data, or undefined if an error occurs.
  */
 const patchData = async <TRequest, TResponse>(url: string, data: TRequest, timeout?: number): Promise<TResponse | undefined> => {
   try {
@@ -163,6 +164,7 @@ const patchData = async <TRequest, TResponse>(url: string, data: TRequest, timeo
  * @param url The endpoint URL.
  * @param data The request payload.
  * @param timeout Optional timeout in milliseconds to override the default.
+ * @returns The response data, or undefined if an error occurs.
  */
 const putData = async <TRequest, TResponse>(url: string, data: TRequest, timeout?: number): Promise<TResponse | undefined> => {
   try {
@@ -183,6 +185,7 @@ const putData = async <TRequest, TResponse>(url: string, data: TRequest, timeout
  * Performs a DELETE request and returns the response data.
  * @param url The endpoint URL.
  * @param timeout Optional timeout in milliseconds to override the default.
+ * @returns The response data, or undefined if an error occurs.
  */
 const deleteData = async <TResponse>(url: string, timeout?: number): Promise<TResponse | undefined> => {
   try {
@@ -199,11 +202,141 @@ const deleteData = async <TResponse>(url: string, timeout?: number): Promise<TRe
   }
 }
 
+/**
+ * Performs a POST request with binary payload (e.g., file upload) and returns the response data.
+ * @param url The endpoint URL.
+ * @param data The binary request payload.
+ * @param timeout Optional timeout in milliseconds to override the default.
+ * @returns The response data, or undefined if an error occurs.
+ */
+const postBinary = async <TResponse>(
+  url: string,
+  data: Blob | ArrayBuffer | Uint8Array,
+  timeout?: number
+): Promise<TResponse | undefined> => {
+  try {
+    const response = await axiosInstance.post<TResponse>(url, data, {
+      headers: {
+        'Content-Type': 'application/octet-stream'
+      },
+      ...(timeout ? { timeout } : {})
+    })
+    return response.data
+  } catch {
+    // Error is already handled by interceptors, so just return undefined
+    return undefined
+  }
+}
+
+/**
+ * Performs a GET request to retrieve binary data (e.g., file download).
+ * @param url The endpoint URL.
+ * @param timeout Optional timeout in milliseconds to override the default.
+ * @param as The format to retrieve the binary data as ('arraybuffer' or 'blob').
+ * @returns The binary data and headers, or undefined if an error occurs.
+ */
+const getBinary = async (
+  url: string,
+  timeout?: number,
+  as: 'arraybuffer' | 'blob' = 'arraybuffer'
+): Promise<{ data: ArrayBuffer | Blob, headers: Record<string, string> } | undefined> => {
+  try {
+    const response = await axiosInstance.get(url, {
+      responseType: as,
+      ...(timeout ? { timeout } : {})
+    })
+
+    return {
+      data: response.data,
+      headers: response.headers as Record<string, string>
+    }
+  } catch {
+    // Error is already handled by interceptors, so just return undefined
+    return undefined
+  }
+}
+
+/**
+ * Performs a POST request using multipart/form-data.
+ * Accepts either a ready FormData or a record of fields to be converted into FormData.
+ * Note: Do NOT set the Content-Type header manually; the browser will include the boundary.
+ * @param url The endpoint URL.
+ * @param form The FormData instance or a record of fields.
+ *             Values can be string | Blob | File | (string | Blob | File)[]
+ * @param timeout Optional timeout in milliseconds to override the default.
+ * @returns The response data, or undefined if an error occurs.
+ */
+const postFormData = async <TResponse>(
+  url: string,
+  form: FormData | Record<string, string | Blob | File | (string | Blob | File)[]>,
+  timeout?: number
+): Promise<TResponse | undefined> => {
+  try {
+    const formData =
+      form instanceof FormData
+        ? form
+        : (() => {
+          const fd = new FormData()
+          Object.entries(form).forEach(([key, value]) => {
+            if (Array.isArray(value)) {
+              value.forEach(v => fd.append(key, v))
+            } else {
+              fd.append(key, value)
+            }
+          })
+          return fd
+        })()
+
+    const response = await axiosInstance.post<TResponse>(url, formData, {
+      // Do NOT set Content-Type; the browser will set the correct multipart boundary
+      ...(timeout ? { timeout } : {})
+    })
+
+    return response.data
+  } catch {
+    // Error is already handled by interceptors, so just return undefined
+    return undefined
+  }
+}
+
+/**
+ * Convenience helper for uploading a single file via multipart/form-data.
+ * @param url The endpoint URL.
+ * @param file The file/blob to upload.
+ * @param fieldName The form field name for the file (default: "file").
+ * @param filename Optional filename; if omitted and "file" is a File, the File.name is used.
+ * @param extraFields Optional extra key/value fields to include in the form.
+ * @param timeout Optional timeout in milliseconds to override the default.
+ * @returns The response data, or undefined if an error occurs.
+ */
+const postFile = async <TResponse>(
+  url: string,
+  file: Blob | File,
+  fieldName: string = 'file',
+  filename?: string,
+  extraFields?: Record<string, string>,
+  timeout?: number
+): Promise<TResponse | undefined> => {
+  const fd = new FormData()
+  const inferredName = filename ?? (file instanceof File ? file.name : 'file')
+  fd.append(fieldName, file, inferredName)
+
+  if (extraFields) {
+    Object.entries(extraFields).forEach(([k, v]) => fd.append(k, v))
+  }
+
+  return postFormData<TResponse>(url, fd, timeout)
+}
+
 export {
   axiosInstance,
   getData,
   postData,
   patchData,
   putData,
-  deleteData
+  deleteData,
+  postBinary,
+  getBinary,
+  postFormData,
+  postFile
 }

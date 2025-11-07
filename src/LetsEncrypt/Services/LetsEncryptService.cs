@@ -22,6 +22,7 @@ using System.Text;
 
 namespace MaksIT.LetsEncrypt.Services;
 
+
 public interface ILetsEncryptService {
   Task<Result> ConfigureClient(Guid sessionId, bool isStaging);
   Task<Result> Init(Guid sessionId,Guid accountId, string description, string[] contacts, RegistrationCache? registrationCache);
@@ -216,6 +217,7 @@ public class LetsEncryptService : ILetsEncryptService {
           Description = description,
           Contacts = contacts,
           IsStaging = state.IsStaging,
+          ChallengeType = ChalengeType.http.GetDisplayName(),
           Location = result.Result.Location,
           AccountKey = accountKey.ExportCspBlob(true),
           Id = result.Result.Id ?? string.Empty,

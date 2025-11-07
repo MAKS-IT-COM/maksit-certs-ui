@@ -1,15 +1,18 @@
-using MaksIT.Core.Webapi.Middlewares;
 using MaksIT.Core.Logging;
+using MaksIT.Core.Webapi.Middlewares;
 using MaksIT.LetsEncrypt.Extensions;
-using MaksIT.LetsEncrypt.Services;
 using MaksIT.LetsEncryptServer;
 using MaksIT.LetsEncryptServer.BackgroundServices;
 using MaksIT.LetsEncryptServer.Services;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Extract configuration
 var configuration = builder.Configuration;
+
+// Add logging
+builder.Logging.AddConsoleLogger();
 
 var configMapPath = Path.Combine(Path.DirectorySeparatorChar.ToString(), "configMap", "appsettings.json");
 if (File.Exists(configMapPath)) {
@@ -25,16 +28,16 @@ if (File.Exists(secretsPath)) {
 var configurationSection = configuration.GetSection("Configuration");
 var appSettings = configurationSection.Get<Configuration>() ?? throw new ArgumentNullException();
 
-// Add logging
-builder.Logging.AddConsoleLogger();
-
 // Allow configurations to be available through IOptions<Configuration>
 builder.Services.Configure<Configuration>(configurationSection);
 
 
 // Add services to the container.
+builder.Services.AddControllers()
+  .AddJsonOptions(options => {
+    options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+  });
 
-builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

@@ -45,7 +45,7 @@ const LayoutWrapper: FC<LayoutWrapperProps> = (props) => {
     }
     footer={
       {
-        children: <p>&copy; {new Date().getFullYear()} {import.meta.env.VITE_COMPANY}</p>
+        children: <p>&copy; {new Date().getFullYear()} <a href={import.meta.env.VITE_COMPANY_URL}>{import.meta.env.VITE_COMPANY}</a></p>
       }
     }
   >{children}</Layout>
@@ -147,7 +147,9 @@ const AppMap: AppMapType[] = [
 
 
 enum ApiRoutes {
-  ACCOUNTS = 'GET|/accounts',
+
+  // Accounts
+  ACCOUNTS_GET = 'GET|/accounts',
 
   ACCOUNT_POST = 'POST|/account',
   ACCOUNT_GET = 'GET|/account/{accountId}',
@@ -160,14 +162,23 @@ enum ApiRoutes {
   // ACCOUNT_ID_HOSTNAMES = 'GET|/account/{accountId}/hostnames',
   // ACCOUNT_ID_HOSTNAME_ID = 'GET|/account/{accountId}/hostname/{index}',
 
-  // Agents
-  AGENT_TEST = 'GET|/agent/test',
+
 
   // Certs flow
   CERTS_FLOW_CONFIGURE_CLIENT = 'POST|/certs/configure-client',
   CERTS_FLOW_TERMS_OF_SERVICE = 'GET|/certs/{sessionId}/terms-of-service',
   CERTS_FLOW_CERTIFICATES_APPLY = 'POST|/certs/{accountId}/certificates/apply',
 
+  // Caches
+  FULL_CACHE_DOWNLOAD_GET = 'GET|/cache/download',
+  FULL_CACHE_UPLOAD_POST = 'POST|/cache/upload',
+  FULL_CACHE_DELETE = 'DELETE|/cache',
+
+  CACHE_DOWNLOAD_GET = 'GET|/cache/{accountId}/download/',
+  CACHE_UPLOAD_POST = 'POST|/cache/{accountId}/upload/',
+
+  // Agents
+  AGENT_TEST = 'GET|/agent/test',
 
   // Secrets
   generateSecret = 'GET|/secret/generatesecret',
