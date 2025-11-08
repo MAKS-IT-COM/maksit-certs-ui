@@ -5,10 +5,11 @@ import { CacheAccount } from '../entities/CacheAccount'
 import { GetAccountResponse } from '../models/letsEncryptServer/account/responses/GetAccountResponse'
 import { deleteData, getData, postData } from '../axiosConfig'
 import { ApiRoutes, GetApiRoute } from '../AppMap'
-import { formatISODateString } from '../functions'
+import { enumToArr, formatISODateString } from '../functions'
 import { addToast } from '../components/Toast/addToast'
 import { Offcanvas } from '../components/Offcanvas'
 import { EditAccount } from './EditAccount'
+import { ChallengeType } from '../entities/ChallengeType'
 
 
 const Home: FC = () => {
@@ -113,14 +114,12 @@ const Home: FC = () => {
                       </li>
                     ))}
                   </ul>
-                  <RadioGroupComponent
-                    colspan={12}
-                    label={'LetsEncrypt Environment'}
-                    options={[
-                      { value: 'staging', label: 'Staging' },
-                      { value: 'production', label: 'Production' }
-                    ]}
-                    value={acc.challengeType ? 'staging' : 'production'}
+                  <SelectBoxComponent
+                    label={'Challenge Type'}
+                    options={enumToArr(ChallengeType)
+                      .map(ct => ({ value: ct.value, label: ct.displayValue }))
+                      .filter(ct => ct.value !== ChallengeType.dns01)}
+                    value={acc.challengeType}
                     disabled={true}
                   />
                   <h3 className={'col-span-12'}>Hostnames:</h3>
@@ -148,11 +147,13 @@ const Home: FC = () => {
                       </li>
                     ))}
                   </ul>
-                  <SelectBoxComponent
-                    label={'Environment'}
+
+                  <RadioGroupComponent
+                    colspan={12}
+                    label={'LetsEncrypt Environment'}
                     options={[
-                      { value: 'production', label: 'Production' },
-                      { value: 'staging', label: 'Staging' }
+                      { value: 'staging', label: 'Staging' },
+                      { value: 'production', label: 'Production' }
                     ]}
                     value={acc.isStaging ? 'staging' : 'production'}
                     disabled={true}

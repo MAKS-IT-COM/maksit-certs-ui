@@ -27,6 +27,7 @@ services:
     volumes:
       - D:\Compose\MaksIT.CertsUI\acme:/acme
       - D:\Compose\MaksIT.CertsUI\cache:/cache
+      - D:\Compose\MaksIT.CertsUI\data:/data
       - D:\Compose\MaksIT.CertsUI\tmp:/tmp
       - D:\Compose\MaksIT.CertsUI\configMap\appsettings.json:/configMap/appsettings.json:ro
       - D:\Compose\MaksIT.CertsUI\secrets\appsecrets.json:/secrets/appsecrets.json:ro

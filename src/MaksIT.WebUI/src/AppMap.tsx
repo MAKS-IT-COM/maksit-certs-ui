@@ -10,6 +10,7 @@ import { Toast } from './components/Toast'
 import { UtilitiesPage } from './pages/UtilitiesPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { LetsEncryptTermsOfServicePage } from './pages/LetsEncryptTermsOfServicePage'
+import { UserPage } from './pages/UserPage'
 
 
 interface LayoutWrapperProps {
@@ -45,7 +46,14 @@ const LayoutWrapper: FC<LayoutWrapperProps> = (props) => {
     }
     footer={
       {
-        children: <p>&copy; {new Date().getFullYear()} <a href={import.meta.env.VITE_COMPANY_URL}>{import.meta.env.VITE_COMPANY}</a></p>
+        children: <p>
+          &copy; {new Date().getFullYear()} <a
+            href={import.meta.env.VITE_COMPANY_URL}
+            target={'_blank'}
+            rel={'noopener noreferrer'}>
+            {import.meta.env.VITE_COMPANY}
+          </a>
+        </p>
       }
     }
   >{children}</Layout>
@@ -90,25 +98,27 @@ const AppMap: AppMapType[] = [
     routes: ['/terms-of-service'],
     page: LetsEncryptTermsOfServicePage,
     linkArea: [LinkArea.SideMenu]
-  }
+  },
 
-  // {
-  //   title: 'Login',
-  //   routes: ['/login'],
-  //   page: LoginScreen,
-  //   useAuth: false,
-  //   useLayout: false
-  // },
+  {
+    title: 'Login',
+    routes: ['/login'],
+    page: LoginScreen,
+    useAuth: false,
+    useLayout: false
+  },
+
+  {
+    title: 'User',
+    routes: ['/user/:userId'],
+    page: UserPage
+  },
   // {
   //   title: 'About',
   //   routes: ['/about'],
   //   page: Home
   // },
-  // {
-  //   title: 'User',
-  //   routes: ['/user/:userId'],
-  //   page: Users
-  // },
+
   // {
   //   title: 'Organizations',
   //   routes: ['/organizations', '/organization/:organizationId'],
@@ -221,14 +231,12 @@ const GetRoutes = () => {
         <Route
           key={route}
           path={route}
-          // element={useAuth
-          //   ? <Authorization>
-          //     {PageComponent}
-          //     <UserOffcanvas />
-          //   </Authorization>
-          //   : PageComponent}
-
-          element={PageComponent}
+          element={useAuth
+            ? <Authorization>
+              {PageComponent}
+              <UserOffcanvas />
+            </Authorization>
+            : PageComponent}
         />
       )
     })

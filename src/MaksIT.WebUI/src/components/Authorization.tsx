@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { FC, useEffect, useMemo } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '../redux/hooks'
 import { setIdentityFromLocalStorage } from '../redux/slices/identitySlice'
 
@@ -7,44 +7,36 @@ interface AuthorizationProps {
   children: React.ReactNode;
 }
 
-const Authorization = (props: AuthorizationProps) => {
+const Authorization: FC<AuthorizationProps> = (props) => {
   const { children } = props
 
   const navigate = useNavigate()
+  const location = useLocation()
   const dispatch = useAppDispatch()
   const { identity } = useAppSelector((state) => state.identity)
 
-  const [loading, setLoading] = useState(true)
+  const isTokenExpired = useMemo(() => {
+    if (!identity || !identity.refreshTokenExpiresAt)
+      return true
+
+    return new Date(identity.refreshTokenExpiresAt) < new Date()
+  }, [identity])
 
   useEffect(() => {
+    // Load identity from local storage on mount
     dispatch(setIdentityFromLocalStorage())
-    setLoading(false)
   }, [dispatch])
 
   useEffect(() => {
-    if (!loading) {
-      if (!identity || new Date(identity.refreshTokenExpiresAt) < new Date()) {
-        navigate('/login', { replace: true })
-      }
+    if (!identity || isTokenExpired) {
+      // Optionally, pass the current location for redirect after login
+      navigate('/login', { replace: true, state: { from: location } })
     }
-  }, [identity, navigate, loading])
+  }, [identity, isTokenExpired, navigate, location])
 
-  // Render a simple loading spinner while loading (Tailwind v4 compatible)
-  if (loading) {
-    return (
-      <div className={'flex items-center justify-center h-screen w-screen bg-white'}>
-        <div className={'animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500'}></div>
-      </div>
-    )
-  }
-
-  if (!identity || new Date(identity.refreshTokenExpiresAt) < new Date()) {
-    return null
-  }
-
-  return <>{children}</>
+  return identity && !isTokenExpired
+    ? children
+    : <></>
 }
 
-export {
-  Authorization
-}
+export { Authorization }

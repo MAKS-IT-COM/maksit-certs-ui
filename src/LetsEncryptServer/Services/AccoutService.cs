@@ -2,30 +2,20 @@
 using LetsEncryptServer.Abstractions;
 using MaksIT.Core.Webapi.Models;
 using MaksIT.LetsEncrypt.Entities;
-using MaksIT.Models;
 using MaksIT.Models.LetsEncryptServer.Account.Requests;
 using MaksIT.Models.LetsEncryptServer.Account.Responses;
 using MaksIT.Results;
-using System;
-using static System.Collections.Specialized.BitVector32;
 
 namespace MaksIT.LetsEncryptServer.Services;
 
 
-public interface IAccountInternalService {
-
-}
-
-
-public interface IAccountRestService {
+public interface IAccountService {
   Task<Result<GetAccountResponse[]?>> GetAccountsAsync();
   Task<Result<GetAccountResponse?>> GetAccountAsync(Guid accountId);
   Task<Result<GetAccountResponse?>> PostAccountAsync(PostAccountRequest requestData);
   Task<Result<GetAccountResponse?>> PatchAccountAsync(Guid accountId, PatchAccountRequest requestData);
   Task<Result> DeleteAccountAsync(Guid accountId);
 }
-
-public interface IAccountService : IAccountInternalService, IAccountRestService { }
 
 public class AccountService : ServiceBase, IAccountService {
 

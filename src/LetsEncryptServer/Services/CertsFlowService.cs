@@ -195,8 +195,11 @@ public class CertsFlowService : ICertsFlowService {
     var sessionId = sessionResult.Value.Value;
 
     var initResult = await InitAsync(sessionId, accountId, description, contacts);
-    if (!initResult.IsSuccess)
+    if (!initResult.IsSuccess || initResult.Value == null)
       return initResult.ToResultOfType<Guid?>(_ => null);
+
+    if (accountId == null)
+      accountId = initResult.Value;
 
     var challengesResult = await NewOrderAsync(sessionId, hostnames, challengeType);
     if (!challengesResult.IsSuccess)
@@ -217,7 +220,7 @@ public class CertsFlowService : ICertsFlowService {
       return certsResult.ToResultOfType<Guid?>(default);
 
     if (!isStaging) {
-      var applyCertsResult = await ApplyCertificatesAsync(accountId ?? Guid.Empty);
+      var applyCertsResult = await ApplyCertificatesAsync(accountId.Value);
       if (!applyCertsResult.IsSuccess)
         return applyCertsResult.ToResultOfType<Guid?>(_ => null);
     }

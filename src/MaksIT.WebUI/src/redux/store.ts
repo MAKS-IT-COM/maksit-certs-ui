@@ -5,7 +5,7 @@ import identityReducer from './slices/identitySlice'
 export const store = configureStore({
   reducer: {
     loader: loaderReducer,
-    //identity: identityReducer,
+    identity: identityReducer,
   },
 })
 

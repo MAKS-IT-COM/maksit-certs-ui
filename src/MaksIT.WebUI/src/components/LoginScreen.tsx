@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { FC, useEffect, useState } from 'react'
 import { LoginRequest, LoginRequestSchema } from '../models/identity/login/LoginRequest'
 import { useAppDispatch, useAppSelector } from '../redux/hooks'
 import { login } from '../redux/slices/identitySlice'
@@ -6,7 +6,7 @@ import { useFormState } from '../hooks/useFormState'
 import { useNavigate } from 'react-router-dom'
 import { ButtonComponent, CheckBoxComponent, TextBoxComponent } from './editors'
 
-const LoginScreen: React.FC = () => {
+const LoginScreen: FC = () => {
   const [use2FA, setUse2FA] = useState(false)
   const [use2FARecovery, setUse2FARecovery] = useState(false)
 
@@ -48,14 +48,6 @@ const LoginScreen: React.FC = () => {
     dispatch(login(formState))
   }
 
-  // Utility classes
-  const inputClasses =
-    'block w-full rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
-  const checkboxClasses =
-    'h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-200'
-  const buttonPrimaryClasses =
-    'w-full py-2 px-4 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold'
-
   return (
     <div className={'flex items-center justify-center min-h-screen bg-gray-100'}>
       <div className={'w-full max-w-md bg-white rounded-lg shadow-md p-8 space-y-6'}>
@@ -68,8 +60,8 @@ const LoginScreen: React.FC = () => {
         <div className={'space-y-4'}>
           <div className={'space-y-4'}>
             <TextBoxComponent
-              label={'Email'}
-              placeholder={'Email...'}
+              label={'Username'}
+              placeholder={'Username...'}
               value={formState.username}
               onChange={(e) => handleInputChange('username', e.target.value)}
               errorText={errors.username}

@@ -1,10 +1,10 @@
+using System.Text.Json.Serialization;
 using MaksIT.Core.Logging;
 using MaksIT.Core.Webapi.Middlewares;
 using MaksIT.LetsEncrypt.Extensions;
 using MaksIT.LetsEncryptServer;
-using MaksIT.LetsEncryptServer.BackgroundServices;
 using MaksIT.LetsEncryptServer.Services;
-using System.Text.Json.Serialization;
+using MaksIT.LetsEncryptServer.BackgroundServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -48,11 +48,19 @@ builder.Services.AddMemoryCache();
 
 builder.Services.RegisterLetsEncrypt(appSettings);
 
+#region Work with files concurrently
 builder.Services.AddSingleton<ICacheService, CacheService>();
+builder.Services.AddSingleton<ISettingsService, SettingsService>();
+#endregion
+
 builder.Services.AddHttpClient<ICertsFlowService, CertsFlowService>();
-builder.Services.AddSingleton<IAccountService, AccountService>();
 builder.Services.AddHttpClient<IAgentService, AgentService>();
+builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<IIdentityService, IdentityService>();
+
+// Hosted services
 builder.Services.AddHostedService<AutoRenewal>();
+builder.Services.AddHostedService<Initialization>();
 
 var app = builder.Build();
 

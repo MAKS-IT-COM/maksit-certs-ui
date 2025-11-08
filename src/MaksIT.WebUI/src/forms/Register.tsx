@@ -117,16 +117,15 @@ const Register: FC<RegisterProps> = () => {
           {formState.contacts.map((contact) => (
             <li key={contact} className={'grid grid-cols-12 gap-4 w-full pb-2'}> 
               <span className={'col-span-10'}>{contact}</span>
-              <FieldContainer colspan={2}>
-                <ButtonComponent
-                  onClick={() => {
-                    const updatedContacts = formState.contacts.filter(c => c !== contact)
-                    handleInputChange('contacts', updatedContacts)
-                  }}
-                >
-                  <TrashIcon />
-                </ButtonComponent>
-              </FieldContainer>
+              <ButtonComponent
+                colspan={2}
+                onClick={() => {
+                  const updatedContacts = formState.contacts.filter(c => c !== contact)
+                  handleInputChange('contacts', updatedContacts)
+                }}
+              >
+                <TrashIcon />
+              </ButtonComponent>
             </li>
           ))}
         </ul>
@@ -170,18 +169,17 @@ const Register: FC<RegisterProps> = () => {
         <h3 className={'col-span-12'}>Hostnames:</h3>
         <ul className={'col-span-12'}>
           {formState.hostnames.map((hostname) => (
-            <li key={hostname} className={'grid grid-cols-12 gap-4 w-full'}>
+            <li key={hostname} className={'grid grid-cols-12 gap-4 w-full pb-2'}>
               <span className={'col-span-10'}>{hostname}</span>
-              <FieldContainer colspan={2}>
-                <ButtonComponent
-                  onClick={() => {
-                    const updatedHostnames = formState.hostnames.filter(h => h !== hostname)
-                    handleInputChange('hostnames', updatedHostnames)
-                  }}
-                >
-                  <TrashIcon />
-                </ButtonComponent>
-              </FieldContainer>
+              <ButtonComponent
+                colspan={2}
+                onClick={() => {
+                  const updatedHostnames = formState.hostnames.filter(h => h !== hostname)
+                  handleInputChange('hostnames', updatedHostnames)
+                }}
+              >
+                <TrashIcon />
+              </ButtonComponent>
             </li>
           ))}
         </ul>

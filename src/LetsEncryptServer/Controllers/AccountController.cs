@@ -8,7 +8,7 @@ namespace MaksIT.LetsEncryptServer.Controllers;
 [ApiController]
 [Route("api")]
 public class AccountController : ControllerBase {
-  private readonly IAccountRestService _accountService;
+  private readonly IAccountService _accountService;
 
   public AccountController(
       IAccountService accountService
