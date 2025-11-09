@@ -1,7 +1,8 @@
-﻿using MaksIT.Core.Extensions;
-using MaksIT.LetsEncrypt.Models.Responses;
+﻿using MaksIT.LetsEncrypt.Models.Responses;
+
 
 namespace MaksIT.LetsEncrypt.Exceptions;
+
 public class LetsEncrytException : Exception {
 
   public Problem? Problem { get; }

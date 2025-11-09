@@ -43,14 +43,15 @@ public class SettingsService : ISettingsService, IDisposable {
 
             var settings = new Settings {
                 Init = settingsDto.Init,
-                Users = [.. settingsDto.Users.Select(userDto =>  new User(userDto.Id, userDto.Name)
-                        .SetSaltedHash(userDto.Salt, userDto.Hash)
-                        .SetJwtTokens([.. userDto.JwtTokens.Select(jtDto =>
-                            new JwtToken(jtDto.Id)
-                                .SetAccessTokenData(jtDto.Token, jtDto.IssuedAt, jtDto.ExpiresAt)
-                                .SetRefreshTokenData(jtDto.RefreshToken, jtDto.RefreshTokenExpiresAt)
-                        )])
-                        .SetLastLogin(userDto.LastLogin)
+                Users = [.. settingsDto.Users.Select(userDto =>  new User(userDto.Id)
+                  .SetName(userDto.Name)
+                  .SetSaltedHash(userDto.Salt, userDto.Hash)
+                  .SetJwtTokens([.. userDto.JwtTokens.Select(jtDto =>
+                    new JwtToken(jtDto.Id)
+                      .SetAccessTokenData(jtDto.Token, jtDto.IssuedAt, jtDto.ExpiresAt)
+                      .SetRefreshTokenData(jtDto.RefreshToken, jtDto.RefreshTokenExpiresAt)
+                  )])
+                  .SetLastLogin(userDto.LastLogin)
                 )]
             };
             return Result<Settings?>.Ok(settings);
@@ -58,7 +59,7 @@ public class SettingsService : ISettingsService, IDisposable {
         catch (Exception ex) {
           var message = "Error loading settings file.";
           _logger.LogError(ex, message);
-          return Result<Settings?>.InternalServerError(null, new[] { message }.Concat(ex.ExtractMessages()).ToArray());
+      return Result<Settings?>.InternalServerError(null, [message, .. ex.ExtractMessages()]);
         }
     }
 

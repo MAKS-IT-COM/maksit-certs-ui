@@ -5,21 +5,15 @@ using MaksIT.Results;
 namespace MaksIT.LetsEncryptServer.Domain;
 
 public class User(
-  Guid id,
-  string name
+  Guid id
 ) : DomainDocumentBase<Guid>(id) {
-  public string Name { get; private set; } = name;
+  public string Name { get; private set; } = string.Empty;
   public string Salt { get; private set; } = string.Empty;
   public string Hash { get; private set; } = string.Empty;
   public List<JwtToken> JwtTokens { get; private set; } = [];
   public DateTime LastLogin { get; private set; }
 
-  public User(
-    string name
-  ) : this(
-    Guid.NewGuid(),
-    name
-  ) { }
+  public User() : this(Guid.NewGuid()) { }
 
   /// <summary>
   /// Change user name

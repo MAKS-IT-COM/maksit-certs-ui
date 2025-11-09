@@ -25,12 +25,11 @@ public class IdentityService(
 
 
   private readonly Configuration _appSettings = appsettings.Value;
-  private readonly ISettingsService _settingsService = settingsService;
 
   #region Login/Refresh/Logout
   public async Task<Result<LoginResponse?>> LoginAsync(LoginRequest requestData) {
 
-    var loadSettingsResult = await _settingsService.LoadAsync();
+    var loadSettingsResult = await settingsService.LoadAsync();
     if (!loadSettingsResult.IsSuccess || loadSettingsResult.Value == null) {
       return loadSettingsResult.ToResultOfType<LoginResponse?>(_ => null);
     }
@@ -73,7 +72,7 @@ public class IdentityService(
     user.SetLastLogin();
     settings.UpsertUser(user);
 
-    var saveSettingsResult = await _settingsService.SaveAsync(settings);
+    var saveSettingsResult = await settingsService.SaveAsync(settings);
     if (!saveSettingsResult.IsSuccess)
       return saveSettingsResult.ToResultOfType<LoginResponse?>(default);
 
@@ -89,7 +88,7 @@ public class IdentityService(
   }
 
   public async Task<Result<LoginResponse?>> RefreshTokenAsync(RefreshTokenRequest requestData) {
-    var loadSettingsResult = await _settingsService.LoadAsync();
+    var loadSettingsResult = await settingsService.LoadAsync();
     if (!loadSettingsResult.IsSuccess || loadSettingsResult.Value == null)
         return loadSettingsResult.ToResultOfType<LoginResponse?>(_ => null);
 
@@ -109,7 +108,7 @@ public class IdentityService(
         user.SetLastLogin();
         settings.UpsertUser(user);
 
-        var saveResult = await _settingsService.SaveAsync(settings);
+        var saveResult = await settingsService.SaveAsync(settings);
         if (!saveResult.IsSuccess)
             return saveResult.ToResultOfType<LoginResponse?>(default);
 
@@ -155,7 +154,7 @@ public class IdentityService(
     user.SetLastLogin();
     settings.UpsertUser(user);
 
-    var writeResult = await _settingsService.SaveAsync(settings);
+    var writeResult = await settingsService.SaveAsync(settings);
     if (!writeResult.IsSuccess)
         return writeResult.ToResultOfType<LoginResponse?>(default);
 
@@ -169,7 +168,7 @@ public class IdentityService(
   }
 
   public async Task<Result> Logout(LogoutRequest requestData) {
-    var loadSettingsResult = await _settingsService.LoadAsync();
+    var loadSettingsResult = await settingsService.LoadAsync();
     if (!loadSettingsResult.IsSuccess || loadSettingsResult.Value == null)
       return loadSettingsResult.ToResultOfType<LoginResponse?>(_ => null);
 

@@ -2,7 +2,9 @@
 
 using System.Text.Json.Serialization;
 
+
 namespace MaksIT.LetsEncrypt.Entities.Jws;
+
 public class Jwk {
   /// <summary>
   /// "kty" (Key Type) Parameter

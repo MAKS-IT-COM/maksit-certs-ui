@@ -3,7 +3,13 @@
  * https://datatracker.ietf.org/doc/html/draft-ietf-acme-acme-12
  */
 
-
+using System.Text;
+using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
+using MaksIT.Results;
 using MaksIT.Core.Extensions;
 using MaksIT.LetsEncrypt.Entities;
 using MaksIT.LetsEncrypt.Entities.Jws;
@@ -12,16 +18,9 @@ using MaksIT.LetsEncrypt.Exceptions;
 using MaksIT.LetsEncrypt.Models.Interfaces;
 using MaksIT.LetsEncrypt.Models.Requests;
 using MaksIT.LetsEncrypt.Models.Responses;
-using MaksIT.Results;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging;
-using System.Net.Http.Headers;
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
+
 
 namespace MaksIT.LetsEncrypt.Services;
-
 
 public interface ILetsEncryptService {
   Task<Result> ConfigureClient(Guid sessionId, bool isStaging);

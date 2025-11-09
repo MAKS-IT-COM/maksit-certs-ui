@@ -11,7 +11,8 @@ public class Settings : DomainObjectBase {
   public Settings() { }
 
   public Result<Settings?> Initialize(string pepper) {
-    var userResult = new User("admin")
+    var userResult = new User()
+      .SetName("admin")
       .SetPassword("password", pepper);
 
     if (!userResult.IsSuccess || userResult.Value == null) {
@@ -47,8 +48,9 @@ public class Settings : DomainObjectBase {
     return Result<User?>.Ok(user);
   }
 
-  public Result<Settings?> AddUser(string name, string password, string pepper) {
-    var setPasswordResult = new User(name)
+  public Result<Settings?> CreateUser(string name, string password, string pepper) {
+    var setPasswordResult = new User()
+      .SetName(name)
       .SetPassword(password, pepper);
 
     if (!setPasswordResult.IsSuccess || setPasswordResult.Value == null)
@@ -73,16 +75,6 @@ public class Settings : DomainObjectBase {
     foreach (var user in users)
       UpsertUser(user);
     return this;
-  }
-
-
-  public Result<Settings?> RemoveUser(string name) {
-    if (Users.Any(x => x.Name == name)) {
-      Users = [.. Users.Where(u => u.Name != name)];
-      return Result<Settings?>.Ok(this);
-    }
-
-    return Result<Settings?>.NotFound(null, "User not found.");
   }
 
   public Result<Settings?> RemoveUser(Guid userId) {

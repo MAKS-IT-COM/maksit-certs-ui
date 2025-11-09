@@ -3,13 +3,11 @@
 * https://tools.ietf.org/html/rfc4648#section-5
 */
 
-
 using System.Text;
 using System.Security.Cryptography;
-
+using MaksIT.Core.Extensions;
 using MaksIT.LetsEncrypt.Entities.Jws;
 
-using MaksIT.Core.Extensions;
 
 namespace MaksIT.LetsEncrypt.Services;
 
