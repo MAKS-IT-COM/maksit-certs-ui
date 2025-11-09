@@ -1,8 +1,11 @@
-﻿namespace MaksIT.LetsEncryptServer.Dto;
+﻿using MaksIT.Core.Abstractions.Dto;
 
-public class UserDto {
-  public required string Id { get; set; }
-  public required string Name { get; set; }
-  public required string Salt { get; set; }
-  public required string Hash { get; set; }
+namespace MaksIT.LetsEncryptServer.Dto;
+
+public class UserDto : DtoDocumentBase<Guid> {
+  public required string Name { get; set; } = string.Empty;
+  public required string Salt { get; set; } = string.Empty;
+  public required string Hash { get; set; } = string.Empty;
+  public required List<JwtTokenDto> JwtTokens { get; set; } = [];
+  public required DateTime LastLogin { get; set; }
 }

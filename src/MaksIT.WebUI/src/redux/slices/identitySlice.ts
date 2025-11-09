@@ -55,9 +55,14 @@ const login = createAsyncThunk(
 const logout = createAsyncThunk(
   'auth/logout',
   async (logOutFromAllDevices: boolean = false) => {
+    const identity = readIdentity()
+    if (!identity || new Date(identity.refreshTokenExpiresAt) < new Date())
+      return
+
     const apiRoute = GetApiRoute(ApiRoutes.identityLogout)
     const response = await postData<LogoutRequest, LogoutResponse>(apiRoute.route, {
-      logOutFromAllDevices
+      logOutFromAllDevices,
+      token: identity.token
     })
     return response
   }

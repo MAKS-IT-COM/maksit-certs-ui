@@ -56,15 +56,33 @@ public class CertsFlowService : ICertsFlowService {
     var termsOfServiceUrl = result.Value;
 
     try {
-      var pdfBytesTask = _httpClient.GetByteArrayAsync(termsOfServiceUrl);
-      pdfBytesTask.Wait();
-      var pdfBytes = pdfBytesTask.Result;
-      var base64 = Convert.ToBase64String(pdfBytes);
-      return Result<string?>.Ok(base64);
+        var fileName = Path.GetFileName(new Uri(termsOfServiceUrl).LocalPath);
+
+        var termsOfServicePdfPath = Path.Combine(_appSettings.DataFolder, fileName);
+
+        // Clean up old PDF files except the current one
+        foreach (var file in Directory.GetFiles(_appSettings.DataFolder, "*.pdf")) {
+            if (!string.Equals(Path.GetFileName(file), fileName, StringComparison.OrdinalIgnoreCase)) {
+                try {
+                  File.Delete(file);
+                }
+                catch { /* ignore */ }
+            }
+        }
+
+        byte[] pdfBytes;
+        if (File.Exists(termsOfServicePdfPath)) {
+            pdfBytes = File.ReadAllBytes(termsOfServicePdfPath);
+        } else {
+            pdfBytes = _httpClient.GetByteArrayAsync(termsOfServiceUrl).GetAwaiter().GetResult();
+            File.WriteAllBytes(termsOfServicePdfPath, pdfBytes);
+        }
+        var base64 = Convert.ToBase64String(pdfBytes);
+        return Result<string?>.Ok(base64);
     }
     catch (Exception ex) {
-      _logger.LogError(ex, "Failed to download or convert Terms of Service PDF");
-      return Result<string?>.InternalServerError(null, $"Failed to download or convert Terms of Service PDF: {ex.Message}");
+      _logger.LogError(ex, "Failed to download, cache, or convert Terms of Service PDF");
+      return Result<string?>.InternalServerError(null, $"Failed to download, cache, or convert Terms of Service PDF: {ex.Message}");
     }
   }
 

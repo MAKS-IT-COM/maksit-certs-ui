@@ -22,28 +22,18 @@ public class IdentityController(
     return result.ToActionResult();
   }
 
-  //[HttpPost("refresh")]
-  //[ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
-  //public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest requestData) {
-  //  var result = await _identityService.RefreshTokenAsync(requestData);
-  //  return result.ToActionResult();
-  //}
+  [HttpPost("refresh")]
+  [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+  public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest requestData) {
+    var result = await _identityService.RefreshTokenAsync(requestData);
+    return result.ToActionResult();
+  }
 
-  //[ServiceFilter(typeof(JwtAuthorizationFilter))]
-  //[HttpPost("logout")]
-  //[ProducesResponseType(StatusCodes.Status200OK)]
-  //public async Task<IActionResult> Logout([FromBody] LogoutRequest requetData) {
-  //  var jwtTokenDataResult = HttpContext.GetJwtTokenData();
-  //  if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
-  //    return jwtTokenDataResult.ToActionResult();
-
-  //  var jwtTokenData = jwtTokenDataResult.Value;
-
-  //  var result = await _identityService.Logout(jwtTokenData, requetData);
-  //  return result.ToActionResult();
-  //}
+  [HttpPost("logout")]
+  [ProducesResponseType(StatusCodes.Status200OK)]
+  public async Task<IActionResult> Logout([FromBody] LogoutRequest requestData) {
+    var result = await _identityService.Logout(requestData);
+    return result.ToActionResult();
+  }
   #endregion
-
-
-
 }

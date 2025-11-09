@@ -34,6 +34,7 @@ namespace MaksIT.LetsEncryptServer {
 
     public required string CacheFolder { get; set; }
     public required string AcmeFolder { get; set; }
+    public required string DataFolder { get; set; }
 
     public required Agent Agent { get; set; }
   }

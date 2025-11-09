@@ -1,9 +1,11 @@
-import { z } from 'zod'
+import { boolean, object, Schema, string } from 'zod'
 
 export interface LogoutRequest {
     logOutFromAllDevices?: boolean;
+    token: string;
 }
 
-export const LoginRequestSchema: z.Schema<LogoutRequest> = z.object({
-  logOutFromAllDevices: z.boolean().optional()
+export const LoginRequestSchema: Schema<LogoutRequest> = object({
+  logOutFromAllDevices: boolean().optional(),
+  token: string()
 })
