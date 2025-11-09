@@ -138,8 +138,6 @@ const enrichStateWithJwtContent = (token: string, identity: Identity) => {
       identity.acls = parseAclEntries(jwtAcls)
     }
   }
-
-  console.log('Enriched identity:', identity)
 }
 
 const identitySlice = createSlice({

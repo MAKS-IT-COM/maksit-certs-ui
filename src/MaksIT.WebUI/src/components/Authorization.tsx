@@ -28,13 +28,13 @@ const Authorization: FC<AuthorizationProps> = (props) => {
   }, [dispatch])
 
   useEffect(() => {
-    if (!identity || isTokenExpired) {
+    if (isTokenExpired) {
       // Optionally, pass the current location for redirect after login
       navigate('/login', { replace: true, state: { from: location } })
     }
-  }, [identity, isTokenExpired, navigate, location])
+  }, [isTokenExpired, navigate, location])
 
-  return identity && !isTokenExpired
+  return !isTokenExpired
     ? children
     : <></>
 }
