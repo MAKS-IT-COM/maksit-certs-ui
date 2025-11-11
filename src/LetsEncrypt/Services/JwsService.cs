@@ -13,19 +13,12 @@ namespace MaksIT.LetsEncrypt.Services;
 
 public interface IJwsService {
   void SetKeyId(string location);
-
   JwsMessage Encode(JwsHeader protectedHeader);
-
   JwsMessage Encode<TPayload>(TPayload payload, JwsHeader protectedHeader);
-
   string GetKeyAuthorization(string token);
-
-
   string Base64UrlEncoded(string s);
-
   string Base64UrlEncoded(byte[] arg);
 }
-
 
 public class JwsService : IJwsService {
 
@@ -89,11 +82,16 @@ public class JwsService : IJwsService {
     $"{token}.{GetSha256Thumbprint()}";
 
   private string GetSha256Thumbprint() {
+
+    var thumbprint = new {
+      e = _jwk.Exponent,
+      kty = "RSA",
+      n = _jwk.Modulus
+    };
+
     var json = "{\"e\":\"" + _jwk.Exponent + "\",\"kty\":\"RSA\",\"n\":\"" + _jwk.Modulus + "\"}";
     return Base64UrlEncoded(SHA256.HashData(Encoding.UTF8.GetBytes(json)));
   }
-
-
 
   public string Base64UrlEncoded(string s) =>
     Base64UrlEncoded(Encoding.UTF8.GetBytes(s));

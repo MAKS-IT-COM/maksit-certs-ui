@@ -19,14 +19,14 @@ This chart deploys the MaksIT CertsUI tool for automated Let's Encrypt HTTPS cer
   The server uses a ConfigMap (`appsettings.json`) for application settings.
 
 - **Persistence**:  
-  PVCs are created for `/acme` and `/cache` directories.
+  PVCs are created for `/acme`, `/cache` and `/data` directories.
 
 ------------------------------------------------------------
 ## Uninstall
 
 To remove all resources created by this chart:
 ```
-helm uninstall {{ .Release.Name }}
+helm uninstall {{ .Release.Name }} -n {{ .Release.Name }}
 ```
 
 ------------------------------------------------------------

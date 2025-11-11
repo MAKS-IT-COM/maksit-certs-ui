@@ -194,6 +194,8 @@ enum ApiRoutes {
   generateSecret = 'GET|/secret/generatesecret',
 
   // Identity
+  identityPatch = 'PATCH|/identity/user/{userId}',
+
   identityLogin = 'POST|/identity/login',
   identityRefresh = 'POST|/identity/refresh',
   identityLogout = 'POST|/identity/logout',

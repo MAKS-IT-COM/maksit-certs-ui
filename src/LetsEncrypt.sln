@@ -7,13 +7,13 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LetsEncrypt", "LetsEncrypt\
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{3374FDB1-C95E-4103-8E14-5BBF0BDC4E9D}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LetsEncryptServer", "LetsEncryptServer\LetsEncryptServer.csproj", "{B5F39E04-C2E3-49BF-82C2-9DEBAA949E3D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MaksIT.Webapi", "MaksIT.Webapi\MaksIT.Webapi.csproj", "{B5F39E04-C2E3-49BF-82C2-9DEBAA949E3D}"
 EndProject
 Project("{E53339B2-1760-4266-BCC7-CA923CBCF16C}") = "docker-compose", "docker-compose.dcproj", "{0233E43F-435D-4309-B20C-ECD4BFBD2E63}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Agent", "Agent\Agent.csproj", "{871BDED3-C6AE-437D-9B45-3AA3F184D002}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Models", "Models\Models.csproj", "{6814169B-D4D0-40B2-9FA9-89997DD44C30}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MaksIT.Models", "Models\MaksIT.Models.csproj", "{6814169B-D4D0-40B2-9FA9-89997DD44C30}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReverseProxy", "ReverseProxy\ReverseProxy.csproj", "{BE051147-7AB7-4358-9C24-5CB40FAFF4FC}"
 EndProject

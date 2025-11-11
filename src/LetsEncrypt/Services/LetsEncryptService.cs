@@ -754,16 +754,12 @@ public class LetsEncryptService : ILetsEncryptService {
   private static bool StatusEquals(string? status, OrderStatus expected) => status == expected.GetDisplayName();
 
   private Result HandleUnhandledException(Exception ex, string defaultMessage = "Let's Encrypt client unhandled exception") {
-    List<string> messages = new() { defaultMessage };
-    _logger.LogError(ex, messages.FirstOrDefault());
-    ex.ExtractMessages().ForEach(m => messages.Add(m));
-    return Result.InternalServerError([.. messages]);
+    _logger.LogError(ex, defaultMessage);
+    return Result.InternalServerError([defaultMessage, .. ex.ExtractMessages()]);
   }
 
   private Result<T?> HandleUnhandledException<T>(Exception ex, T? defaultValue = default, string defaultMessage = "Let's Encrypt client unhandled exception") {
-    List<string> messages = new() { defaultMessage };
-    _logger.LogError(ex, messages.FirstOrDefault());
-    ex.ExtractMessages().ForEach(m => messages.Add(m));
-    return Result<T?>.InternalServerError(defaultValue, [.. messages]);
+    _logger.LogError(ex, defaultMessage);
+    return Result<T?>.InternalServerError(defaultValue, [.. ex.ExtractMessages()]);
   }
 }

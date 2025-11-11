@@ -1,14 +1,14 @@
-﻿using MaksIT.Core.Abstractions.Webapi;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
+using MaksIT.Core.Abstractions.Webapi;
 
-namespace MaksIT.Models.LetsEncryptServer.CertsFlow.Requests
-{
-  public class GetOrderRequest : RequestModelBase {
-    public required string[] Hostnames { get; set; }
 
-    public override IEnumerable<ValidationResult> Validate(ValidationContext validationContext) {
-      if (Hostnames == null || Hostnames.Length == 0)
-        yield return new ValidationResult("Hostnames is required", new[] { nameof(Hostnames) });
-    }
+namespace MaksIT.Models.LetsEncryptServer.CertsFlow.Requests;
+
+public class GetOrderRequest : RequestModelBase {
+  public required string[] Hostnames { get; set; }
+
+  public override IEnumerable<ValidationResult> Validate(ValidationContext validationContext) {
+    if (Hostnames == null || Hostnames.Length == 0)
+      yield return new ValidationResult("Hostnames is required", new[] { nameof(Hostnames) });
   }
 }

@@ -15,4 +15,4 @@ services:
     image: ${DOCKER_REGISTRY-}certs-ui-server
     build:
       context: .
-      dockerfile: LetsEncryptServer/Dockerfile
+      dockerfile: MaksIT.Webapi/Dockerfile

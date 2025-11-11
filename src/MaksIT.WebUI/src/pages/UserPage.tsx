@@ -1,8 +1,11 @@
-import { EditIdentity } from '../forms/EditIdentity'
+import { useParams } from 'react-router-dom'
+import { EditUser } from '../forms/Users/EditUser'
 
 
 const UserPage = () => {
-  return <EditIdentity />
+  const { userId } = useParams<{ userId: string }>()
+  
+  return userId ? <EditUser userId={userId} /> : <>User not found</>
 }
 
 export {

@@ -1,22 +1,18 @@
-﻿using MaksIT.Core.Abstractions.Webapi;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.ComponentModel.DataAnnotations;
+using MaksIT.Core.Abstractions.Webapi;
 
-namespace MaksIT.Models.LetsEncryptServer.CertsFlow.Requests {
-    public class InitRequest : RequestModelBase {
-      public required string Description { get; set; }
-      public required string[] Contacts { get; set; }
 
-    public override IEnumerable<ValidationResult> Validate(ValidationContext validationContext) {
-      if (string.IsNullOrWhiteSpace(Description))
-        yield return new ValidationResult("Description is required", new[] { nameof(Description) });
+namespace MaksIT.Models.LetsEncryptServer.CertsFlow.Requests;
 
-      if (Contacts == null || Contacts.Length == 0)
-        yield return new ValidationResult("Contacts is required", new[] { nameof(Contacts) });
-    }
+public class InitRequest : RequestModelBase {
+  public required string Description { get; set; }
+  public required string[] Contacts { get; set; }
+
+  public override IEnumerable<ValidationResult> Validate(ValidationContext validationContext) {
+    if (string.IsNullOrWhiteSpace(Description))
+      yield return new ValidationResult("Description is required", new[] { nameof(Description) });
+
+    if (Contacts == null || Contacts.Length == 0)
+      yield return new ValidationResult("Contacts is required", new[] { nameof(Contacts) });
   }
 }

@@ -1,11 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using MaksIT.Core.Abstractions.Webapi;
 
-namespace MaksIT.Models.Agent.Requests {
-  public class ServiceReloadRequest {
-    public string ServiceName { get; set; }
-  }
+
+namespace MaksIT.Models.Agent.Requests;
+
+public class ServiceReloadRequest : RequestModelBase {
+  public string ServiceName { get; set; }
 }

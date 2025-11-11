@@ -1,7 +1,8 @@
-﻿namespace MaksIT.Models.Agent.Requests {
-  public class CertsUploadRequest {
+﻿using MaksIT.Core.Abstractions.Webapi;
 
-    public Dictionary<string, string> Certs { get; set; }
 
-  }
+namespace MaksIT.Models.Agent.Requests;
+
+public class CertsUploadRequest : RequestModelBase {
+  public Dictionary<string, string> Certs { get; set; }
 }

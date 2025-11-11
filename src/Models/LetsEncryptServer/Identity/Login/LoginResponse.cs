@@ -1,10 +1,9 @@
 ﻿using MaksIT.Core.Abstractions.Webapi;
 
 
-namespace Models.LetsEncryptServer.Identity.Login;
+namespace MaksIT.Models.LetsEncryptServer.Identity.Login;
 
 public class LoginResponse : ResponseModelBase {
-
   public required string TokenType { get; set; }
   public required string Token { get; set; }
   public required DateTime ExpiresAt { get; set; }

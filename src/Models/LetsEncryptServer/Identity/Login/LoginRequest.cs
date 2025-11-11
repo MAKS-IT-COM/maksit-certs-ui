@@ -1,7 +1,7 @@
 ﻿using MaksIT.Core.Abstractions.Webapi;
 
 
-namespace Models.LetsEncryptServer.Identity.Login;
+namespace MaksIT.Models.LetsEncryptServer.Identity.Login;
 
 public class LoginRequest : RequestModelBase {
   public required string Username { get; set; }

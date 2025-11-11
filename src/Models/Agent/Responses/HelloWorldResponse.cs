@@ -1,10 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using MaksIT.Core.Abstractions.Webapi;
 
-namespace Models.Agent.Responses;
-public class HelloWorldResponse {
+
+namespace MaksIT.Models.Agent.Responses;
+
+public class HelloWorldResponse : ResponseModelBase {
   public string Message { get; set; }
 }

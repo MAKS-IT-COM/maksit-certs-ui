@@ -1,7 +1,8 @@
-﻿using MaksIT.Core.Abstractions.Webapi;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
+using MaksIT.Core.Abstractions.Webapi;
 
 namespace MaksIT.Models.LetsEncryptServer.Account.Requests;
+
 public class PostAccountRequest : RequestModelBase {
   public required string Description { get; set; }
   public required string[] Contacts { get; set; }
@@ -11,15 +12,15 @@ public class PostAccountRequest : RequestModelBase {
 
   public override IEnumerable<ValidationResult> Validate(ValidationContext validationContext) {
     if (string.IsNullOrWhiteSpace(Description))
-      yield return new ValidationResult("Description is required", new[] { nameof(Description) });
+      yield return new ValidationResult("Description is required", [nameof(Description)]);
 
     if (Contacts == null || Contacts.Length == 0)
-      yield return new ValidationResult("Contacts is required", new[] { nameof(Contacts) });
+      yield return new ValidationResult("Contacts is required", [nameof(Contacts)]);
 
     if (Hostnames == null || Hostnames.Length == 0)
-      yield return new ValidationResult("Hostnames is required", new[] { nameof(Hostnames) });
+      yield return new ValidationResult("Hostnames is required", [nameof(Hostnames)]);
 
     if (string.IsNullOrWhiteSpace(ChallengeType) && ChallengeType != "http-01")
-      yield return new ValidationResult("ChallengeType is required", new[] { nameof(ChallengeType) });
+      yield return new ValidationResult("ChallengeType is required", [nameof(ChallengeType)]);
   }
 }
