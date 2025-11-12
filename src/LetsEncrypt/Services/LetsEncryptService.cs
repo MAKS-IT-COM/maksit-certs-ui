@@ -3,14 +3,8 @@
  * https://datatracker.ietf.org/doc/html/draft-ietf-acme-acme-12
  */
 
-using System.Text;
-using System.Net.Http.Headers;
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging;
-using MaksIT.Results;
 using MaksIT.Core.Extensions;
+using MaksIT.Core.Security.JWK;
 using MaksIT.LetsEncrypt.Entities;
 using MaksIT.LetsEncrypt.Entities.Jws;
 using MaksIT.LetsEncrypt.Entities.LetsEncrypt;
@@ -18,6 +12,13 @@ using MaksIT.LetsEncrypt.Exceptions;
 using MaksIT.LetsEncrypt.Models.Interfaces;
 using MaksIT.LetsEncrypt.Models.Requests;
 using MaksIT.LetsEncrypt.Models.Responses;
+using MaksIT.Results;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
+using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
 
 
 namespace MaksIT.LetsEncrypt.Services;
@@ -354,7 +355,7 @@ public class LetsEncryptService : ILetsEncryptService {
           case "dns-01":
             using (var sha256 = SHA256.Create()) {
               var dnsToken = state.JwsService != null
-                ? state.JwsService.Base64UrlEncoded(sha256.ComputeHash(Encoding.UTF8.GetBytes(keyToken ?? string.Empty)))
+                ? Base64UrlUtility.Encode(sha256.ComputeHash(Encoding.UTF8.GetBytes(keyToken ?? string.Empty)))
                 : string.Empty;
 
               results[challengeResponse.Result?.Identifier?.Value ?? string.Empty] = dnsToken;
@@ -482,7 +483,7 @@ public class LetsEncryptService : ILetsEncryptService {
       csr.CertificateExtensions.Add(san.Build());
 
       var letsEncryptOrder = new FinalizeRequest {
-        Csr = state.JwsService!.Base64UrlEncoded(csr.CreateSigningRequest())
+        Csr = Base64UrlUtility.Encode(csr.CreateSigningRequest())
       };
 
       Uri? certificateUrl = default;
@@ -606,7 +607,7 @@ public class LetsEncryptService : ILetsEncryptService {
       
       var derEncodedCert = certificate.Export(X509ContentType.Cert);
       
-      var base64UrlEncodedCert = state.JwsService!.Base64UrlEncoded(derEncodedCert);
+      var base64UrlEncodedCert = Base64UrlUtility.Encode(derEncodedCert);
       
       var revokeRequest = new RevokeRequest {
         Certificate = base64UrlEncodedCert,

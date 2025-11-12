@@ -18,8 +18,6 @@ public interface IJwsService {
   JwsMessage Encode(ACMEJwsHeader protectedHeader);
   JwsMessage Encode<TPayload>(TPayload payload, ACMEJwsHeader protectedHeader);
   string GetKeyAuthorization(string token);
-  string Base64UrlEncoded(string s);
-  string Base64UrlEncoded(byte[] arg);
 }
 
 public class JwsService : IJwsService {
@@ -36,9 +34,9 @@ public class JwsService : IJwsService {
     var mod = publicParameters.Modulus ?? throw new ArgumentNullException(nameof(publicParameters.Modulus));
 
     _jwk = new Jwk() {
-      KeyType = "RSA",
-      RsaExponent = Base64UrlEncoded(exp),
-      RsaModulus = Base64UrlEncoded(mod),
+      KeyType = JwkKeyType.Rsa.Name,
+      RsaExponent = Base64UrlUtility.Encode(exp),
+      RsaModulus = Base64UrlUtility.Encode(mod),
     };
   }
 
@@ -51,7 +49,7 @@ public class JwsService : IJwsService {
 
   public JwsMessage Encode<T>(T? payload, ACMEJwsHeader protectedHeader) {
 
-    protectedHeader.Algorithm = "RS256";
+    protectedHeader.Algorithm = JwkAlgorithm.Rs256.Name;
     if (_jwk.KeyId != null) {
       protectedHeader.KeyId = _jwk.KeyId;
     }
@@ -61,17 +59,17 @@ public class JwsService : IJwsService {
 
     var message = new JwsMessage {
       Payload = "",
-      Protected = Base64UrlEncoded(protectedHeader.ToJson())
+      Protected = Base64UrlUtility.Encode(protectedHeader.ToJson())
     };
 
     if (payload != null) {
       if (payload is string stringPayload) 
-        message.Payload = Base64UrlEncoded(stringPayload);
+        message.Payload = Base64UrlUtility.Encode(stringPayload);
       else 
-        message.Payload = Base64UrlEncoded(payload.ToJson());
+        message.Payload = Base64UrlUtility.Encode(payload.ToJson());
     }
 
-    message.Signature = Base64UrlEncoded(
+    message.Signature = Base64UrlUtility.Encode(
         _rsa.SignData(Encoding.ASCII.GetBytes($"{message.Protected}.{message.Payload}"),
             HashAlgorithmName.SHA256,
             RSASignaturePadding.Pkcs1));
@@ -91,16 +89,6 @@ public class JwsService : IJwsService {
     };
 
     var json = "{\"e\":\"" + _jwk.RsaExponent + "\",\"kty\":\"RSA\",\"n\":\"" + _jwk.RsaModulus + "\"}";
-    return Base64UrlEncoded(SHA256.HashData(Encoding.UTF8.GetBytes(json)));
+    return Base64UrlUtility.Encode(SHA256.HashData(Encoding.UTF8.GetBytes(json)));
   }
-
-  public string Base64UrlEncoded(string s) =>
-    Base64UrlEncoded(Encoding.UTF8.GetBytes(s));
-
-  // https://tools.ietf.org/html/rfc4648#section-5
-  public string Base64UrlEncoded(byte[] bytes) =>
-    Convert.ToBase64String(bytes) // Regular base64 encoder
-      .Split('=').First() // Remove any trailing '='s
-      .Replace('+', '-') // 62nd char of encoding
-      .Replace('/', '_'); // 63rd char of encoding
 }
