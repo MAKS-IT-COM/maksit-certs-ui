@@ -89,8 +89,8 @@ public class LetsEncryptService : ILetsEncryptService {
 
       await HandleNonceAsync(sessionId, challenge.Url, state);
 
-      var pollJson = EncodeMessage(true, null, state, new JwsHeader {
-        Url = challenge.Url,
+      var pollJson = EncodeMessage(true, null, state, new ACMEJwsHeader {
+        Url = challenge.Url.ToString(),
         Nonce = state.Nonce
       });
 
@@ -194,8 +194,8 @@ public class LetsEncryptService : ILetsEncryptService {
 
         await HandleNonceAsync(sessionId, state.Directory.NewAccount, state);
 
-        var json = EncodeMessage(false, letsEncryptOrder, state, new JwsHeader {
-          Url = state.Directory.NewAccount,
+        var json = EncodeMessage(false, letsEncryptOrder, state, new ACMEJwsHeader {
+          Url = state.Directory.NewAccount.ToString(),
           Nonce = state.Nonce
         });
 
@@ -287,8 +287,8 @@ public class LetsEncryptService : ILetsEncryptService {
 
       await HandleNonceAsync(sessionId, state.Directory.NewOrder, state);
 
-      var json = EncodeMessage(false, letsEncryptOrder, state, new JwsHeader {
-        Url = state.Directory.NewOrder,
+      var json = EncodeMessage(false, letsEncryptOrder, state, new ACMEJwsHeader {
+        Url = state.Directory.NewOrder.ToString(),
         Nonce = state.Nonce
       });
 
@@ -316,8 +316,8 @@ public class LetsEncryptService : ILetsEncryptService {
 
         await HandleNonceAsync(sessionId, item, state);
 
-        json = EncodeMessage(true, null, state, new JwsHeader {
-          Url = item,
+        json = EncodeMessage(true, null, state, new ACMEJwsHeader {
+          Url = item.ToString(),
           Nonce = state.Nonce
         });
 
@@ -399,8 +399,8 @@ public class LetsEncryptService : ILetsEncryptService {
 
         await HandleNonceAsync(sessionId, challenge.Url, state);
 
-        var json = EncodeMessage(false, "{}", state, new JwsHeader {
-          Url = challenge.Url,
+        var json = EncodeMessage(false, "{}", state, new ACMEJwsHeader {
+          Url = challenge.Url.ToString(),
           Nonce = state.Nonce
         });
 
@@ -440,8 +440,8 @@ public class LetsEncryptService : ILetsEncryptService {
 
       await HandleNonceAsync(sessionId, state.Directory.NewOrder, state);
 
-      var json = EncodeMessage(false, letsEncryptOrder, state, new JwsHeader {
-        Url = state.Directory.NewOrder,
+      var json = EncodeMessage(false, letsEncryptOrder, state, new ACMEJwsHeader {
+        Url = state.Directory.NewOrder.ToString(),
         Nonce = state.Nonce
       });
 
@@ -501,8 +501,8 @@ public class LetsEncryptService : ILetsEncryptService {
 
           await HandleNonceAsync(sessionId, state.CurrentOrder.Finalize!, state);
 
-          var json = EncodeMessage(false, letsEncryptOrder, state, new JwsHeader {
-            Url = state.CurrentOrder.Finalize,
+          var json = EncodeMessage(false, letsEncryptOrder, state, new ACMEJwsHeader {
+            Url = state.CurrentOrder.Finalize.ToString(),
             Nonce = state.Nonce
           });
 
@@ -515,8 +515,8 @@ public class LetsEncryptService : ILetsEncryptService {
 
             await HandleNonceAsync(sessionId, state.CurrentOrder.Location!, state);
 
-            json = EncodeMessage(true, null, state, new JwsHeader {
-              Url = state.CurrentOrder.Location,
+            json = EncodeMessage(true, null, state, new ACMEJwsHeader {
+              Url = state.CurrentOrder.Location.ToString(),
               Nonce = state.Nonce
             });
 
@@ -544,8 +544,8 @@ public class LetsEncryptService : ILetsEncryptService {
 
       await HandleNonceAsync(sessionId, certificateUrl!, state);
 
-      var finalJson = EncodeMessage(true, null, state, new JwsHeader {
-        Url = certificateUrl,
+      var finalJson = EncodeMessage(true, null, state, new ACMEJwsHeader {
+        Url = certificateUrl.ToString(),
         Nonce = state.Nonce
       });
 
@@ -617,8 +617,8 @@ public class LetsEncryptService : ILetsEncryptService {
 
       await HandleNonceAsync(sessionId, state.Directory.RevokeCert, state);
 
-      var jwsHeader = new JwsHeader {
-        Url = state.Directory.RevokeCert,
+      var jwsHeader = new ACMEJwsHeader {
+        Url = state.Directory.RevokeCert.ToString(),
         Nonce = state.Nonce
       };
 
@@ -691,7 +691,7 @@ public class LetsEncryptService : ILetsEncryptService {
     }
   }
 
-  private string EncodeMessage(bool isPostAsGet, object? requestModel, State state, JwsHeader jwsHeader) {
+  private string EncodeMessage(bool isPostAsGet, object? requestModel, State state, ACMEJwsHeader jwsHeader) {
     return isPostAsGet
         ? state.JwsService!.Encode(jwsHeader).ToJson()
         : state.JwsService!.Encode(requestModel, jwsHeader).ToJson();

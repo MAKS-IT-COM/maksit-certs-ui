@@ -1,4 +1,5 @@
-﻿using MaksIT.LetsEncrypt.Entities.Jws;
+﻿using MaksIT.Core.Security.JWK;
+using MaksIT.LetsEncrypt.Entities.Jws;
 using MaksIT.LetsEncrypt.Models.Interfaces;
 
 /*

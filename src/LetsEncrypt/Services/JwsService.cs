@@ -7,14 +7,16 @@ using System.Text;
 using System.Security.Cryptography;
 using MaksIT.Core.Extensions;
 using MaksIT.LetsEncrypt.Entities.Jws;
+using MaksIT.Core.Security.JWK;
+using MaksIT.Core.Security.JWS;
 
 
 namespace MaksIT.LetsEncrypt.Services;
 
 public interface IJwsService {
   void SetKeyId(string location);
-  JwsMessage Encode(JwsHeader protectedHeader);
-  JwsMessage Encode<TPayload>(TPayload payload, JwsHeader protectedHeader);
+  JwsMessage Encode(ACMEJwsHeader protectedHeader);
+  JwsMessage Encode<TPayload>(TPayload payload, ACMEJwsHeader protectedHeader);
   string GetKeyAuthorization(string token);
   string Base64UrlEncoded(string s);
   string Base64UrlEncoded(byte[] arg);
@@ -35,8 +37,8 @@ public class JwsService : IJwsService {
 
     _jwk = new Jwk() {
       KeyType = "RSA",
-      Exponent = Base64UrlEncoded(exp),
-      Modulus = Base64UrlEncoded(mod),
+      RsaExponent = Base64UrlEncoded(exp),
+      RsaModulus = Base64UrlEncoded(mod),
     };
   }
 
@@ -44,10 +46,10 @@ public class JwsService : IJwsService {
     _jwk.KeyId = location;
   }
 
-  public JwsMessage Encode(JwsHeader protectedHeader) =>
+  public JwsMessage Encode(ACMEJwsHeader protectedHeader) =>
     Encode<string>(null, protectedHeader);
 
-  public JwsMessage Encode<T>(T? payload, JwsHeader protectedHeader) {
+  public JwsMessage Encode<T>(T? payload, ACMEJwsHeader protectedHeader) {
 
     protectedHeader.Algorithm = "RS256";
     if (_jwk.KeyId != null) {
@@ -69,7 +71,6 @@ public class JwsService : IJwsService {
         message.Payload = Base64UrlEncoded(payload.ToJson());
     }
 
-
     message.Signature = Base64UrlEncoded(
         _rsa.SignData(Encoding.ASCII.GetBytes($"{message.Protected}.{message.Payload}"),
             HashAlgorithmName.SHA256,
@@ -84,12 +85,12 @@ public class JwsService : IJwsService {
   private string GetSha256Thumbprint() {
 
     var thumbprint = new {
-      e = _jwk.Exponent,
+      e = _jwk.RsaExponent,
       kty = "RSA",
-      n = _jwk.Modulus
+      n = _jwk.RsaModulus
     };
 
-    var json = "{\"e\":\"" + _jwk.Exponent + "\",\"kty\":\"RSA\",\"n\":\"" + _jwk.Modulus + "\"}";
+    var json = "{\"e\":\"" + _jwk.RsaExponent + "\",\"kty\":\"RSA\",\"n\":\"" + _jwk.RsaModulus + "\"}";
     return Base64UrlEncoded(SHA256.HashData(Encoding.UTF8.GetBytes(json)));
   }
 

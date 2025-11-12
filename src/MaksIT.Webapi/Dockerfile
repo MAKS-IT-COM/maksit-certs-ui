@@ -8,7 +8,7 @@ EXPOSE 5000
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["Models/Models.csproj", "Models/"]
+COPY ["MaksIT.Models/MaksIT.Models.csproj", "MaksIT.Models/"]
 COPY ["LetsEncrypt/LetsEncrypt.csproj", "LetsEncrypt/"]
 COPY ["MaksIT.Webapi/MaksIT.Webapi.csproj", "MaksIT.Webapi/"]
 RUN dotnet restore "./MaksIT.Webapi/MaksIT.Webapi.csproj"

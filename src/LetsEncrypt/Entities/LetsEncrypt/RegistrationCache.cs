@@ -2,7 +2,7 @@
 using System.Text;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
-using MaksIT.LetsEncrypt.Entities.Jws;
+using MaksIT.Core.Security.JWK;
 
 
 namespace MaksIT.LetsEncrypt.Entities;
