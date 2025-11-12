@@ -26,12 +26,12 @@ public class JwsService : IJwsService {
   private RSA _rsa;
 
   public JwsService(RSA rsa) {
-    _rsa = rsa ?? throw new ArgumentNullException(nameof(rsa));
+    _rsa = rsa;
 
     var publicParameters = rsa.ExportParameters(false);
 
-    var exp = publicParameters.Exponent ?? throw new ArgumentNullException(nameof(publicParameters.Exponent));
-    var mod = publicParameters.Modulus ?? throw new ArgumentNullException(nameof(publicParameters.Modulus));
+    var exp = publicParameters.Exponent;
+    var mod = publicParameters.Modulus;
 
     _jwk = new Jwk() {
       KeyType = JwkKeyType.Rsa.Name,
@@ -80,6 +80,11 @@ public class JwsService : IJwsService {
   public string GetKeyAuthorization(string token) =>
     $"{token}.{GetSha256Thumbprint()}";
 
+
+  /// <summary>
+  /// For thumbprint calculation, always build the JSON string manually or use an anonymous object with the correct property order
+  /// </summary>
+  /// <returns></returns>
   private string GetSha256Thumbprint() {
 
     var thumbprint = new {
@@ -88,7 +93,7 @@ public class JwsService : IJwsService {
       n = _jwk.RsaModulus
     };
 
-    var json = "{\"e\":\"" + _jwk.RsaExponent + "\",\"kty\":\"RSA\",\"n\":\"" + _jwk.RsaModulus + "\"}";
+    var json = thumbprint.ToJson();
     return Base64UrlUtility.Encode(SHA256.HashData(Encoding.UTF8.GetBytes(json)));
   }
 }
