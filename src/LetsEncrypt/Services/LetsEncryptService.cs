@@ -4,6 +4,7 @@
  */
 
 using MaksIT.Core.Extensions;
+using MaksIT.Core.Security;
 using MaksIT.Core.Security.JWK;
 using MaksIT.LetsEncrypt.Entities;
 using MaksIT.LetsEncrypt.Entities.Jws;

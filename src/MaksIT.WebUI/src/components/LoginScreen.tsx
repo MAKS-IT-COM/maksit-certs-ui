@@ -58,7 +58,7 @@ const LoginScreen: FC = () => {
       <div className={'w-full max-w-md bg-white rounded-lg shadow-md p-8 space-y-6'} onKeyDown={handleSubmit} tabIndex={0}>
         {/* App logo and name above form */}
         <div className={'flex justify-center items-center space-x-3 mb-2'}>
-          <img src={'/logo.png'} alt={'App Logo'} className={'h-12 w-auto'} />
+          <img src={'/certs-ui-logo-only.png'} alt={'CertsUI'} className={'h-12 w-auto'} />
           <span className={'text-2xl font-bold text-gray-800 select-none'}>{import.meta.env.VITE_APP_TITLE}</span>
         </div>
         {/* Form */}

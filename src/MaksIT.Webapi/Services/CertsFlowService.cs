@@ -175,31 +175,41 @@ public class CertsFlowService(
     var sessionResult = await ConfigureClientAsync(isStaging);
     if (!sessionResult.IsSuccess || sessionResult.Value == null)
       return sessionResult;
+
     var sessionId = sessionResult.Value.Value;
+
     var initResult = await InitAsync(sessionId, accountId, description, contacts);
     if (!initResult.IsSuccess || initResult.Value == null)
       return initResult.ToResultOfType<Guid?>(_ => null);
+
     if (accountId == null)
       accountId = initResult.Value;
+
     var challengesResult = await NewOrderAsync(sessionId, hostnames, challengeType);
+
     if (!challengesResult.IsSuccess)
       return challengesResult.ToResultOfType<Guid?>(_ => null);
+
     if (challengesResult.Value?.Count > 0) {
       var challengeResult = await CompleteChallengesAsync(sessionId);
       if (!challengeResult.IsSuccess)
         return challengeResult.ToResultOfType<Guid?>(default);
     }
+
     var getOrderResult = await GetOrderAsync(sessionId, hostnames);
     if (!getOrderResult.IsSuccess)
       return getOrderResult.ToResultOfType<Guid?>(default);
+
     var certsResult = await GetCertificatesAsync(sessionId, hostnames);
     if (!certsResult.IsSuccess)
       return certsResult.ToResultOfType<Guid?>(default);
+
     if (!isStaging) {
       var applyCertsResult = await ApplyCertificatesAsync(accountId.Value);
       if (!applyCertsResult.IsSuccess)
         return applyCertsResult.ToResultOfType<Guid?>(_ => null);
     }
+
     return Result<Guid?>.Ok(initResult.Value);
   }
 

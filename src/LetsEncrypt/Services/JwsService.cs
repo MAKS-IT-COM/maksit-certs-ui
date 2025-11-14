@@ -3,12 +3,11 @@
 * https://tools.ietf.org/html/rfc4648#section-5
 */
 
-using System.Text;
 using System.Security.Cryptography;
-using MaksIT.Core.Extensions;
 using MaksIT.LetsEncrypt.Entities.Jws;
 using MaksIT.Core.Security.JWK;
 using MaksIT.Core.Security.JWS;
+
 
 
 namespace MaksIT.LetsEncrypt.Services;
@@ -28,72 +27,43 @@ public class JwsService : IJwsService {
   public JwsService(RSA rsa) {
     _rsa = rsa;
 
-    var publicParameters = rsa.ExportParameters(false);
-
-    var exp = publicParameters.Exponent;
-    var mod = publicParameters.Modulus;
-
-    _jwk = new Jwk() {
-      KeyType = JwkKeyType.Rsa.Name,
-      RsaExponent = Base64UrlUtility.Encode(exp),
-      RsaModulus = Base64UrlUtility.Encode(mod),
-    };
+    if (!JwkGenerator.TryGenerateFromRSA(rsa, out _jwk, out var errorMessage)) {
+      throw new Exception(errorMessage);
+    }
   }
 
   public void SetKeyId(string location) {
     _jwk.KeyId = location;
   }
 
-  public JwsMessage Encode(ACMEJwsHeader protectedHeader) =>
+  public JwsMessage Encode(ACMEJwsHeader protectedHeader) {
+
     Encode<string>(null, protectedHeader);
 
-  public JwsMessage Encode<T>(T? payload, ACMEJwsHeader protectedHeader) {
-
-    protectedHeader.Algorithm = JwkAlgorithm.Rs256.Name;
-    if (_jwk.KeyId != null) {
-      protectedHeader.KeyId = _jwk.KeyId;
-    }
-    else {
-      protectedHeader.Key = _jwk;
+    if (!JwsGenerator.TryEncode(_rsa, _jwk, protectedHeader, out var jwsMessage, out var errorMessage)) {
+      throw new Exception(errorMessage);
     }
 
-    var message = new JwsMessage {
-      Payload = "",
-      Protected = Base64UrlUtility.Encode(protectedHeader.ToJson())
-    };
+    return jwsMessage;
 
-    if (payload != null) {
-      if (payload is string stringPayload) 
-        message.Payload = Base64UrlUtility.Encode(stringPayload);
-      else 
-        message.Payload = Base64UrlUtility.Encode(payload.ToJson());
+  }
+  
+
+  public JwsMessage Encode<TPayload>(TPayload? payload, ACMEJwsHeader protectedHeader) {
+
+    if (!JwsGenerator.TryEncode(_rsa, _jwk, protectedHeader, payload, out var jwsMessage, out var errorMessage)) {
+      throw new Exception(errorMessage);
     }
 
-    message.Signature = Base64UrlUtility.Encode(
-        _rsa.SignData(Encoding.ASCII.GetBytes($"{message.Protected}.{message.Payload}"),
-            HashAlgorithmName.SHA256,
-            RSASignaturePadding.Pkcs1));
+    return jwsMessage;
 
-    return message;
   }
 
-  public string GetKeyAuthorization(string token) =>
-    $"{token}.{GetSha256Thumbprint()}";
+  public string GetKeyAuthorization(string token) {
+    if (!JwkThumbprintUtility.TryGetKeyAuthorization(_jwk, token, out var keyAuthorization, out var errorMessage))
+      throw new Exception(errorMessage);
 
+    return keyAuthorization;
 
-  /// <summary>
-  /// For thumbprint calculation, always build the JSON string manually or use an anonymous object with the correct property order
-  /// </summary>
-  /// <returns></returns>
-  private string GetSha256Thumbprint() {
-
-    var thumbprint = new {
-      e = _jwk.RsaExponent,
-      kty = "RSA",
-      n = _jwk.RsaModulus
-    };
-
-    var json = thumbprint.ToJson();
-    return Base64UrlUtility.Encode(SHA256.HashData(Encoding.UTF8.GetBytes(json)));
   }
 }

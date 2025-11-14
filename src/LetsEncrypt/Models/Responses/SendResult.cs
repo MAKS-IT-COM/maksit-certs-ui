@@ -7,6 +7,5 @@
 
         public string? ResponseText { get; set; }
 
-
-    }
+  }
 }
