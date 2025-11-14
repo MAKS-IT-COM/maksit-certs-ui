@@ -12,11 +12,10 @@ public class State {
   public JwsService? JwsService { get; set; }
   public Order? CurrentOrder { get; set; }
   public List<AuthorizationChallengeChallenge> Challenges { get; } = new List<AuthorizationChallengeChallenge>();
-  public string? Nonce { get; set; }
   public RegistrationCache? Cache { get; set; }
 
 
 
-  public Jwk? Jwk;
-  private RSA? RSA;
+  public Jwk? Jwk { get; set; }
+  public RSA? Rsa { get; set; }
 }
