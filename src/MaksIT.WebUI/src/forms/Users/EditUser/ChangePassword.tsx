@@ -45,7 +45,7 @@ const ChangePassword: FC<ChangePasswordProps> = (props) => {
     onClose?.()
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (formIsValid) {
       const data: PatchUserChangePasswordRequest = {
         password: formState.password,
@@ -54,12 +54,11 @@ const ChangePassword: FC<ChangePasswordProps> = (props) => {
         }
       }
 
-      patchData<PatchUserChangePasswordRequest, UserResponse>(GetApiRoute(ApiRoutes.identityPatch).route.replace('{userId}', userId), data)
-        .then(response => {
-          if (!response) return
+      const response = await patchData<PatchUserChangePasswordRequest, UserResponse>(GetApiRoute(ApiRoutes.identityPatch).route.replace('{userId}', userId), data)
 
-          handleOnClose()
-        })
+      if (!response) return
+
+      handleOnClose()
     }
   }
 

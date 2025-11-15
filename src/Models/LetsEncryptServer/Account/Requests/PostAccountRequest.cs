@@ -9,6 +9,7 @@ public class PostAccountRequest : RequestModelBase {
   public required string ChallengeType { get; set; }
   public required string[] Hostnames { get; set; }
   public required bool IsStaging { get; set; }
+  public required bool AgreeToS { get; set; }
 
   public override IEnumerable<ValidationResult> Validate(ValidationContext validationContext) {
     if (string.IsNullOrWhiteSpace(Description))
@@ -22,5 +23,8 @@ public class PostAccountRequest : RequestModelBase {
 
     if (string.IsNullOrWhiteSpace(ChallengeType) && ChallengeType != "http-01")
       yield return new ValidationResult("ChallengeType is required", [nameof(ChallengeType)]);
+
+    if (!AgreeToS)
+      yield return  new ValidationResult("You must agree to the Terms of Service", [nameof(AgreeToS)]);
   }
 }

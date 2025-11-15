@@ -8,6 +8,7 @@ export interface PostAccountRequest extends RequestModelBase {
   challengeType: string
   hostnames: string[]
   isStaging: boolean
+  agreeToS: boolean
 }
 
 export const PostAccountRequestSchema: Schema<PostAccountRequest> = RequestModelBaseSchema.and(
@@ -16,6 +17,7 @@ export const PostAccountRequestSchema: Schema<PostAccountRequest> = RequestModel
     contacts: array(string()),
     hostnames: array(string()),
     challengeType: z.enum(ChallengeType),
-    isStaging: boolean()
+    isStaging: boolean(),
+    agreeToS: boolean()
   })
 )

@@ -1,15 +1,16 @@
-# LetsEncrypt C# Client by Maks-IT.com
+# LetsEncrypt C# Client by MaksIT
 
-Simple client to obtain Let's Encrypt HTTPS certificates developed with .net core and curently works only with http challange
+Simple client to obtain Let's Encrypt HTTPS certificates developed with .net core and currently works only with http challenge
 
 ## Versions History
 
 * 29 Jun, 2019 - V1.0
-* 01 Nov, 2019 - V2.0 (Dependency Injection pattern impelemtation)
+* 01 Nov, 2019 - V2.0 (Dependency Injection pattern implementation)
 * 31 May, 2024 - V3.0 (Webapi and containerization)
 * 11 Aug, 2024 - V3.1 (Release)
 * 11 Sep, 2025 - V3.2 New WebUI with authentication
-
+* 15 Nov, 2025 - V3.3 Pre release
+* 
 ## Haproxy configuration
 
 ```bash

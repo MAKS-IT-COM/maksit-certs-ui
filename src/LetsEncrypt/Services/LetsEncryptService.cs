@@ -26,9 +26,9 @@ using System.Text;
 namespace MaksIT.LetsEncrypt.Services;
 
 public interface ILetsEncryptService {
+  Result<RegistrationCache?> GetRegistrationCache(Guid sessionId);
   Task<Result> ConfigureClient(Guid sessionId, bool isStaging);
   Task<Result> Init(Guid sessionId,Guid accountId, string description, string[] contacts, RegistrationCache? registrationCache);
-  Result<RegistrationCache?> GetRegistrationCache(Guid sessionId);
   Result<string?> GetTermsOfServiceUri(Guid sessionId);
   Task<Result<Dictionary<string, string>?>> NewOrder(Guid sessionId, string[] hostnames, string challengeType);
   Task<Result> CompleteChallenges(Guid sessionId);
@@ -59,7 +59,14 @@ public class LetsEncryptService : ILetsEncryptService {
     _memoryCache = cache;
   }
 
-  
+  public Result<RegistrationCache?> GetRegistrationCache(Guid sessionId) {
+    var state = GetOrCreateState(sessionId);
+
+    if (state?.Cache == null)
+      return Result<RegistrationCache?>.InternalServerError(null);
+
+    return Result<RegistrationCache?>.Ok(state.Cache);
+  }
 
   #region ConfigureClient
   public async Task<Result> ConfigureClient(Guid sessionId, bool isStaging) {
@@ -204,15 +211,6 @@ public class LetsEncryptService : ILetsEncryptService {
     }
   }
   #endregion
-
-  public Result<RegistrationCache?> GetRegistrationCache(Guid sessionId) {
-    var state = GetOrCreateState(sessionId);
-
-    if(state?.Cache == null)
-      return Result<RegistrationCache?>.InternalServerError(null);
-
-    return Result<RegistrationCache?>.Ok(state.Cache);
-  }
 
   #region GetTermsOfService
   public Result<string?> GetTermsOfServiceUri(Guid sessionId) {
@@ -882,31 +880,6 @@ public class LetsEncryptService : ILetsEncryptService {
       ResponseText = responseText
     };
   }
-  #endregion
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   // Helper for status comparison
   private static bool StatusEquals(string? status, OrderStatus expected) => status == expected.GetDisplayName();
@@ -920,4 +893,5 @@ public class LetsEncryptService : ILetsEncryptService {
     _logger.LogError(ex, defaultMessage);
     return Result<T?>.InternalServerError(defaultValue, [.. ex.ExtractMessages()]);
   }
+  #endregion
 }

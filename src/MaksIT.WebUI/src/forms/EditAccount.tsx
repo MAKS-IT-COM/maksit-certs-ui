@@ -134,7 +134,7 @@ const EditAccount: FC<EditAccountProps> = (props) => {
     return patchRequest
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formIsValid) return
 
     const fromFormState = mapFormStateToPatchRequest(formState)
@@ -164,14 +164,15 @@ const EditAccount: FC<EditAccountProps> = (props) => {
       return
     }
 
-    patchData<PatchAccountRequest, GetAccountResponse>(GetApiRoute(ApiRoutes.ACCOUNT_PATCH).route
+    const response = await patchData<PatchAccountRequest, GetAccountResponse>(GetApiRoute(ApiRoutes.ACCOUNT_PATCH).route
       .replace('{accountId}', accountId), delta, 120000
-    ).then((response) => {
-      if (!response) return
+    )
 
-      handleInitialization(response)
-      onSubmitted?.(response)
-    })
+    if (!response) return
+
+    handleInitialization(response)
+    onSubmitted?.(response)
+
   }
 
   const handleCancel = () => {

@@ -97,7 +97,6 @@ const AppMap: AppMapType[] = [
     title: 'Terms of Service',
     routes: ['/terms-of-service'],
     page: LetsEncryptTermsOfServicePage,
-    linkArea: [LinkArea.SideMenu]
   },
 
   {

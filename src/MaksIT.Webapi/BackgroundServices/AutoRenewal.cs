@@ -1,9 +1,8 @@
-﻿using Microsoft.Extensions.Options;
-
-
-using MaksIT.Webapi.Services;
-using MaksIT.LetsEncrypt.Entities;
+﻿using MaksIT.LetsEncrypt.Entities;
 using MaksIT.Results;
+using MaksIT.Webapi.Services;
+using Microsoft.Extensions.Options;
+using System;
 
 namespace MaksIT.Webapi.BackgroundServices {
   public class AutoRenewal : BackgroundService {
@@ -12,6 +11,8 @@ namespace MaksIT.Webapi.BackgroundServices {
     private readonly ILogger<AutoRenewal> _logger;
     private readonly ICacheService _cacheService;
     private readonly ICertsFlowService _certsFlowService;
+
+    private static readonly Random _random = new();
 
     public AutoRenewal(
         IOptions<Configuration> appSettings,
@@ -46,24 +47,38 @@ namespace MaksIT.Webapi.BackgroundServices {
     }
 
     private async Task<Result> ProcessAccountAsync(RegistrationCache cache) {
-      
-      var hostnames = cache.GetHostsWithUpcomingSslExpiry();
-      if (hostnames == null) {
-        _logger.LogError("Unexpected hostnames null");
+
+      var hosts = cache.GetHosts();
+      var toRenew = new List<string>();
+
+      foreach (var host in hosts) {
+        if (host.IsDisabled)
+          continue;
+
+        // Only consider certs expiring within 30 days
+        if ((host.Expires - DateTime.UtcNow).TotalDays < 30) {
+          // Randomize renewal between 1 and 5 days before expiry
+          int randomDays = _random.Next(1, 6);
+          var renewalTime = host.Expires.AddDays(-randomDays);
+          if (DateTime.UtcNow >= renewalTime) {
+            toRenew.Add(host.Hostname);
+          }
+        }
+      }
+
+      if (!toRenew.Any()) {
+        _logger.LogInformation("No certificates are due for randomized renewal at this time.");
         return Result.Ok();
       }
 
+      var fullFlowResult = await _certsFlowService.FullFlow(
+          cache.IsStaging, cache.AccountId, cache.Description, cache.Contacts, cache.ChallengeType, toRenew.ToArray()
+      );
 
-      if (!hostnames.Any()) {
-        _logger.LogInformation("No hosts found with upcoming SSL expiry");
-        return Result.Ok();
-      }
-
-      var fullFlowResult = await _certsFlowService.FullFlow(cache.IsStaging, cache.AccountId, cache.Description, cache.Contacts, cache.ChallengeType, hostnames);
       if (!fullFlowResult.IsSuccess)
         return fullFlowResult;
 
-      _logger.LogInformation($"Certificates renewed for account {cache.AccountId}");
+      _logger.LogInformation($"Certificates renewed for account {cache.AccountId}: {string.Join(", ", toRenew)}");
 
       return Result.Ok();
     }

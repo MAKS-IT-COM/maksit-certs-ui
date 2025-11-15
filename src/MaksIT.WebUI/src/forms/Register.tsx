@@ -3,14 +3,14 @@ import { FormContainer, FormContent, FormFooter, FormHeader } from '../component
 import { postData } from '../axiosConfig'
 import { GetAccountResponse } from '../models/letsEncryptServer/account/responses/GetAccountResponse'
 import { ApiRoutes, GetApiRoute } from '../AppMap'
-import { ButtonComponent, RadioGroupComponent, SelectBoxComponent, TextBoxComponent } from '../components/editors'
+import { ButtonComponent, CheckBoxComponent, RadioGroupComponent, SelectBoxComponent, TextBoxComponent } from '../components/editors'
 import { ChallengeType } from '../entities/ChallengeType'
 import z, { array, boolean, object, Schema, string } from 'zod'
 import { useFormState } from '../hooks/useFormState'
 import { enumToArr } from '../functions'
 import { PostAccountRequest, PostAccountRequestSchema } from '../models/letsEncryptServer/account/requests/PostAccountRequest'
 import { addToast } from '../components/Toast/addToast'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { PlusIcon, TrashIcon } from 'lucide-react'
 import { FieldContainer } from '../components/editors/FieldContainer'
 
@@ -26,6 +26,8 @@ interface RegisterFormProps {
 
   challengeType: ChallengeType
   isStaging: boolean
+
+  agreeToS: boolean
 }
 
 const RegisterFormProto = (): RegisterFormProps => ({
@@ -38,7 +40,9 @@ const RegisterFormProto = (): RegisterFormProps => ({
   hostnames: [],
 
   challengeType: ChallengeType.http01,
-  isStaging: true
+  isStaging: true,
+
+  agreeToS: false,
 })
 
 const RegisterFormSchema: Schema<RegisterFormProps> = object({
@@ -51,7 +55,41 @@ const RegisterFormSchema: Schema<RegisterFormProps> = object({
   hostnames: array(string()),
 
   challengeType: z.enum(ChallengeType),
-  isStaging: boolean()
+  isStaging: boolean(),
+
+  agreeToS: boolean()
+}).superRefine((data, ctx) => {
+  if (data.description.trim() === '') {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Description is required',
+      path: ['description']
+    })
+  }
+
+  if (data.contacts.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'At least one contact is required',
+      path: ['contacts']
+    })
+  }
+
+  if (data.hostnames.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'At least one hostname is required',
+      path: ['hostnames']
+    })
+  }
+
+  if (!data.agreeToS) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'You must agree to the Terms of Service',
+      path: ['agreeToS']
+    })
+  }
 })
 
 interface RegisterProps {
@@ -71,7 +109,7 @@ const Register: FC<RegisterProps> = () => {
     validationSchema: RegisterFormSchema,
   })
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formIsValid) return
 
     const requestData: PostAccountRequest = {
@@ -80,6 +118,7 @@ const Register: FC<RegisterProps> = () => {
       hostnames: formState.hostnames,
       challengeType: formState.challengeType,
       isStaging: formState.isStaging,
+      agreeToS: formState.agreeToS
     }
 
     const request = PostAccountRequestSchema.safeParse(requestData)
@@ -92,12 +131,15 @@ const Register: FC<RegisterProps> = () => {
       return
     }
 
-    postData<PostAccountRequest, GetAccountResponse>(GetApiRoute(ApiRoutes.ACCOUNT_POST).route, request.data, 120000)
-      .then(response => {
-        if (!response) return
+    const response = await postData<PostAccountRequest, GetAccountResponse>(
+      GetApiRoute(ApiRoutes.ACCOUNT_POST).route,
+      request.data,
+      120000
+    )
 
-        navigate('/')
-      })
+    if (!response) return
+
+    navigate('/')
   }
 
   return <FormContainer>
@@ -111,24 +153,29 @@ const Register: FC<RegisterProps> = () => {
           onChange={(e) => handleInputChange('description', e.target.value)}
           placeholder={'Account Description'}
           errorText={errors.description}
-        />
-        <h3 className={'col-span-12'}>Contacts:</h3>
-        <ul className={'col-span-12'}>
-          {formState.contacts.map((contact) => (
-            <li key={contact} className={'grid grid-cols-12 gap-4 w-full pb-2'}> 
-              <span className={'col-span-10'}>{contact}</span>
-              <ButtonComponent
-                colspan={2}
-                onClick={() => {
-                  const updatedContacts = formState.contacts.filter(c => c !== contact)
-                  handleInputChange('contacts', updatedContacts)
-                }}
-              >
-                <TrashIcon />
-              </ButtonComponent>
-            </li>
-          ))}
-        </ul>
+        />        
+        <FieldContainer
+          colspan={12}
+          label={'Contacts'}
+          errorText={errors.contacts}
+        >
+          <ul>
+            {formState.contacts.map((contact) => (
+              <li key={contact} className={'grid grid-cols-12 gap-4 w-full pb-2'}> 
+                <span className={'col-span-10'}>{contact}</span>
+                <ButtonComponent
+                  colspan={2}
+                  onClick={() => {
+                    const updatedContacts = formState.contacts.filter(c => c !== contact)
+                    handleInputChange('contacts', updatedContacts)
+                  }}
+                >
+                  <TrashIcon />
+                </ButtonComponent>
+              </li>
+            ))}
+          </ul>
+        </FieldContainer>
         <TextBoxComponent
           colspan={10}
           label={'New Contact'}
@@ -166,23 +213,28 @@ const Register: FC<RegisterProps> = () => {
             errorText={errors.challengeType}
           />
         </div>
-        <h3 className={'col-span-12'}>Hostnames:</h3>
-        <ul className={'col-span-12'}>
-          {formState.hostnames.map((hostname) => (
-            <li key={hostname} className={'grid grid-cols-12 gap-4 w-full pb-2'}>
-              <span className={'col-span-10'}>{hostname}</span>
-              <ButtonComponent
-                colspan={2}
-                onClick={() => {
-                  const updatedHostnames = formState.hostnames.filter(h => h !== hostname)
-                  handleInputChange('hostnames', updatedHostnames)
-                }}
-              >
-                <TrashIcon />
-              </ButtonComponent>
-            </li>
-          ))}
-        </ul>
+        <FieldContainer
+          colspan={12}
+          label={'Hostnames'}
+          errorText={errors.hostnames}
+        >
+          <ul>
+            {formState.hostnames.map((hostname) => (
+              <li key={hostname} className={'grid grid-cols-12 gap-4 w-full pb-2'}>
+                <span className={'col-span-10'}>{hostname}</span>
+                <ButtonComponent
+                  colspan={2}
+                  onClick={() => {
+                    const updatedHostnames = formState.hostnames.filter(h => h !== hostname)
+                    handleInputChange('hostnames', updatedHostnames)
+                  }}
+                >
+                  <TrashIcon />
+                </ButtonComponent>
+              </li>
+            ))}
+          </ul>
+        </FieldContainer>
         <TextBoxComponent
           colspan={10}
           label={'New Hostname'}
@@ -222,6 +274,18 @@ const Register: FC<RegisterProps> = () => {
           }}
           errorText={errors.isStaging}
         />
+
+        <Link to={'/terms-of-service'} className={'col-span-12 text-blue-600 underline'}> Terms of Service</Link>
+        <CheckBoxComponent
+          colspan={12}
+          label={'I agree to the LetsEncrypt Terms of Service'}
+          value={formState.agreeToS}
+          onChange={(e) => {
+            handleInputChange('agreeToS', e.target.checked)
+          }}
+          errorText={errors.agreeToS}
+        />
+
       </div>
     </FormContent>
     <FormFooter rightChildren={
