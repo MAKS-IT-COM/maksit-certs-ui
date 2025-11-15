@@ -142,7 +142,10 @@ const EditAccount: FC<EditAccountProps> = (props) => {
 
     const delta = deepDelta(fromFormState, fromBackupState, {
       arrays: {
-        hostnames: { identityKey: 'hostname' }
+        hostnames: {
+          identityKey: 'hostname',
+          idFieldKey: 'hostname'
+        }
       }
     })
 
