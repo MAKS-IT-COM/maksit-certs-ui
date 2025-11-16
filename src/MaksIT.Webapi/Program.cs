@@ -69,16 +69,28 @@ builder.Services.AddHostedService<AutoRenewal>();
 builder.Services.AddHostedService<Initialization>();
 #endregion
 
+// Add CORS services to the container and configure to allow any origin
+builder.Services.AddCors(options => {
+  options.AddPolicy("AllowAllOrigins", policy =>
+  {
+    policy.AllowAnyOrigin()
+          .AllowAnyMethod()
+          .AllowAnyHeader();
+  });
+});
+
 var app = builder.Build();
+
+app.UseMiddleware<ErrorHandlingMiddleware>();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment()) {
   app.UseSwagger();
   app.UseSwaggerUI();
-  app.UseCors(builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 }
 
-app.UseMiddleware<ErrorHandlingMiddleware>();
+// Use CORS policy in the pipeline
+app.UseCors("AllowAllOrigins");
 
 app.UseAuthorization();
 

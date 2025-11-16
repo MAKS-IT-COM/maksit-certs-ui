@@ -4,7 +4,6 @@ global:
 
 components:
   server:
-    replicas: 1
     image:
       registry: cr.maks-it.com
       repository: certs-ui/server
@@ -21,13 +20,13 @@ components:
       port: 5000
       targetPort: 5000
     persistence:
+      storageClass: local-path
       volumes:
         - name: acme
           mountPath: /acme
           type: pvc
           pvc:
             create: true
-            storageClass: local-path
             size: 50Mi
             accessModes: [ReadWriteOnce]
         - name: cache
@@ -35,7 +34,6 @@ components:
           type: pvc
           pvc:
             create: true
-            storageClass: local-path
             size: 50Mi
             accessModes: [ReadWriteOnce]
         - name: data
@@ -43,7 +41,6 @@ components:
           type: pvc
           pvc:
             create: true
-            storageClass: local-path
             size: 50Mi
             accessModes: [ReadWriteOnce]
     secretsFile:
@@ -99,7 +96,6 @@ components:
       forceUpdate: false
 
   client:
-    replicas: 1
     image:
       registry: cr.maks-it.com
       repository: certs-ui/client
@@ -108,16 +104,14 @@ components:
     env:
       - name: ASPNETCORE_ENVIRONMENT
         value: Development
-      - name: NEXT_PUBLIC_API_BASE_URL
-        value: http://certs-ui-server:5000
     service:
       enabled: true
       type: ClusterIP
-      port: 3000
-      targetPort: 3000
+      port: 5173
+      targetPort: 5173
+
 
   reverseproxy:
-    replicas: 1
     image:
       registry: cr.maks-it.com
       repository: certs-ui/reverseproxy

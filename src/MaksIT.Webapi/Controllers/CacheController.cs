@@ -24,7 +24,7 @@ public class CacheController(ICacheService cacheService) : ControllerBase {
 
   [HttpPost("cache/upload")]
   //[RequestSizeLimit(200_000_000)]
-  public async Task<IActionResult> PostCache([FromForm] IFormFile file) {
+  public async Task<IActionResult> PostCache(IFormFile file) {
     if (file is null || file.Length == 0) return BadRequest("No file.");
 
     using var ms = new MemoryStream();

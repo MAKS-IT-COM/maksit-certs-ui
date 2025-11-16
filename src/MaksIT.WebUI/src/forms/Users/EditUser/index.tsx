@@ -1,23 +1,16 @@
 import { FC, useState } from 'react'
 import { FormContainer, FormContent, FormHeader } from '../../../components/FormLayout'
 import { ButtonComponent } from '../../../components/editors'
-import { UserResponse } from '../../../models/identity/user/UserResponse'
 import { ChangePassword } from './ChangePassword'
 
 
 interface EditUserProps {
   userId: string;
-  onSubmitted?: (entity: UserResponse) => void
-  cancelEnabled?: boolean
-  onCancel?: () => void
 }
 
 const EditUser : FC<EditUserProps> = (props) => {
   const {
     userId,
-    onSubmitted,
-    cancelEnabled = false,
-    onCancel
   } = props
 
   const [showChangePassword, setShowChangePassword] = useState(false)

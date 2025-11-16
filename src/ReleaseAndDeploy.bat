@@ -4,11 +4,11 @@ setlocal
 REM Get the directory of the current script
 set "SCRIPT_DIR=%~dp0"
 
-REM Run the first batch file
-call "%SCRIPT_DIR%Release-DockerImage.bat"
+REM Invoke the PowerShell script (Release-NuGetPackage.ps1) in the same directory
+powershell -ExecutionPolicy Bypass -File "%~dp0Release.ps1"
 
-REM Run the second batch file
-call "%SCRIPT_DIR%Deploy-Helm.bat"
+REM Invoke the PowerShell script (Release-NuGetPackage.ps1) in the same directory
+powershell -ExecutionPolicy Bypass -File "%~dp0Deploy-Helm.ps1"
 
 echo All scripts completed.
 pause

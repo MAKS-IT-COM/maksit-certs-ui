@@ -17,7 +17,7 @@ spec:
   resources:
     requests:
       storage: {{ default "1Gi" $vol.pvc.size }}
-  storageClassName: {{ default "local-path" $vol.pvc.storageClass }}
+  storageClassName: {{ default $.Values.components.server.persistence.storageClass $vol.pvc.storageClass | quote }}
 {{- end }}
 {{- end }}
 {{- end }}

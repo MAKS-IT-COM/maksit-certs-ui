@@ -1,7 +1,6 @@
 import { FC, useCallback, useEffect, useState } from 'react'
 import { FormContainer, FormContent, FormFooter, FormHeader } from '../components/FormLayout'
 import { ButtonComponent, CheckBoxComponent, RadioGroupComponent, SelectBoxComponent } from '../components/editors'
-import { CacheAccount } from '../entities/CacheAccount'
 import { GetAccountResponse } from '../models/letsEncryptServer/account/responses/GetAccountResponse'
 import { deleteData, getData, postData } from '../axiosConfig'
 import { ApiRoutes, GetApiRoute } from '../AppMap'
@@ -26,16 +25,6 @@ const Home: FC = () => {
   useEffect(() => {
     loadData()
   }, [loadData])
-
-  const handleAccountUpdate = (updatedAccount: CacheAccount) => {
-    // setAccounts(
-    //   accounts.map((account) =>
-    //     account.accountId === updatedAccount.accountId
-    //       ? updatedAccount
-    //       : account
-    //   )
-    // )
-  }
 
   const handleDeleteAccount = (accountId: string) => {
     deleteData<void>(

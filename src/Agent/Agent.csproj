@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Models\MaksIT.Models.csproj" />
+    <ProjectReference Include="..\MaksIT.Models\MaksIT.Models.csproj" />
   </ItemGroup>
 
   <ItemGroup>

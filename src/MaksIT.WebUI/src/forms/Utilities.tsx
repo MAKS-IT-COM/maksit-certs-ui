@@ -6,6 +6,7 @@ import { deleteData, getBinary, getData, postFile } from '../axiosConfig'
 import { addToast } from '../components/Toast/addToast'
 import { extractFilenameFromHeaders, saveBinaryToDisk } from '../functions'
 import { downloadZip } from 'client-zip'
+import { HelloWorldResponse } from '../models/Agent/HelloWorldResponse'
 
 
 const Utilities: FC = () => {
@@ -13,7 +14,7 @@ const Utilities: FC = () => {
   const [files, setFiles] = useState<File[]>([])
 
   const hadnleTestAgent = () => {
-    getData(GetApiRoute(ApiRoutes.AGENT_TEST).route)
+    getData<HelloWorldResponse>(GetApiRoute(ApiRoutes.AGENT_TEST).route)
       .then((response) => {
         if (!response) return
 

@@ -87,7 +87,7 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
   const gridRef = useRef<MultiGrid>(null)
   
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null)
-  const [filterValues, setFilterValues] = useState<Record<string, Record<string, string>>>({})
+  const filterValues = useRef<Record<string, Record<string, string>>>({})
 
   const [colWidths, setColWidths] = useState<number[]>(() => {
     const defaultWidths = [DEFAULT_ACTION_WIDTH, ...columns.map(() => DEFAULT_COL_WIDTH)]
@@ -138,28 +138,28 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
     columnId: string,
     filters: string
   ) => {
-    setFilterValues((prev) => {
-      const newValues = {
-        ...prev,
-        [filterId]: {
-          ...prev[filterId],
-          [columnId]: filters,
-        },
-      }
+    const prev = filterValues.current
+    
+    const newValues = {
+      ...prev,
+      [filterId]: {
+        ...prev[filterId],
+        [columnId]: filters,
+      },
+    }
+    filterValues.current = newValues
 
-      const linqQueries = Object.fromEntries(
-        Object.entries(newValues).map(([fid, cols]) => {
-          const q = Object.values(cols)
-            .filter((v) => v)
-            .map((v) => `(${v})`)
-            .join(' && ')
-          return [fid, q]
-        })
-      )
+    const linqQueries = Object.fromEntries(
+      Object.entries(newValues).map(([fid, cols]) => {
+        const q = Object.values(cols)
+          .filter((v) => v)
+          .map((v) => `(${v})`)
+          .join(' && ')
+        return [fid, q]
+      })
+    )
 
-      debouncedOnFilterChange?.(linqQueries)
-      return newValues
-    })
+    debouncedOnFilterChange?.(linqQueries)
   }
 
   const handlePreviousPage = () => onPreviousPage?.(pageNumber - 1)

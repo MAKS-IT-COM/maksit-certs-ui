@@ -13,6 +13,14 @@ import { LetsEncryptTermsOfServicePage } from './pages/LetsEncryptTermsOfService
 import { UserPage } from './pages/UserPage'
 
 
+declare global {
+  interface Window {
+    RUNTIME_CONFIG?: {
+      API_URL?: string;
+    };
+  }
+}
+
 interface LayoutWrapperProps {
     children: ReactNode
   }
@@ -250,7 +258,7 @@ interface ApiRoute {
 }
 
 const GetApiRoute = (apiRoute: ApiRoutes): ApiRoute => {
-  const apiUrl = import.meta.env.VITE_API_URL
+  const apiUrl = window.RUNTIME_CONFIG?.API_URL || import.meta.env.VITE_API_URL
 
   const [method, route] = apiRoute.split('|')
 

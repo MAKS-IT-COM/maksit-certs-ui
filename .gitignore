@@ -193,6 +193,7 @@ ClientBin/
 *.pfx
 *.publishsettings
 node_modules/
+dist/
 orleans.codegen.cs
 .directory
 
@@ -262,5 +263,3 @@ __pycache__/
 *.pyc
 
 
-**/*docker-compose/LetsEncryptServer/acme
-**/*docker-compose/LetsEncryptServer/cache

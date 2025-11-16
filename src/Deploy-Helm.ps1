@@ -3,7 +3,6 @@ $projectName = "certs-ui"
 $namespace = "certs-ui"
 $chartPath = "./helm"
 $harborUrl = "cr.maks-it.com"
-$loadBalancerIP = "172.16.0.5"
 
 # Retrieve and decode username:password from environment variable (Base64)
 try {

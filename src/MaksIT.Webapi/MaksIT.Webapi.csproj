@@ -25,7 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\LetsEncrypt\LetsEncrypt.csproj" />
-    <ProjectReference Include="..\Models\MaksIT.Models.csproj" />
+    <ProjectReference Include="..\MaksIT.Models\MaksIT.Models.csproj" />
   </ItemGroup>
 
 </Project>
