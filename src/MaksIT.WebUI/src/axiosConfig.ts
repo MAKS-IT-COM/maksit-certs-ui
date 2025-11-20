@@ -75,16 +75,17 @@ axiosInstance.interceptors.response.use(
   error => {
     // Handle response error
     store.dispatch(hideLoader())
+    
     if (error.response) {
       const contentType = error.response.headers['content-type']
 
       if (contentType && contentType.includes('application/problem+json')) {
         const problem = error.response.data as ProblemDetails
         addToast(`${problem.title}: ${problem.detail}`, 'error')
-
-        if (error.response.status === 401) {
-          // Handle unauthorized error (e.g., redirect to login)
-        }
+      }
+      else if (error.response.status === 401) {
+        const problem = error.response.data as ProblemDetails
+        addToast(`${problem.title}: ${problem.detail}`, 'error') 
       }
     }
     return Promise.reject(error)
