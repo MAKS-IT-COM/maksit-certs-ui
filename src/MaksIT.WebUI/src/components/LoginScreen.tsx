@@ -33,10 +33,12 @@ const LoginScreen: FC = () => {
   const handleLogin = () => {
     if (!formIsValid) return
 
-    if (formState.twoFactorCode === '') delete formState.twoFactorCode
-    if (formState.twoFactorRecoveryCode === '') delete formState.twoFactorRecoveryCode
+    const newFormState = { ...formState }
 
-    dispatch(login(formState))
+    if (newFormState.twoFactorCode === '') delete newFormState.twoFactorCode
+    if (newFormState.twoFactorRecoveryCode === '') delete newFormState.twoFactorRecoveryCode
+
+    dispatch(login(newFormState))
   }
 
   const handleSubmit = (e: KeyboardEvent<HTMLDivElement>) => {

@@ -22,15 +22,13 @@ spec:
       labels:
         {{- include "certs-ui.labels" $root | nindent 8 }}
         app.kubernetes.io/component: {{ $compName }}
-      {{- if and $comp.secretsFile $comp.secretsFile.forceUpdate }}
       annotations:
         rollme: "{{$roll}}"
-      {{- end }}
     spec:
       {{- include "certs-ui.imagePullSecrets" $root | nindent 6 }}
       containers:
         - name: {{ $compName }}
-          image: "{{ $comp.image.registry }}/{{ $comp.image.repository }}:{{ $comp.image.tag }}"
+          image: "{{ $comp.image.registry }}/{{ $comp.image.repository }}:{{ $.Chart.AppVersion }}"
           imagePullPolicy: {{ default "IfNotPresent" $comp.image.pullPolicy }}
           {{ $svc := default dict $comp.service }}
           {{ $tgt := default 8080 $svc.targetPort }}
@@ -46,15 +44,6 @@ spec:
               value: {{ .value | quote }}
             {{- end }}
           {{- end }}
-          {{- if eq $compName "client" }}
-            - name: VITE_API_URL
-              value: >
-                {{- if eq $root.Values.components.reverseproxy.service.type "LoadBalancer" -}}
-                http://{{ $root.Values.components.reverseproxy.service.loadBalancerIP }}:{{ $root.Values.components.reverseproxy.service.port }}
-                {{- else -}}
-                http://{{ include "certs-ui.fullname" $root }}-reverseproxy:{{ $root.Values.components.reverseproxy.service.port }}
-                {{- end }}
-            {{- end }}
           {{- $p := default dict $comp.persistence -}}
           {{- $vols := default (list) $p.volumes -}}
           {{- $hasVols := gt (len $vols) 0 -}}

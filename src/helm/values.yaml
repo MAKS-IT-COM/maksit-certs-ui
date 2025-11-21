@@ -1,17 +1,17 @@
 global:
-  imagePullSecrets:
-    - name: cr-maksit-pull
+  imagePullSecrets: []  # Keep empty
+  # imagePullSecrets:
+  #   - name: cr-maksit-pull
 
 components:
   server:
     image:
       registry: cr.maks-it.com
       repository: certs-ui/server
-      tag: latest
       pullPolicy: Always
     env:
       - name: ASPNETCORE_ENVIRONMENT
-        value: Development
+        value: Production
       - name: ASPNETCORE_HTTP_PORTS
         value: "5000"
     service:
@@ -57,7 +57,7 @@ components:
           },
         }
       keep: true
-      forceUpdate: false
+
     configMapFile:
       key: appsettings.json
       mountPath: /configMap/appsettings.json
@@ -93,47 +93,43 @@ components:
           }
         }
       keep: true
-      forceUpdate: false
 
   client:
     image:
       registry: cr.maks-it.com
       repository: certs-ui/client
-      tag: latest
       pullPolicy: Always
-    env:
-      - name: ASPNETCORE_ENVIRONMENT
-        value: Development
     service:
       enabled: true
       type: ClusterIP
       port: 5173
       targetPort: 5173
 
-
   reverseproxy:
     image:
       registry: cr.maks-it.com
       repository: certs-ui/reverseproxy
-      tag: latest
       pullPolicy: Always
     env:
       - name: ASPNETCORE_ENVIRONMENT
-        value: Development
+        value: Production
       - name: ASPNETCORE_HTTP_PORTS
         value: "8080"
     service:
       enabled: true
-      type: LoadBalancer
+      type: ClusterIP
       port: 8080
       targetPort: 8080
-      loadBalancerIP: "172.16.0.5"
-      annotations:
-        lbipam.cilium.io/ips: "172.16.0.5" 
-      labels:
-        export: "bgp"
-      externalTrafficPolicy: Local
-      sessionAffinity: ClientIP
-      sessionAffinityConfig:
-        clientIP:
-          timeoutSeconds: 10800
+      # type: LoadBalancer
+      # port: 8080
+      # targetPort: 8080
+      # loadBalancerIP: "172.16.0.5"
+      # annotations:
+      #   lbipam.cilium.io/ips: "172.16.0.5" 
+      # labels:
+      #   export: "bgp"
+      # externalTrafficPolicy: Local
+      # sessionAffinity: ClientIP
+      # sessionAffinityConfig:
+      #   clientIP:
+      #     timeoutSeconds: 10800

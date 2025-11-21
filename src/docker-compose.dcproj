@@ -7,7 +7,7 @@
     <ProjectGuid>0233e43f-435d-4309-b20c-ecd4bfbd2e63</ProjectGuid>
     <DockerLaunchAction>LaunchBrowser</DockerLaunchAction>
     <DockerServiceUrl>{Scheme}://localhost:{ServicePort}/swagger</DockerServiceUrl>
-    <DockerServiceName>letsencryptserver</DockerServiceName>
+    <DockerServiceName>maksit-certs-ui</DockerServiceName>
   </PropertyGroup>
   <ItemGroup>
     <None Include="docker-compose.override.yml">

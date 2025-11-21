@@ -1,7 +1,10 @@
-# MaksIT.CertsUI - Container-based Let's Encrypt ACME client with WebUI
+# MaksIT.CertsUI – Modern container-native ACME client with a full WebUI experience
 
-Powerful client to obtain and manage Let's Encrypt HTTPS certificates.
-This client currently supports the HTTP-01 challenge and is designed to follow the official [Let's Encrypt requirements and guidelines](https://letsencrypt.org/docs/), implementing the ACME protocol and adhering to recommended security and operational practices.
+MaksIT.CertsUI is a powerful, container-native ACMEv2 client built to simplify and automate the entire lifecycle of HTTPS certificates issued by Let’s Encrypt. It is an independent, unofficial project and is not affiliated with or endorsed by Let’s Encrypt or ISRG.
+
+Designed for modern infrastructure, it combines a robust WebAPI, intuitive WebUI, and lightweight edge Agent to deliver fully automated certificate issuance, renewal, and deployment across Docker, Podman, and Kubernetes environments. MaksIT.CertsUI supports the HTTP-01 challenge and follows the official [Let’s Encrypt guidelines](https://letsencrypt.org/docs/) while implementing recommended security and operational best practices.
+
+---
 
 
 If you find this project useful, please consider supporting its development:
@@ -13,34 +16,30 @@ If you find this project useful, please consider supporting its development:
 
 ## Table of Contents
 
-- [MaksIT.CertsUI - Container-based Let's Encrypt ACME client with WebUI](#maksitcertsui---container-based-lets-encrypt-acme-client-with-webui)
-  - [Table of Contents](#table-of-contents)
-  - [Versions History](#versions-history)
-  - [Architecture](#architecture)
-    - [Current Limitations](#current-limitations)
-    - [Architecture Scheme](#architecture-scheme)
-    - [Architecture Description](#architecture-description)
-      - [MaksIT.CertsUI Agent](#maksitcertsui-agent)
-      - [MaksIT.CertsUI WebUI](#maksitcertsui-webui)
-      - [MaksIT.CertsUI WebAPI](#maksitcertsui-webapi)
-      - [Flow Overview](#flow-overview)
-  - [HAProxy configuration](#haproxy-configuration)
-    - [Explanation](#explanation)
-  - [MaksIT.CertsUI Agent installation](#maksitcertsui-agent-installation)
-  - [MaksIT.CertsUI Server Installation on Linux with Podman Compose](#maksitcertsui-server-installation-on-linux-with-podman-compose)
-    - [Prerequisites](#prerequisites)
-    - [Running the Project with Podman Compose](#running-the-project-with-podman-compose)
-  - [MaksIT.CertsUI Server Installation on Windows with Docker Compose](#maksitcertsui-server-installation-on-windows-with-docker-compose)
-    - [Prerequisites](#prerequisites-1)
-    - [Secrets and Configuration](#secrets-and-configuration)
-    - [Running the Project with Docker Compose](#running-the-project-with-docker-compose)
-  - [MaksIT.CertsUI Server installation on Kubernetes](#maksitcertsui-server-installation-on-kubernetes)
-    - [1. Add MaksIT Helm Repository](#1-add-maksit-helm-repository)
-    - [2. Prepare Namespace, Secrets, and ConfigMap](#2-prepare-namespace-secrets-and-configmap)
-    - [3. Create a Minimal Custom Values File](#3-create-a-minimal-custom-values-file)
-    - [4. Install the Helm Chart](#4-install-the-helm-chart)
-  - [MaksIT.CertsUI Interface Overview](#maksitcertsui-interface-overview)
-  - [Contact](#contact)
+- [Versions History](#versions-history)
+- [Architecture](#architecture)
+  - [Current Limitations](#current-limitations)
+  - [Architecture Scheme](#architecture-scheme)
+  - [Architecture Description](#architecture-description)
+    - [MaksIT.CertsUI Agent](#maksitcertsui-agent)
+    - [MaksIT.CertsUI WebUI](#maksitcertsui-webui)
+    - [MaksIT.CertsUI WebAPI](#maksitcertsui-webapi)
+    - [Flow Overview](#flow-overview)
+- [MaksIT.CertsUI Agent installation](https://github.com/MAKS-IT-COM/maksit-certs-ui-agent)
+- [MaksIT.CertsUI Server Installation on Linux with Podman Compose](#maksitcertsui-server-installation-on-linux-with-podman-compose)
+  - [Prerequisites](#prerequisites)
+  - [Running the Project with Podman Compose](#running-the-project-with-podman-compose)
+- [MaksIT.CertsUI Server Installation on Windows with Docker Compose](#maksitcertsui-server-installation-on-windows-with-docker-compose)
+  - [Prerequisites](#prerequisites-1)
+  - [Secrets and Configuration](#secrets-and-configuration)
+  - [Running the Project with Docker Compose](#running-the-project-with-docker-compose)
+- [MaksIT.CertsUI Server installation on Kubernetes](#maksitcertsui-server-installation-on-kubernetes)
+  - [1. Add MaksIT Helm Repository](#1-add-maksit-helm-repository)
+  - [2. Prepare Namespace, Secrets, and ConfigMap](#2-prepare-namespace-secrets-and-configmap)
+  - [3. Create a Minimal Custom Values File](#3-create-a-minimal-custom-values-file)
+  - [4. Install the Helm Chart](#4-install-the-helm-chart)
+- [MaksIT.CertsUI Interface Overview](#maksitcertsui-interface-overview)
+- [Contact](#contact)
 
 
 ## Versions History
@@ -51,6 +50,7 @@ If you find this project useful, please consider supporting its development:
 * 11 Aug, 2024 - V3.1.0 (Release)
 * 11 Sep, 2025 - V3.2.0 New WebUI with authentication
 * 15 Nov, 2025 - V3.3.0 Pre release
+* 22 Nov, 2025 - V3.3.1 Public release
 
 
 ---
@@ -108,21 +108,7 @@ These limitations are intentional to keep the architecture simple and reliable f
 
 The **MaksIT.CertsUI Agent** is a lightweight service responsible for **receiving cached certificates** from the **MaksIT.CertsUI** server and **deploying them to the local file system** used by your reverse proxy (e.g., **HAProxy** or **Nginx**). It also handles **proxy service reloads** to activate new certificates.
 
-
-**Language Independence:**  
-A standard **C# WebAPI implementation** of the Agent is available in this repository for immediate use or customization. However, the Agent is fully independent from the MaksIT.CertsUI server and communicates via standard **HTTP APIs**. This means you can implement the Agent in **any programming language or framework** that supports HTTP endpoints (such as **C#**, **Go**, **Python**, **Rust**, **Node.js**, etc.). The only requirements are:
-
-- Ability to **receive certificate files via HTTP**
-- Ability to **write files** to the proxy’s certificate directory
-- Ability to **reload or restart** the proxy process
-
-
-**Security:**  
-Communication between the Agent and the **MaksIT.CertsUI** server is secured using a **shared API key**. This ensures that only authorized servers can deploy certificates and trigger proxy reloads, protecting your edge infrastructure from unauthorized access.
-
-> **Warning:** Never commit secrets or API keys to version control. Always use strong, unique secrets and passwords.
-
-This flexibility allows you to integrate the Agent into diverse environments and choose the best technology stack for your edge server.
+Check **Agent** repository for more details and installation instructions: [MaksIT.CertsUI Agent](https://github.com/MAKS-IT-COM/maksit-certs-ui-agent.git)
 
 #### MaksIT.CertsUI WebUI
 
@@ -206,158 +192,6 @@ The Webapi is designed for deployment in secure environments such as Kubernetes 
 
 ---
 
-## HAProxy configuration
-
-```bash
-sudo mkdir /etc/haproxy/certs
-```
-
-```bash
-sudo nano /etc/haproxy/haproxy.cfg
-```
-
-```cfg
-#---------------------------------------------------------------------
-# Global settings
-#---------------------------------------------------------------------
-global
-    log         127.0.0.1 local2
-    chroot      /var/lib/haproxy
-    pidfile     /var/run/haproxy.pid
-    maxconn     4000
-    user        haproxy
-    group       haproxy
-    daemon
-    stats socket /var/lib/haproxy/stats
-    ssl-default-bind-ciphers PROFILE=SYSTEM
-    ssl-default-server-ciphers PROFILE=SYSTEM
-
-#---------------------------------------------------------------------
-# common defaults that all the 'listen' and 'backend' sections will
-# use if not designated in their block
-#---------------------------------------------------------------------
-defaults
-    mode                    http
-    log                     global
-    option                  httplog
-    option                  dontlognull
-    option http-server-close
-    option forwardfor       except 127.0.0.0/8
-    option                  redispatch
-    retries                 3
-    timeout http-request    10s
-    timeout queue           1m
-    timeout connect         10s
-    timeout client          1m
-    timeout server          1m
-    timeout http-keep-alive 10s
-    timeout check           10s
-    maxconn                 3000
-
-#---------------------------------------------------------------------
-# Frontend for HTTP traffic on port 80
-#---------------------------------------------------------------------
-frontend http_frontend
-    bind *:80
-    acl acme_path path_beg /.well-known/acme-challenge/
-
-    # Redirect all HTTP traffic to HTTPS except ACME challenge requests
-    redirect scheme https if !acme_path
-
-    # Use the appropriate backend based on hostname if it's an ACME challenge request
-    use_backend acme_backend if acme_path
-
-#---------------------------------------------------------------------
-# Backend to handle ACME challenge requests
-#---------------------------------------------------------------------
-backend acme_backend
-    #server local_acme  172.16.0.5:8080
-
-#---------------------------------------------------------------------
-# Frontend for HTTPS traffic (port 443) with SNI and strict-sni
-#---------------------------------------------------------------------
-frontend https_frontend
-    bind *:443 ssl crt /etc/haproxy/certs strict-sni
-
-    http-request capture req.hdr(host) len 64
-
-    # Define ACLs for routing based on hostname
-    acl host_homepage hdr(host) -i maks-it.com
-
-    # Use appropriate backend based on SNI hostname
-    use_backend homepage_backend if host_homepage
-
-    default_backend homepage_backend
-
-#---------------------------------------------------------------------
-# Backend for maks-it.com
-#---------------------------------------------------------------------
-backend homepage_backend
-    http-request set-header X-Forwarded-Proto https
-    http-request set-header X-Forwarded-Host %[hdr(host)]
-    server homepage_server 172.16.0.10:8080
-```
-
-### Explanation
-* ACME Challenge Handling:
-The http_frontend listens on port 80 and checks if the request path starts with /.well-known/acme-challenge/. These requests are required by Let's Encrypt for domain validation and are forwarded to the acme_backend. All other HTTP requests are redirected to HTTPS.
-* HTTPS Frontend:
-The https_frontend listens on port 443, uses SNI (Server Name Indication) to serve the correct certificate, and routes requests to the appropriate backend based on the hostname.
-*	Backends:
-  * acme_backend should point to your ACME challenge responder (such as your LetsEncrypt client).
-  * homepage_backend is an example backend for your main site, forwarding requests to your application server.
-* Certificate Storage:
-Place your SSL certificates in /etc/haproxy/certs. Each certificate file should contain the full certificate chain and private key.
-
-## MaksIT.CertsUI Agent installation
-
-Agent should be installed on same machine with your reverse proxy.
-
-From your home directory
-
-```bash
-git clone https://github.com/MAKS-IT-COM/certs-ui.git
-```
-
-```bash
-cd certs-ui/src/Agent
-```
-
-Edit `appsettings.json` configuration:
-
-```json
-{
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  },
-  "AllowedHosts": "*",
-
-  "Configuration": {
-    "ApiKey": "<your-agent-key>",
-    "CertsPath": "<your-certs-dir-path>"
-  }
-}
-```
-
-
-**Note:**  
-Replace `<your-auth-secret>` with your shared API key and `<your-certs-dir-path>` with the path to your certificates directory (e.g., `/etc/haproxy/certs` as referenced in `haproxy.cfg`).
-> **Warning:** Never commit secrets or API keys to version control. Always use strong, unique secrets and passwords.
-
-If you are using a **RHEL-based** distribution, you can deploy the agent with:
-
-```bash
-sudo sh ./build_and_deploy.sh
-```
-
-This script will create the `maks-it-agent` service and open port `5000` for communication.
-
-
----
-
 ## MaksIT.CertsUI Server Installation on Linux with Podman Compose
 
 Podman Compose usage to orchestrate multiple **MaksIT.CertsUI** services on Linux.
@@ -365,6 +199,11 @@ Podman Compose usage to orchestrate multiple **MaksIT.CertsUI** services on Linu
 ### Prerequisites
 
 - [Podman](https://podman.io/getting-started/installation)
+
+- sudo dnf install podman-compose -y
+
+
+
 - Create these folders:
   - `/opt/Compose/MaksIT.CertsUI/acme`
   - `/opt/Compose/MaksIT.CertsUI/cache`
@@ -377,7 +216,7 @@ Podman Compose usage to orchestrate multiple **MaksIT.CertsUI** services on Linu
 Bash command to use:
 
 ```bash
-mkdir -p /opt/Compose/MaksIT.CertsUI/acme \
+sudo mkdir -p /opt/Compose/MaksIT.CertsUI/acme \
   /opt/Compose/MaksIT.CertsUI/cache \
   /opt/Compose/MaksIT.CertsUI/data \
   /opt/Compose/MaksIT.CertsUI/tmp \
@@ -391,7 +230,7 @@ Create the following files in the appropriate folders:
 **1. Create the file `/opt/Compose/MaksIT.CertsUI/secrets/appsecrets.json` with this command:**
 
 ```bash
-cat > /opt/Compose/MaksIT.CertsUI/secrets/appsecrets.json <<EOF
+sudo tee /opt/Compose/MaksIT.CertsUI/secrets/appsecrets.json > /dev/null <<EOF
 {
   "Configuration": {
     "Auth": {
@@ -413,7 +252,7 @@ Make sure `<your-agent-key>` matches the key configured in your agent deployment
 **2. Create the file  `/opt/Compose/MaksIT.CertsUI/configMap/appsettings.json` with this command:**
 
 ```bash
-cat > /opt/Compose/MaksIT.CertsUI/configMap/appsettings.json <<EOF
+sudo tee /opt/Compose/MaksIT.CertsUI/configMap/appsettings.json <<EOF
 {
   "Logging": {
     "LogLevel": {
@@ -450,7 +289,7 @@ Replace all JWT-related placeholder values `<your-issuer>`, `<your-audience>` an
 **3. Create the file `/opt/Compose/MaksIT.CertsUI/client/config.js` with this command:**
 
 ```bash
-cat > /opt/Compose/MaksIT.CertsUI/configMap/appsettings.json <<EOF
+sudo tee /opt/Compose/MaksIT.CertsUI/client/config.js <<EOF
 window.RUNTIME_CONFIG = {
   API_URL: "http://<your-server-hostname>/api"
 };
@@ -464,7 +303,8 @@ EOF
 
 In the project root (`/opt/Compose/MaksIT.CertsUI`), create a new file named `docker-compose.yml` with the following content:
 
-```yaml
+```bash
+sudo tee /opt/Compose/MaksIT.CertsUI/docker-compose.yml <<EOF
 services:
   reverse-proxy:
     image: cr.maks-it.com/certs-ui/reverseproxy:latest
@@ -504,10 +344,71 @@ services:
 networks:
   certs-ui-network:
     driver: bridge
+EOF
 ```
 
 **Note:**  
   - Adjust volume paths if changed
+
+**1. Run Podman compose in Rootfull mode (The only supported by podman-compose):**
+
+```bash
+sudo chown -R 1654:1654 /opt/Compose/MaksIT.CertsUI/{data,cache,acme}
+sudo chmod -R 775 /opt/Compose/MaksIT.CertsUI/{data,cache,acme}
+
+sudo chown -R 1654:1654 /opt/Compose/MaksIT.CertsUI/tmp
+sudo chmod 1777 /opt/Compose/MaksIT.CertsUI/tmp
+
+sudo su -
+sudo bash -c 'echo "export PATH=/usr/local/bin:/usr/local/sbin:\$PATH" >> /root/.bashrc'
+
+exit
+sudo su -
+
+podman compose -f docker-compose.yml up --build
+```
+
+**2. Run Podman compose in Rootless mode (Not supported by podman-compose on Alma10, havent tested):**
+
+Correct UID and GID for `app` user inside container:
+
+```bash
+[root@test-podman maksym]# podman exec certs-ui-server id -u app
+1654
+[root@test-podman maksym]# podman exec certs-ui-server id -g app
+1654
+```
+
+Then you have to find your `subuid` and `subgid` ranges:
+
+```bash
+[<youruser>@<yourdomain> ~]$ grep $(whoami) /etc/subuid
+<youruser>:524288:65536
+[<youruser>@<yourdomain> ~]$ grep $(whoami) /etc/subgid
+<youruser>:524288:65536
+```
+
+Calculate host UID and GID that maps to container's `app
+
+```
+host_uid = subuid_start + container_uid
+         = 524288 + 1654
+         = 525942
+
+host_gid = 525942
+```
+
+Apply correct ownership and permissions to the volumes:
+
+```bash
+sudo chown -R 525942:525942 /opt/Compose/MaksIT.CertsUI/{data,cache,acme}
+sudo chmod -R 775 /opt/Compose/MaksIT.CertsUI/{data,cache,acme}
+
+sudo chown -R 525942:525942 /opt/Compose/MaksIT.CertsUI/tmp
+sudo chmod 1777 /opt/Compose/MaksIT.CertsUI/tmp
+```
+
+Then run podman compose as normal user:
 
 ```bash
 podman compose -f docker-compose.yml up --build
@@ -708,14 +609,10 @@ docker compose -f docker-compose.yml down
 
 ## MaksIT.CertsUI Server installation on Kubernetes
 
-### 1. Add MaksIT Helm Repository
+The MaksIT.CertsUI Helm chart is distributed via the MaksIT container registry using the Helm OCI (Open Container Initiative) protocol.
 
-The MaksIT.CertsUI Helm chart is available from the MaksIT container registry. Add the MaksIT Helm repository to your Helm client:
-
-```bash
-helm repo add maksit https://cr.maks-it.com/chartrepo/charts
-helm repo update
-```
+**What is Helm OCI?**  
+Helm OCI support enables you to pull and install Helm charts directly from container registries (such as Harbor, Docker Hub, or GitHub Container Registry), just like you would with Docker images. This approach is secure, versioned, and recommended for modern Kubernetes deployments.
 
 ### 2. Prepare Namespace, Secrets, and ConfigMap
 
@@ -832,7 +729,7 @@ Replace all JWT-related placeholder values `<your-issuer>`, `<your-audience>` an
 
 ### 3. Create a Minimal Custom Values File
 
-Below is a minimal example of a `custom-values.yaml` for most users. It disables image pull secrets by default (since the chart and images are public), sets the storage class for persistent volumes, and configures the reverse proxy service. You can further customize this file as needed for your environment.
+Below is a minimal example of a `custom-values.yaml` for most users. It sets the storage class for persistent volumes, and configures the reverse proxy service. You can further customize this file as needed for your environment.
 
 ```yaml
 global:
@@ -845,32 +742,54 @@ components:
 
   reverseproxy:
     service:
-      type: LoadBalancer
+      enabled: true
+      type: ClusterIP
       port: 8080
       targetPort: 8080
-      # Remove or comment out the next two lines to let your cloud provider assign a dynamic IP
-      # loadBalancerIP: "172.16.0.5"
-      # annotations:
-      #   lbipam.cilium.io/ips: "172.16.0.5"
-      externalTrafficPolicy: Local
-      sessionAffinity: ClientIP
-      sessionAffinityConfig:
-        clientIP:
-          timeoutSeconds: 10800
 ```
 
 ### 4. Install the Helm Chart
 
-Install the MaksIT.CertsUI chart using your custom values file:
+Install the MaksIT.CertsUI chart using your custom values file.
+
+**On Linux:**
 
 ```bash
-helm install certs-ui maksit/certs-ui -n certs-ui -f custom-values.yaml
+helm upgrade certs-ui oci://cr.maks-it.com/charts/certs-ui \
+  -n certs-ui \
+  -f custom-values.yaml \
+  --version 3.3.1 \
 ```
 
+**On Windows PowerShell:*
 
+```powershell
+helm upgrade certs-ui oci://cr.maks-it.com/charts/certs-ui `
+  -n certs-ui `
+  -f custom-values.yaml `
+  --version 3.3.1 `
+```
 
+**Note:**
+Chart version follows app version. To install a specific version, use the `--version` flag:
 
+### 5. Uninstall the Helm Chart
 
+To uninstall the MaksIT.CertsUI chart and remove all associated resources, run the following command:
+
+**On Linux:**
+
+```bash
+helm uninstall certs-ui oci://cr.maks-it.com/charts/certs-ui \
+  -n certs-ui
+```
+
+**On Windows PowerShell:**
+
+```powershell
+helm uninstall certs-ui oci://cr.maks-it.com/charts/certs-ui `
+  -n certs-ui-test
+```
 
 ---
 
@@ -929,7 +848,3 @@ For any inquiries or contributions, feel free to reach out:
 
 - **Email**: maksym.sadovnychyy@gmail.com
 - **Author**: Maksym Sadovnychyy (MAKS-IT)
-
----
-
-> **Tip:** For the latest updates, documentation, and source code, visit the [GitHub repository](https://github.com/MAKS-IT-COM/certs-ui).

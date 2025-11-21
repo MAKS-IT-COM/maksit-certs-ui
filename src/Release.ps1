@@ -74,6 +74,24 @@ foreach ($service in $services.Keys) {
 }
 
 # --- Helm Chart Release Section ---
+# Backup Chart.yaml
+Copy-Item "helm/Chart.yaml" "helm/Chart.yaml.bak" -Force
+
+# Use the same tags, but choose the first non-'latest' for Helm
+$helmTag = $tags | Where-Object { $_ -ne "latest" } | Select-Object -First 1
+if (-not $helmTag) { throw "No valid SemVer tag found for Helm chart release." }
+
+Write-Output "Using Helm chart version: $helmTag"
+
+# Update Chart.yaml version and appVersion
+$content = Get-Content "helm/Chart.yaml" -Raw
+
+$content = $content `
+    -replace '(?m)^\s*version:\s*.*$',    "version: $helmTag" `
+    -replace '(?m)^\s*appVersion:\s*.*$', "appVersion: $helmTag"
+
+Set-Content "helm/Chart.yaml" $content
+
 # Package the Helm chart
 $chartDir = "helm"
 $chartPackageOutput = helm package $chartDir
@@ -85,8 +103,9 @@ if (-not $chartPackage) {
     throw "Helm chart packaging failed. Output: $chartPackageOutput"
 }
 
-# Push the Helm chart to the same Harbor project/repo as Docker images
-$helmRepoUrl = "oci://$harborUrl/$projectName/charts"
+# Push the Helm chart to Harbor
+$helmRepoUrl = "oci://$harborUrl/charts"
+
 Write-Output "Pushing Helm chart $chartPackage to $helmRepoUrl..."
 helm push $chartPackage $helmRepoUrl --username $harborUsername --password $harborPassword
 if ($LASTEXITCODE -ne 0) {
@@ -98,8 +117,8 @@ if ($chartPackage) {
     Write-Output "Cleaned up $chartPackage"
 }
 
+# Restore Chart.yaml
+Move-Item "helm/Chart.yaml.bak" "helm/Chart.yaml" -Force
+
 docker logout $harborUrl | Out-Null
 Write-Output "Completed successfully."
-
-
-# Logout after pushing images
