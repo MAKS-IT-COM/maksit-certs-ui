@@ -53,6 +53,7 @@ If you find this project useful, please consider supporting its development:
 * 15 Nov, 2025 - V3.3.0 Pre release
 * 22 Nov, 2025 - V3.3.1 Public release
 * 20 Dec, 2025 - V3.3.2 Minimal helm chart and documentation improvements
+* 20 Dec, 2025 - V3.3.3 Relicense project from GPL-3.0 to Apache-2.0
 
 
 ---
@@ -783,7 +784,7 @@ Install the MaksIT.CertsUI chart using your custom values file.
 helm upgrade certs-ui oci://cr.maks-it.com/charts/certs-ui \
   -n certs-ui \
   -f custom-values.yaml \
-  --version 3.3.2 \
+  --version 3.3.3 \
 ```
 
 **On Windows PowerShell:*
@@ -792,7 +793,7 @@ helm upgrade certs-ui oci://cr.maks-it.com/charts/certs-ui \
 helm upgrade certs-ui oci://cr.maks-it.com/charts/certs-ui `
   -n certs-ui `
   -f custom-values.yaml `
-  --version 3.3.2 `
+  --version 3.3.3 `
 ```
 
 **Note:**
