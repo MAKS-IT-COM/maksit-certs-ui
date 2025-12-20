@@ -16,30 +16,31 @@ If you find this project useful, please consider supporting its development:
 
 ## Table of Contents
 
-- [Versions History](#versions-history)
-- [Architecture](#architecture)
-  - [Current Limitations](#current-limitations)
-  - [Architecture Scheme](#architecture-scheme)
-  - [Architecture Description](#architecture-description)
-    - [MaksIT.CertsUI Agent](#maksitcertsui-agent)
-    - [MaksIT.CertsUI WebUI](#maksitcertsui-webui)
-    - [MaksIT.CertsUI WebAPI](#maksitcertsui-webapi)
-    - [Flow Overview](#flow-overview)
-- [MaksIT.CertsUI Agent installation](https://github.com/MAKS-IT-COM/maksit-certs-ui-agent)
-- [MaksIT.CertsUI Server Installation on Linux with Podman Compose](#maksitcertsui-server-installation-on-linux-with-podman-compose)
-  - [Prerequisites](#prerequisites)
-  - [Running the Project with Podman Compose](#running-the-project-with-podman-compose)
-- [MaksIT.CertsUI Server Installation on Windows with Docker Compose](#maksitcertsui-server-installation-on-windows-with-docker-compose)
-  - [Prerequisites](#prerequisites-1)
-  - [Secrets and Configuration](#secrets-and-configuration)
-  - [Running the Project with Docker Compose](#running-the-project-with-docker-compose)
-- [MaksIT.CertsUI Server installation on Kubernetes](#maksitcertsui-server-installation-on-kubernetes)
-  - [1. Add MaksIT Helm Repository](#1-add-maksit-helm-repository)
-  - [2. Prepare Namespace, Secrets, and ConfigMap](#2-prepare-namespace-secrets-and-configmap)
-  - [3. Create a Minimal Custom Values File](#3-create-a-minimal-custom-values-file)
-  - [4. Install the Helm Chart](#4-install-the-helm-chart)
-- [MaksIT.CertsUI Interface Overview](#maksitcertsui-interface-overview)
-- [Contact](#contact)
+- [MaksIT.CertsUI – Modern container-native ACME client with a full WebUI experience](#maksitcertsui--modern-container-native-acme-client-with-a-full-webui-experience)
+  - [Table of Contents](#table-of-contents)
+  - [Versions History](#versions-history)
+  - [Architecture](#architecture)
+    - [Current Limitations](#current-limitations)
+    - [Architecture Scheme](#architecture-scheme)
+    - [Architecture Description](#architecture-description)
+      - [MaksIT.CertsUI Agent](#maksitcertsui-agent)
+      - [MaksIT.CertsUI WebUI](#maksitcertsui-webui)
+      - [MaksIT.CertsUI WebAPI](#maksitcertsui-webapi)
+      - [Flow Overview](#flow-overview)
+  - [MaksIT.CertsUI Server Installation on Linux with Podman Compose](#maksitcertsui-server-installation-on-linux-with-podman-compose)
+    - [Prerequisites](#prerequisites)
+    - [Running the Project with Podman Compose](#running-the-project-with-podman-compose)
+  - [MaksIT.CertsUI Server Installation on Windows with Docker Compose](#maksitcertsui-server-installation-on-windows-with-docker-compose)
+    - [Prerequisites](#prerequisites-1)
+    - [Secrets and Configuration](#secrets-and-configuration)
+    - [Running the Project with Docker Compose](#running-the-project-with-docker-compose)
+  - [MaksIT.CertsUI Server installation on Kubernetes](#maksitcertsui-server-installation-on-kubernetes)
+    - [2. Prepare Namespace, Secrets, and ConfigMap](#2-prepare-namespace-secrets-and-configmap)
+    - [3. Create a Minimal Custom Values File](#3-create-a-minimal-custom-values-file)
+    - [4. Install the Helm Chart](#4-install-the-helm-chart)
+    - [5. Uninstall the Helm Chart](#5-uninstall-the-helm-chart)
+  - [MaksIT.CertsUI Interface Overview](#maksitcertsui-interface-overview)
+  - [Contact](#contact)
 
 
 ## Versions History
@@ -51,6 +52,7 @@ If you find this project useful, please consider supporting its development:
 * 11 Sep, 2025 - V3.2.0 New WebUI with authentication
 * 15 Nov, 2025 - V3.3.0 Pre release
 * 22 Nov, 2025 - V3.3.1 Public release
+* 20 Dec, 2025 - V3.3.2 Minimal helm chart and documentation improvements
 
 
 ---
@@ -672,15 +674,15 @@ Edit the values as needed for your environment. This configmap contains applicat
 },
   "Configuration": {
     "Auth": {
-    "Issuer": "<your-issuer>",
-    "Audience": "<your-audience>",
-    "Expiration": 15,
-    "RefreshExpiration": 180
+      "Issuer": "<your-issuer>",
+      "Audience": "<your-audience>",
+      "Expiration": 15,
+      "RefreshExpiration": 180
     },
     "Agent": {
-    "AgentHostname": "http://<your-agent-hostname>",
-    "AgentPort": 5000,
-    "ServiceToReload": "haproxy"
+      "AgentHostname": "http://<your-agent-hostname>",
+      "AgentPort": 5000,
+      "ServiceToReload": "haproxy"
     },
     "Production": "https://acme-v02.api.letsencrypt.org/directory",
     "Staging": "https://acme-staging-v02.api.letsencrypt.org/directory",
@@ -727,6 +729,29 @@ kubectl create configmap certs-ui-server-configmap \
 **Note:**  
 Replace all JWT-related placeholder values `<your-issuer>`, `<your-audience>` and `<your-agent-hostname>` with your environment-specific values.
 
+**Step 4: Create the ConfigMap (`config.json`)**
+
+Edit the values as needed for your environment. This configmap contains client settings to connect backend.
+
+```bash
+window.RUNTIME_CONFIG = {
+  API_URL: "http://<your-server-hostname>/api"
+};
+```
+
+```bash
+kubectl create configmap certs-ui-client-configmap \
+  --from-literal=config.js='
+    window.RUNTIME_CONFIG = {
+      API_URL: "http://<your-server-hostname>/api"
+    };' \
+  -n certs-ui
+```
+
+**Note:**  
+Replace `<your-server-hostname>` with the actual hostname or IP address where your MaksIT.CertsUI server is configured.  
+This ConfigMap provides the client-side runtime configuration for the WebUI to connect to the backend API.
+
 ### 3. Create a Minimal Custom Values File
 
 Below is a minimal example of a `custom-values.yaml` for most users. It sets the storage class for persistent volumes, and configures the reverse proxy service. You can further customize this file as needed for your environment.
@@ -758,7 +783,7 @@ Install the MaksIT.CertsUI chart using your custom values file.
 helm upgrade certs-ui oci://cr.maks-it.com/charts/certs-ui \
   -n certs-ui \
   -f custom-values.yaml \
-  --version 3.3.1 \
+  --version 3.3.2 \
 ```
 
 **On Windows PowerShell:*
@@ -767,7 +792,7 @@ helm upgrade certs-ui oci://cr.maks-it.com/charts/certs-ui \
 helm upgrade certs-ui oci://cr.maks-it.com/charts/certs-ui `
   -n certs-ui `
   -f custom-values.yaml `
-  --version 3.3.1 `
+  --version 3.3.2 `
 ```
 
 **Note:**

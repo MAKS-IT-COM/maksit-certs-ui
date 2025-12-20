@@ -104,6 +104,14 @@ components:
       type: ClusterIP
       port: 5173
       targetPort: 5173
+    configMapFile:
+      key: config.js
+      mountPath: /app/dist/config.js
+      content: |
+        window.RUNTIME_CONFIG = {
+          API_URL: "http://<your-server-hostname>/api"
+        };
+      keep: true
 
   reverseproxy:
     image:
