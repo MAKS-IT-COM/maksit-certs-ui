@@ -8,5 +8,9 @@
         "javascriptreact",
         "typescript",
         "typescriptreact"
-    ]
+    ],
+    "sonarlint.connectedMode.project": {
+        "connectionId": "sonar.maks-it.com",
+        "projectKey": "MaksIT.CertsUI"
+    }
 }

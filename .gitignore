@@ -262,4 +262,6 @@ paket-files/
 __pycache__/
 *.pyc
 
-
+# SonarQube
+.scannerwork/
+.sonarlint/
