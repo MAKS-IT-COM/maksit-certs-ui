@@ -9,6 +9,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: {{ include "certs-ui.fullname" $root }}-{{ $compName }}-{{ $vol.name }}
+  namespace: {{ $root.Release.Namespace }}
   labels:
     {{- include "certs-ui.labels" $root | nindent 4 }}
     app.kubernetes.io/component: {{ $compName }}

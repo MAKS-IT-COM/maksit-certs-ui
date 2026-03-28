@@ -1,17 +1,28 @@
-{{- $roll := ((.Values.rollme | default (now | unixEpoch)) | toString) -}}
-
 {{- $root := . -}}
 {{- range $compName, $comp := .Values.components }}
+{{- $imageTag := include "certs-ui.component.imageTag" (dict "root" $root "comp" $comp) }}
+{{- $cf := default dict $comp.configMapFile }}
+{{- $sf := default dict $comp.secretsFile }}
+{{- $cmName := ternary $cf.existingConfigMap (printf "%s-%s-configmap" (include "certs-ui.fullname" $root) $compName) (ne ($cf.existingConfigMap | default "") "") }}
+{{- $secretName := ternary $sf.existingSecret (printf "%s-%s-secrets" (include "certs-ui.fullname" $root) $compName) (ne ($sf.existingSecret | default "") "") }}
+{{- $hasCm := or (ne ($cf.existingConfigMap | default "") "") (and $cf.key (hasKey $cf "content")) }}
+{{- $hasSecret := or (ne ($sf.existingSecret | default "") "") (and $sf.key (hasKey $sf "content")) }}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "certs-ui.fullname" $root }}-{{ $compName }}
+  namespace: {{ $root.Release.Namespace }}
   labels:
     {{- include "certs-ui.labels" $root | nindent 4 }}
     app.kubernetes.io/component: {{ $compName }}
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app.kubernetes.io/instance: {{ $root.Release.Name }}
@@ -20,15 +31,14 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "certs-ui.labels" $root | nindent 8 }}
-        app.kubernetes.io/component: {{ $compName }}
+{{ include "certs-ui.podLabels" (dict "root" $root "component" $compName "imageTag" $imageTag) | indent 8 }}
       annotations:
-        rollme: "{{$roll}}"
+        rollme: {{ $root.Release.Revision | quote }}
     spec:
       {{- include "certs-ui.imagePullSecrets" $root | nindent 6 }}
       containers:
         - name: {{ $compName }}
-          image: "{{ $comp.image.registry }}/{{ $comp.image.repository }}:{{ $.Chart.AppVersion }}"
+          image: "{{ $comp.image.registry }}/{{ $comp.image.repository }}:{{ $imageTag }}"
           imagePullPolicy: {{ default "IfNotPresent" $comp.image.pullPolicy }}
           {{ $svc := default dict $comp.service }}
           {{ $tgt := default 8080 $svc.targetPort }}
@@ -37,8 +47,6 @@ spec:
               containerPort: {{ $tgt }}
           {{- if $comp.env }}
           env:
-            - name: ROLLOUT_TOKEN
-              value: "{{$roll}}"
             {{- range $comp.env }}
             - name: {{ .name }}
               value: {{ .value | quote }}
@@ -47,25 +55,26 @@ spec:
           {{- $p := default dict $comp.persistence -}}
           {{- $vols := default (list) $p.volumes -}}
           {{- $hasVols := gt (len $vols) 0 -}}
-          {{- $hasSecret := (hasKey $comp "secretsFile") -}}
-          {{- if or $hasVols $hasSecret $comp.configMapFile }}
+          {{- if or $hasVols $hasSecret $hasCm }}
           volumeMounts:
             {{- range $vol := $vols }}
             - name: {{ $compName }}-{{ $vol.name }}
               mountPath: {{ $vol.mountPath }}
             {{- end }}
-            {{- if $comp.secretsFile }}
+            {{- if $hasSecret }}
             - name: {{ $compName }}-secrets
-              mountPath: {{ $comp.secretsFile.mountPath }}
-              subPath: {{ base $comp.secretsFile.mountPath }}
+              mountPath: {{ $sf.mountPath }}
+              subPath: {{ base $sf.mountPath }}
+              readOnly: true
             {{- end }}
-            {{- if $comp.configMapFile }}
+            {{- if $hasCm }}
             - name: {{ $compName }}-configmap
-              mountPath: {{ $comp.configMapFile.mountPath }}
-              subPath: {{ base $comp.configMapFile.mountPath }}
+              mountPath: {{ $cf.mountPath }}
+              subPath: {{ base $cf.mountPath }}
+              readOnly: true
             {{- end }}
           {{- end }}
-      {{- if or $hasVols $hasSecret $comp.configMapFile }}
+      {{- if or $hasVols $hasSecret $hasCm }}
       volumes:
         {{- range $vol := $vols }}
         - name: {{ $compName }}-{{ $vol.name }}
@@ -78,21 +87,21 @@ spec:
           emptyDir: {}
           {{- end }}
         {{- end }}
-        {{- if $comp.secretsFile }}
+        {{- if $hasSecret }}
         - name: {{ $compName }}-secrets
           secret:
-            secretName: {{ include "certs-ui.fullname" $root }}-{{ $compName }}-secrets
+            secretName: {{ $secretName }}
             items:
-              - key: {{ $comp.secretsFile.key }}
-                path: {{ base $comp.secretsFile.mountPath }}
+              - key: {{ $sf.key }}
+                path: {{ base $sf.mountPath }}
         {{- end }}
-        {{- if $comp.configMapFile }}
+        {{- if $hasCm }}
         - name: {{ $compName }}-configmap
           configMap:
-            name: {{ include "certs-ui.fullname" $root }}-{{ $compName }}-configmap
+            name: {{ $cmName }}
             items:
-              - key: {{ $comp.configMapFile.key }}
-                path: {{ base $comp.configMapFile.mountPath }}
+              - key: {{ $cf.key }}
+                path: {{ base $cf.mountPath }}
         {{- end }}
       {{- end }}
 {{- end }}

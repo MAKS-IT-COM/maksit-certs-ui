@@ -1,27 +1,37 @@
 {{- $root := . -}}
 {{- range $compName, $comp := .Values.components }}
 {{- if $comp.configMapFile }}
-{{- $cf := $comp.configMapFile -}}
-{{- $cmName := printf "%s-%s-configmap" (include "certs-ui.fullname" $root) $compName -}}
-{{- $existing := lookup "v1" "ConfigMap" $root.Release.Namespace $cmName -}}
+{{- $cf := $comp.configMapFile }}
+{{- if ne ($cf.existingConfigMap | default "") "" }}
+{{- else if not $cf.key }}
+{{- else if not (hasKey $cf "content") }}
+{{- fail (printf "components.%s.configMapFile.content is required when configMapFile.key is set (or set existingConfigMap)" $compName) }}
+{{- else }}
+{{- $cmName := printf "%s-%s-configmap" (include "certs-ui.fullname" $root) $compName }}
+{{- $existing := lookup "v1" "ConfigMap" $root.Release.Namespace $cmName }}
 {{- if and $cf.keep $existing }}
-{{/* keep=true and ConfigMap exists -> render nothing */}}
 {{- else }}
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ $cmName }}
+  namespace: {{ $root.Release.Namespace }}
   labels:
     {{- include "certs-ui.labels" $root | nindent 4 }}
     app.kubernetes.io/component: {{ $compName }}
   {{- if $cf.keep }}
   annotations:
-    "helm.sh/resource-policy": keep
+    helm.sh/resource-policy: keep
   {{- end }}
 data:
   {{ $cf.key }}: |
-{{ $cf.content | indent 4 }}
+{{- if default false $cf.tpl }}
+{{ tpl ($cf.content | toString) $root | nindent 4 }}
+{{- else }}
+{{ $cf.content | nindent 4 }}
+{{- end }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

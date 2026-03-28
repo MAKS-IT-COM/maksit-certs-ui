@@ -1,39 +1,37 @@
-Thank you for installing **{{ .Chart.Name }}**!
+Thank you for installing **{{ .Chart.Name }}**.
 
-This chart deploys the MaksIT CertsUI tool for automated Let's Encrypt HTTPS certificate renewal.
+Release: {{ .Release.Name }} / namespace {{ .Release.Namespace }}
+
+Services use ClusterIP; expose via ingress, gateway, or kubectl port-forward.
 
 ------------------------------------------------------------
 ## Components
 
-- **Server**: Handles certificate requests and renewal logic.
-- **Client**: Web UI for managing and viewing certificate status.
-- **Reverse Proxy**: Exposes the UI and API endpoints.
+- server: {{ include "certs-ui.fullname" . }}-server:{{ .Values.components.server.service.port }}
+- client: {{ include "certs-ui.fullname" . }}-client:{{ .Values.components.client.service.port }}
+- reverseproxy: {{ include "certs-ui.fullname" . }}-reverseproxy:{{ .Values.components.reverseproxy.service.port }}
+
+Port-forward API example:
+
+  kubectl port-forward svc/{{ include "certs-ui.fullname" . }}-server {{ .Values.components.server.service.port }}:{{ .Values.components.server.service.port }} -n {{ .Release.Namespace }}
 
 ------------------------------------------------------------
-## Configuration
+## Images
 
-- **Secrets**:  
-  The server uses a Kubernetes Secret (`appsecrets.json`) for sensitive data.
+Image tag: `components.*.image.tag`, then `global.image.tag`, then Chart `appVersion`. Change tag and run `helm upgrade` to roll out.
 
-- **ConfigMap**:  
-  The server uses a ConfigMap (`appsettings.json`) for application settings.
+`pullPolicy: Always` helps with a moving tag (e.g. latest); pinned tags often use `IfNotPresent`.
 
-- **Persistence**:  
-  PVCs are created for `/acme`, `/cache` and `/data` directories.
+Pod annotation `rollme` tracks Helm release revision.
+
+------------------------------------------------------------
+## Config
+
+Root keys `certsServerConfig`, `certsServerSecrets`, `certsClientRuntime` feed templated `configMapFile` / `secretsFile` content when `tpl: true`.
+
+Use `existingConfigMap` / `existingSecret` to mount resources created outside the chart. With `keep: true`, existing objects are not replaced on upgrade if already present.
 
 ------------------------------------------------------------
 ## Uninstall
 
-To remove all resources created by this chart:
-```
-helm uninstall {{ .Release.Name }} -n {{ .Release.Name }}
-```
-
-------------------------------------------------------------
-## Notes
-
-- Certificates are renewed automatically using Let's Encrypt.
-- You can customize settings in `values.yaml` before installation.
-- For advanced configuration, see the chart documentation and templates.
-
-------------------------------------------------------------
+  helm uninstall {{ .Release.Name }} -n {{ .Release.Namespace }}

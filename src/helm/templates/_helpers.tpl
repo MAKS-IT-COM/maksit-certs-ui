@@ -37,3 +37,22 @@ imagePullSecrets:
 {{- end }}
 {{- end }}
 {{- end }}
+
+{{- /* image tag: component, global.image.tag, Chart.AppVersion */ -}}
+{{- define "certs-ui.component.imageTag" -}}
+{{- $root := .root }}
+{{- $comp := .comp }}
+{{- $g := default dict $root.Values.global.image }}
+{{- $comp.image.tag | default $g.tag | default $root.Chart.AppVersion }}
+{{- end }}
+
+{{- define "certs-ui.podLabels" -}}
+{{- $root := .root }}
+{{- $compName := .component }}
+{{- $imageTag := .imageTag }}
+app.kubernetes.io/name: {{ include "certs-ui.name" $root }}
+app.kubernetes.io/instance: {{ $root.Release.Name }}
+app.kubernetes.io/version: {{ $imageTag | quote }}
+helm.sh/chart: {{ include "certs-ui.chart" $root }}
+app.kubernetes.io/component: {{ $compName }}
+{{- end }}

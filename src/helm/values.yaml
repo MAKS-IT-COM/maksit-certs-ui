@@ -1,14 +1,51 @@
 global:
-  imagePullSecrets: []  # Keep empty
-  # imagePullSecrets:
-  #   - name: cr-maksit-pull
+  imagePullSecrets: []
+  image:
+    tag: "" # used if component image.tag is empty; else Chart appVersion
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Server ConfigMap (appsettings.json); referenced from components.server.configMapFile when tpl: true
+certsServerConfig:
+  allowedHosts: "*"
+  logging:
+    default: Information
+    microsoftAspNetCore: Warning
+  configuration:
+    auth:
+      issuer: ""
+      audience: ""
+      expiration: 15
+      refreshExpiration: 180
+    agent:
+      agentHostname: ""
+      agentPort: 5000
+      serviceToReload: haproxy
+    production: "https://acme-v02.api.letsencrypt.org/directory"
+    staging: "https://acme-staging-v02.api.letsencrypt.org/directory"
+    acmeFolder: /acme
+    cacheFolder: /cache
+    dataFolder: /data
+    settingsFile: /data/settings.json
+
+# Server Secret (appsecrets.json); referenced from components.server.secretsFile when tpl: true
+certsServerSecrets:
+  authSecret: changeme-generate-a-long-random-string
+  authPepper: ""
+  agentKey: ""
+
+# Client ConfigMap (config.js); referenced when tpl: true
+certsClientRuntime:
+  apiUrl: "http://certs-ui.example.com/api"
 
 components:
   server:
     image:
       registry: cr.maks-it.com
       repository: certs-ui/server
-      pullPolicy: Always
+      tag: ""
+      pullPolicy: IfNotPresent
     env:
       - name: ASPNETCORE_ENVIRONMENT
         value: Production
@@ -46,59 +83,63 @@ components:
     secretsFile:
       key: appsecrets.json
       mountPath: /secrets/appsecrets.json
+      tpl: true
+      keep: true
+      existingSecret: ""
       content: |
         {
-          "Auth": {
-            "Secret": "",
-            "Pepper": ""
-          },
-          "Agent": {
-            "AgentKey": ""
-          },
+          "Configuration": {
+            "Auth": {
+              "Secret": {{ .Values.certsServerSecrets.authSecret | toJson }},
+              "Pepper": {{ .Values.certsServerSecrets.authPepper | toJson }}
+            },
+            "Agent": {
+              "AgentKey": {{ .Values.certsServerSecrets.agentKey | toJson }}
+            }
+          }
         }
-      keep: true
-
     configMapFile:
       key: appsettings.json
       mountPath: /configMap/appsettings.json
+      tpl: true
+      keep: true
+      existingConfigMap: ""
       content: |
         {
           "Logging": {
             "LogLevel": {
-              "Default": "Information",
-              "Microsoft.AspNetCore": "Warning"
+              "Default": {{ .Values.certsServerConfig.logging.default | toJson }},
+              "Microsoft.AspNetCore": {{ .Values.certsServerConfig.logging.microsoftAspNetCore | toJson }}
             }
           },
+          "AllowedHosts": {{ .Values.certsServerConfig.allowedHosts | toJson }},
           "Configuration": {
             "Auth": {
-              "Issuer": "",
-              "Audience": "",
-              "Expiration": 15, // Access token lifetime in minutes (default: 15 minutes)
-              "RefreshExpiration": 180, // Refresh token lifetime in days (default: 180 days)
+              "Issuer": {{ .Values.certsServerConfig.configuration.auth.issuer | toJson }},
+              "Audience": {{ .Values.certsServerConfig.configuration.auth.audience | toJson }},
+              "Expiration": {{ .Values.certsServerConfig.configuration.auth.expiration }},
+              "RefreshExpiration": {{ .Values.certsServerConfig.configuration.auth.refreshExpiration }}
             },
-
             "Agent": {
-              "AgentHostname": "http://websrv0001.corp.maks-it.com",
-              "AgentPort": 5000,
-              "ServiceToReload": "haproxy"
+              "AgentHostname": {{ .Values.certsServerConfig.configuration.agent.agentHostname | toJson }},
+              "AgentPort": {{ .Values.certsServerConfig.configuration.agent.agentPort }},
+              "ServiceToReload": {{ .Values.certsServerConfig.configuration.agent.serviceToReload | toJson }}
             },
-
-            "Production": "https://acme-v02.api.letsencrypt.org/directory",
-            "Staging": "https://acme-staging-v02.api.letsencrypt.org/directory",
-            "CacheFolder": "/cache",
-            "AcmeFolder": "/acme",
-
-            "DataFolder": "/data",
-            "SettingsFile": "/data/settings.json",
+            "Production": {{ .Values.certsServerConfig.configuration.production | toJson }},
+            "Staging": {{ .Values.certsServerConfig.configuration.staging | toJson }},
+            "CacheFolder": {{ .Values.certsServerConfig.configuration.cacheFolder | toJson }},
+            "AcmeFolder": {{ .Values.certsServerConfig.configuration.acmeFolder | toJson }},
+            "DataFolder": {{ .Values.certsServerConfig.configuration.dataFolder | toJson }},
+            "SettingsFile": {{ .Values.certsServerConfig.configuration.settingsFile | toJson }}
           }
         }
-      keep: true
 
   client:
     image:
       registry: cr.maks-it.com
       repository: certs-ui/client
-      pullPolicy: Always
+      tag: ""
+      pullPolicy: IfNotPresent
     service:
       enabled: true
       type: ClusterIP
@@ -107,17 +148,20 @@ components:
     configMapFile:
       key: config.js
       mountPath: /app/dist/config.js
+      tpl: true
+      keep: true
+      existingConfigMap: ""
       content: |
         window.RUNTIME_CONFIG = {
-          API_URL: "http://<your-server-hostname>/api"
+          API_URL: {{ .Values.certsClientRuntime.apiUrl | toJson }}
         };
-      keep: true
 
   reverseproxy:
     image:
       registry: cr.maks-it.com
       repository: certs-ui/reverseproxy
-      pullPolicy: Always
+      tag: ""
+      pullPolicy: IfNotPresent
     env:
       - name: ASPNETCORE_ENVIRONMENT
         value: Production
@@ -128,16 +172,3 @@ components:
       type: ClusterIP
       port: 8080
       targetPort: 8080
-      # type: LoadBalancer
-      # port: 8080
-      # targetPort: 8080
-      # loadBalancerIP: "172.16.0.5"
-      # annotations:
-      #   lbipam.cilium.io/ips: "172.16.0.5" 
-      # labels:
-      #   export: "bgp"
-      # externalTrafficPolicy: Local
-      # sessionAffinity: ClientIP
-      # sessionAffinityConfig:
-      #   clientIP:
-      #     timeoutSeconds: 10800
