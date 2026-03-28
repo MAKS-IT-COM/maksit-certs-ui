@@ -9,6 +9,10 @@ import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 
 import type { PDFDocumentProxy } from 'pdfjs-dist'
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+
+// pdfjs-dist worker (bundled asset URL for prod)
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
 const LetsEncryptTermsOfService: FC = () => {
 
@@ -20,11 +24,6 @@ const LetsEncryptTermsOfService: FC = () => {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState<number>()
 
-  // Set up pdfjs worker
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.min.mjs',
-    import.meta.url,
-  ).toString()
   useEffect(() => {
     const handleResize = () => {
       if (containerRef.current) {
