@@ -2,6 +2,9 @@ global:
   imagePullSecrets: []
   image:
     tag: "" # used if component image.tag is empty; else Chart appVersion
+    # pullPolicy: always    # optional; default IfNotPresent. Use always (any casing) for same-tag registry updates.
+  # rollme: ""              # optional; when Always — fixed rollme; bump manually to roll
+  # rolloutNonce: ""       # optional; when Always — set per CI run (e.g. build id) if you apply frozen manifests (git-rendered YAML); changes rollme without re-helm timing
 
 nameOverride: ""
 fullnameOverride: ""
@@ -45,7 +48,6 @@ components:
       registry: cr.maks-it.com
       repository: certs-ui/server
       tag: ""
-      pullPolicy: IfNotPresent
     env:
       - name: ASPNETCORE_ENVIRONMENT
         value: Production
@@ -64,6 +66,7 @@ components:
           type: pvc
           pvc:
             create: true
+            keep: true
             size: 50Mi
             accessModes: [ReadWriteOnce]
         - name: cache
@@ -71,6 +74,7 @@ components:
           type: pvc
           pvc:
             create: true
+            keep: true
             size: 50Mi
             accessModes: [ReadWriteOnce]
         - name: data
@@ -78,6 +82,7 @@ components:
           type: pvc
           pvc:
             create: true
+            keep: true
             size: 50Mi
             accessModes: [ReadWriteOnce]
     secretsFile:
@@ -139,7 +144,6 @@ components:
       registry: cr.maks-it.com
       repository: certs-ui/client
       tag: ""
-      pullPolicy: IfNotPresent
     service:
       enabled: true
       type: ClusterIP
@@ -161,7 +165,6 @@ components:
       registry: cr.maks-it.com
       repository: certs-ui/reverseproxy
       tag: ""
-      pullPolicy: IfNotPresent
     env:
       - name: ASPNETCORE_ENVIRONMENT
         value: Production

@@ -27,18 +27,18 @@ function Invoke-Plugin {
     Import-PluginDependency -ModuleName "Logging" -RequiredCommand "Write-Log"
 
     $pluginSettings = $Settings
-    $sharedSettings = $Settings.Context
-    $artifactsDirectory = $sharedSettings.ArtifactsDirectory
-    $version = $sharedSettings.Version
+    $sharedSettings = $Settings.context
+    $artifactsDirectory = $sharedSettings.artifactsDirectory
+    $version = $sharedSettings.version
     $archiveInputs = @()
 
-    if ($sharedSettings.PSObject.Properties['ReleaseArchiveInputs'] -and $sharedSettings.ReleaseArchiveInputs) {
-        $archiveInputs = @($sharedSettings.ReleaseArchiveInputs)
+    if ($sharedSettings.PSObject.Properties['releaseArchiveInputs'] -and $sharedSettings.releaseArchiveInputs) {
+        $archiveInputs = @($sharedSettings.releaseArchiveInputs)
     }
-    elseif ($sharedSettings.PSObject.Properties['PackageFile'] -and $sharedSettings.PackageFile) {
-        $archiveInputs = @($sharedSettings.PackageFile.FullName)
-        if ($sharedSettings.PSObject.Properties['SymbolsPackageFile'] -and $sharedSettings.SymbolsPackageFile) {
-            $archiveInputs += $sharedSettings.SymbolsPackageFile.FullName
+    elseif ($sharedSettings.PSObject.Properties['packageFile'] -and $sharedSettings.packageFile) {
+        $archiveInputs = @($sharedSettings.packageFile.FullName)
+        if ($sharedSettings.PSObject.Properties['symbolsPackageFile'] -and $sharedSettings.symbolsPackageFile) {
+            $archiveInputs += $sharedSettings.symbolsPackageFile.FullName
         }
     }
 
@@ -78,16 +78,16 @@ function Invoke-Plugin {
     Write-Log -Level "OK" -Message "  Release archive ready: $zipPath"
 
     $releaseAssetPaths = @($zipPath)
-    if ($sharedSettings.PSObject.Properties['PackageFile'] -and $sharedSettings.PackageFile) {
-        $releaseAssetPaths += $sharedSettings.PackageFile.FullName
+    if ($sharedSettings.PSObject.Properties['packageFile'] -and $sharedSettings.packageFile) {
+        $releaseAssetPaths += $sharedSettings.packageFile.FullName
     }
-    if ($sharedSettings.PSObject.Properties['SymbolsPackageFile'] -and $sharedSettings.SymbolsPackageFile) {
-        $releaseAssetPaths += $sharedSettings.SymbolsPackageFile.FullName
+    if ($sharedSettings.PSObject.Properties['symbolsPackageFile'] -and $sharedSettings.symbolsPackageFile) {
+        $releaseAssetPaths += $sharedSettings.symbolsPackageFile.FullName
     }
 
-    $sharedSettings | Add-Member -NotePropertyName ReleaseDir -NotePropertyValue $artifactsDirectory -Force
-    $sharedSettings | Add-Member -NotePropertyName ReleaseArchivePath -NotePropertyValue $zipPath -Force
-    $sharedSettings | Add-Member -NotePropertyName ReleaseAssetPaths -NotePropertyValue $releaseAssetPaths -Force
+    $sharedSettings | Add-Member -NotePropertyName releaseDir -NotePropertyValue $artifactsDirectory -Force
+    $sharedSettings | Add-Member -NotePropertyName releaseArchivePath -NotePropertyValue $zipPath -Force
+    $sharedSettings | Add-Member -NotePropertyName releaseAssetPaths -NotePropertyValue $releaseAssetPaths -Force
 }
 
 Export-ModuleMember -Function Invoke-Plugin

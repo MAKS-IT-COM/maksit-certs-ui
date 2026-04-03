@@ -1,6 +1,15 @@
 {{- $root := . -}}
+{{- $globalPull := $root.Values.global.image.pullPolicy | default "" }}
 {{- range $compName, $comp := .Values.components }}
 {{- $imageTag := include "certs-ui.component.imageTag" (dict "root" $root "comp" $comp) }}
+{{- $pullPolicy := include "certs-ui.normalizePullPolicy" (coalesce $comp.image.pullPolicy $globalPull "IfNotPresent") | trim }}
+{{- $alwaysPull := eq $pullPolicy "Always" }}
+{{- $rollEpoch := now | unixEpoch | toString }}
+{{- $rollRev := $root.Release.Revision | toString }}
+{{- $rollPin := $root.Values.global.rollme | default "" | toString | trim }}
+{{- $rollNonce := $root.Values.global.rolloutNonce | default "" | toString | trim }}
+{{- /* rollPin wins; else nonce-epoch for CI; else release revision + epoch (helm upgrade bumps revision; re-render bumps epoch). */ -}}
+{{- $rollmeVal := ternary $rollPin (ternary (printf "%s-%s" $rollNonce $rollEpoch) (printf "r%s-%s" $rollRev $rollEpoch) (ne $rollNonce "")) (ne $rollPin "") }}
 {{- $cf := default dict $comp.configMapFile }}
 {{- $sf := default dict $comp.secretsFile }}
 {{- $cmName := ternary $cf.existingConfigMap (printf "%s-%s-configmap" (include "certs-ui.fullname" $root) $compName) (ne ($cf.existingConfigMap | default "") "") }}
@@ -33,13 +42,17 @@ spec:
       labels:
 {{ include "certs-ui.podLabels" (dict "root" $root "component" $compName "imageTag" $imageTag) | indent 8 }}
       annotations:
-        rollme: {{ $root.Release.Revision | quote }}
+        {{- /* With Always: changing rollme forces a rollout so new pods run imagePullPolicy Always against the registry (same tag). Pin global.rollme for stable manifests. */ -}}
+        {{- if $alwaysPull }}
+        rollme: {{ $rollmeVal | quote }}
+        {{- end }}
+        certs-ui.io/image: {{ printf "%s/%s:%s" $comp.image.registry $comp.image.repository $imageTag | quote }}
     spec:
       {{- include "certs-ui.imagePullSecrets" $root | nindent 6 }}
       containers:
         - name: {{ $compName }}
           image: "{{ $comp.image.registry }}/{{ $comp.image.repository }}:{{ $imageTag }}"
-          imagePullPolicy: {{ default "IfNotPresent" $comp.image.pullPolicy }}
+          imagePullPolicy: {{ $pullPolicy }}
           {{ $svc := default dict $comp.service }}
           {{ $tgt := default 8080 $svc.targetPort }}
           ports:

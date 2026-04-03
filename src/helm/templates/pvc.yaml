@@ -4,12 +4,21 @@
 {{- $vols := default (list) $p.volumes }}
 {{- range $vol := $vols }}
 {{- if and (eq $vol.type "pvc") $vol.pvc.create }}
+{{- $keepPvc := true -}}
+{{- if and $vol.pvc (hasKey $vol.pvc "keep") -}}
+{{- $keepPvc = $vol.pvc.keep -}}
+{{- end }}
+
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: {{ include "certs-ui.fullname" $root }}-{{ $compName }}-{{ $vol.name }}
   namespace: {{ $root.Release.Namespace }}
+  {{- if $keepPvc }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
   labels:
     {{- include "certs-ui.labels" $root | nindent 4 }}
     app.kubernetes.io/component: {{ $compName }}
@@ -19,6 +28,6 @@ spec:
     requests:
       storage: {{ default "1Gi" $vol.pvc.size }}
   storageClassName: {{ default $.Values.components.server.persistence.storageClass $vol.pvc.storageClass | quote }}
-{{- end }}
+{{ end }}
 {{- end }}
 {{- end }}

@@ -3,12 +3,23 @@
 
 <#
 .SYNOPSIS
-    Quality gate plugin for validating release readiness.
+    Quality gate plugin (coverage threshold + optional .NET vulnerability scan).
 
 .DESCRIPTION
-    This plugin evaluates quality constraints using shared test
-    results and project files. It enforces coverage thresholds
-    and checks for vulnerable packages before release plugins run.
+    Does not run tests or collect coverage. It reads whatever prior plugins left on the
+    shared engine context (same object passed to every plugin as .context).
+
+    Line coverage for threshold checks is resolved in order (first present wins):
+      - qualityLineCoverage  (generic; any plugin may set this)
+      - coverageLineRate     (conventional flat metric)
+      - testResult.LineRate  (object from a test plugin; property name is conventional)
+
+    Configure coverageThreshold > 0 to require one of those inputs. With coverageThreshold 0
+    and scanVulnerabilities false, the plugin is a no-op.
+
+    When scanVulnerabilities is true, runs dotnet list package --vulnerable on projectFiles.
+
+    Use stageLabel "qualityGate" in scriptsettings.json; plugin module: CorePlugins/QualityGate.psm1 (`"name": "QualityGate"`).
 #>
 
 if (-not (Get-Command Import-PluginDependency -ErrorAction SilentlyContinue)) {
@@ -46,6 +57,32 @@ function Test-VulnerablePackagesInternal {
     return $findings
 }
 
+function Get-LineCoveragePercentFromSharedContext {
+    param(
+        [Parameter(Mandatory = $true)]
+        $Shared
+    )
+
+    foreach ($prop in @('qualityLineCoverage', 'coverageLineRate')) {
+        if ($Shared.PSObject.Properties.Name -contains $prop) {
+            $raw = $Shared.$prop
+            if ($null -eq $raw) { continue }
+            $asString = [string]$raw
+            if ([string]::IsNullOrWhiteSpace($asString)) { continue }
+            return [double]$asString
+        }
+    }
+
+    if ($Shared.PSObject.Properties.Name -contains 'testResult' -and $null -ne $Shared.testResult) {
+        $tr = $Shared.testResult
+        if ($tr.PSObject.Properties.Name -contains 'LineRate') {
+            return [double]$tr.LineRate
+        }
+    }
+
+    return $null
+}
+
 function Invoke-Plugin {
     param(
         [Parameter(Mandatory = $true)]
@@ -54,19 +91,26 @@ function Invoke-Plugin {
 
     Import-PluginDependency -ModuleName "Logging" -RequiredCommand "Write-Log"
     Import-PluginDependency -ModuleName "ScriptConfig" -RequiredCommand "Assert-Command"
+    Import-PluginDependency -ModuleName "ReleaseContext" -RequiredCommand "Resolve-RelativePaths"
 
     $pluginSettings = $Settings
-    $sharedSettings = $Settings.Context
+    $sharedSettings = $Settings.context
+    $scriptDir = $sharedSettings.scriptDir
     $coverageThresholdSetting = $pluginSettings.coverageThreshold
     $failOnVulnerabilitiesSetting = $pluginSettings.failOnVulnerabilities
-    $projectFiles = $sharedSettings.ProjectFiles
-    $testResult = $null
-    if ($sharedSettings.PSObject.Properties['TestResult']) {
-        $testResult = $sharedSettings.TestResult
+    $scanVulnerabilities = $true
+    if ($null -ne $pluginSettings.scanVulnerabilities) {
+        $scanVulnerabilities = [bool]$pluginSettings.scanVulnerabilities
     }
 
-    if ($null -eq $testResult) {
-        throw "QualityGate plugin requires test results. Run the DotNetTest plugin first."
+    if ($pluginSettings.PSObject.Properties['projectFiles'] -and $null -ne $pluginSettings.projectFiles) {
+        $projectFiles = @(Resolve-RelativePaths -Value $pluginSettings.projectFiles -BasePath $scriptDir)
+    }
+    elseif ($sharedSettings.PSObject.Properties['projectFiles'] -and $null -ne $sharedSettings.projectFiles) {
+        $projectFiles = @($sharedSettings.projectFiles)
+    }
+    else {
+        $projectFiles = @()
     }
 
     $coverageThreshold = 0
@@ -74,16 +118,33 @@ function Invoke-Plugin {
         $coverageThreshold = [double]$coverageThresholdSetting
     }
 
-    if ($coverageThreshold -gt 0) {
-        Write-Log -Level "STEP" -Message "Checking coverage threshold..."
-        if ([double]$testResult.LineRate -lt $coverageThreshold) {
-            throw "Line coverage $($testResult.LineRate)% is below the configured threshold of $coverageThreshold%."
+    $needCoverageCheck = $coverageThreshold -gt 0
+    if (-not $needCoverageCheck -and -not $scanVulnerabilities) {
+        Write-Log -Level "INFO" -Message "  Quality gate: no checks enabled (coverageThreshold 0, scanVulnerabilities false)."
+        return
+    }
+
+    $lineRate = $null
+    if ($needCoverageCheck) {
+        $lineRate = Get-LineCoveragePercentFromSharedContext -Shared $sharedSettings
+        if ($null -eq $lineRate) {
+            throw "coverageThreshold is $coverageThreshold but shared context has no line coverage. Set one of: qualityLineCoverage, coverageLineRate, or testResult.LineRate (from an earlier plugin)."
         }
 
-        Write-Log -Level "OK" -Message "  Coverage threshold met: $($testResult.LineRate)% >= $coverageThreshold%"
+        Write-Log -Level "STEP" -Message "Checking line coverage threshold against shared context..."
+        if ($lineRate -lt $coverageThreshold) {
+            throw "Line coverage $lineRate% is below the configured threshold of $coverageThreshold%."
+        }
+
+        Write-Log -Level "OK" -Message "  Coverage threshold met: $lineRate% >= $coverageThreshold%"
     }
     else {
-        Write-Log -Level "WARN" -Message "Skipping coverage threshold check (disabled)."
+        Write-Log -Level "INFO" -Message "  Coverage threshold check not required (coverageThreshold is 0)."
+    }
+
+    if (-not $scanVulnerabilities) {
+        Write-Log -Level "INFO" -Message "  Vulnerability scan skipped (scanVulnerabilities is false)."
+        return
     }
 
     Assert-Command dotnet
@@ -91,6 +152,10 @@ function Invoke-Plugin {
     $failOnVulnerabilities = $true
     if ($null -ne $failOnVulnerabilitiesSetting) {
         $failOnVulnerabilities = [bool]$failOnVulnerabilitiesSetting
+    }
+
+    if ($projectFiles.Count -eq 0) {
+        throw "QualityGate requires projectFiles when scanVulnerabilities is true."
     }
 
     $vulnerabilities = Test-VulnerablePackagesInternal -ProjectFiles $projectFiles

@@ -4,7 +4,10 @@
   "description": "Configuration for Generate-CoverageBadges.ps1 script",
   "openReport": false,
   "paths": {
-    "testProject": "..\\..\\src\\MaksIT.Core.Tests",
+    "testProjects": [
+      "..\\..\\src\\LetsEncrypt.Tests",
+      "..\\..\\src\\MaksIT.Webapi.Tests"
+    ],
     "badgesDir": "..\\..\\assets\\badges"
   },
   "badges": [
@@ -35,7 +38,8 @@
   "_comments": {
     "openReport": "If true, generate and open full HTML coverage report (requires reportgenerator tool).",
     "paths": {
-      "testProject": "Relative path to test project used by TestRunner.",
+      "testProjects": "Array of relative paths (from this folder) to test project directories or .csproj files. All are run; badge metrics aggregate Cobertura line/branch/method stats.",
+      "testProject": "Optional legacy single path if testProjects is omitted.",
       "badgesDir": "Relative path where SVG coverage badges are written."
     },
     "badges": "List of output badges. Each entry maps a metric key (line|branch|method) to filename and label.",

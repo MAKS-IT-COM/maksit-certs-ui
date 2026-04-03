@@ -1,92 +1,108 @@
 {
   "$schema": "https://json-schema.org/draft-07/schema",
   "title": "Release Package Script Settings",
-  "description": "Configuration file for Release-Package.ps1 script.",
-  "Plugins": [
+  "description": "maksit-certs-ui: container images (Web API + Web UI) and Helm chart to OCI. No NuGet packages or zip archives. ReleasePublishGuard (before Docker/Helm) controls allowed branches and tag rules; publish plugins omit branches. Engine aligned with maksit-repoutils.",
+  "plugins": [
     {
-      "Name": "DotNetTest",
-      "Stage": "Test",
-      "Enabled": true,
-      "project": "..\\..\\src\\MaksIT.Core.Tests",
+      "name": "DotNetReleaseVersion",
+      "stageLabel": "build",
+      "enabled": true,
+      "projectFiles": [
+        "..\\..\\src\\MaksIT.Webapi\\MaksIT.Webapi.csproj"
+      ]
+    },
+    {
+      "name": "DotNetTest",
+      "stageLabel": "test",
+      "enabled": true,
+      "projects": [
+        "..\\..\\src\\LetsEncrypt.Tests",
+        "..\\..\\src\\MaksIT.Webapi.Tests"
+      ],
       "resultsDir": "..\\..\\testResults"
     },
     {
-      "Name": "QualityGate",
-      "Stage": "QualityGate",
-      "Enabled": true,
+      "name": "QualityGate",
+      "stageLabel": "qualityGate",
+      "enabled": true,
       "coverageThreshold": 0,
-      "failOnVulnerabilities": true
+      "scanVulnerabilities": false
     },
     {
-      "Name": "DotNetPack",
-      "Stage": "Build",
-      "Enabled": true,
-      "projectFiles": [
-        "..\\..\\src\\MaksIT.Core\\MaksIT.Core.csproj"
-      ],
-      "artifactsDir": "..\\..\\release"
-    },
-    {
-      "Name": "CreateArchive",
-      "Stage": "Build",
-      "Enabled": true,
-      "zipNamePattern": "maksit.core-{version}.zip"
-    },
-    {
-      "Name": "GitHub",
-      "Stage": "Release",
-      "Enabled": true,
+      "name": "ReleasePublishGuard",
+      "stageLabel": "release",
+      "enabled": true,
       "branches": [
         "main"
       ],
-      "githubToken": "GITHUB_MAKS_IT_COM",
-      "repository": "https://github.com/MAKS-IT-COM/maksit-core",
-      "releaseNotesFile": "..\\..\\CHANGELOG.md",
-      "releaseTitlePattern": "Release {version}"
+      "requireExactTagOnHead": true,
+      "tagVersionMustMatchDotNetRelease": true,
+      "whenRequirementsNotMet": "skip",
+      "requireCleanWorkingTree": false,
+      "ensureTagOnRemote": true,
+      "remoteName": "origin"
     },
     {
-      "Name": "NuGet",
-      "Stage": "Release",
-      "Enabled": true,
-      "branches": [
-        "main"
-      ],
-      "nugetApiKey": "NUGET_MAKS_IT",
-      "source": "https://api.nuget.org/v3/index.json"
-    },
-    {
-      "Name": "CleanupArtifacts",
-      "Stage": "Release",
-      "Enabled": true,
-      "includePatterns": [
-        "*"
-      ],
-      "excludePatterns": [
-        "*.zip"
+      "name": "DockerPush",
+      "stageLabel": "release",
+      "enabled": true,
+      "registryUrl": "cr.maks-it.com",
+      "credentialsEnvVar": "CR_MAKS_IT",
+      "projectName": "certs-ui",
+      "contextPath": "..\\..\\src",
+      "pushLatest": true,
+      "images": [
+        {
+          "service": "server",
+          "dockerfile": "MaksIT.Webapi/Dockerfile"
+        },
+        {
+          "service": "client",
+          "dockerfile": "MaksIT.WebUI/Dockerfile.prod"
+        },
+        {
+          "service": "reverseproxy",
+          "dockerfile": "ReverseProxy/Dockerfile"
+        }
       ]
+    },
+    {
+      "name": "HelmPush",
+      "stageLabel": "release",
+      "enabled": true,
+      "chartPath": "..\\..\\src\\helm",
+      "ociRepository": "oci://cr.maks-it.com/charts",
+      "credentialsEnvVar": "CR_MAKS_IT",
+      "pushLatest": false
     }
   ],
   "_comments": {
-    "Plugins": {
-      "Name": "Plugin module file name in CorePlugins (for example, DotNetPack -> CorePlugins/DotNetPack.psm1).",
-      "Stage": "Execution phase. Supported values are Test, QualityGate, Build, and Release.",
-      "Enabled": "If true, the plugin is imported and Invoke-Plugin is called in the configured order.",
-      "branches": "Used only by publish plugins such as GitHub and NuGet. When the current branch is not listed, publishing is skipped.",
-      "project": "DotNetTest plugin only. Path to the test project directory, relative to the script folder.",
-      "resultsDir": "DotNetTest plugin only. Optional results directory path, relative to the script folder.",
-      "projectFiles": "DotNetPack, DotNetPublish, or another producer plugin can define the project files used for version discovery and artifact creation.",
-      "artifactsDir": "DotNetPack, DotNetPublish, or another producer plugin can define the artifacts output directory, relative to the script folder.",
-      "coverageThreshold": "QualityGate plugin only. Coverage threshold percent (0 disables threshold check).",
-      "failOnVulnerabilities": "QualityGate plugin only. If true, fail when vulnerable packages are detected.",
-      "githubToken": "GitHub plugin only. Environment variable name containing the GitHub token used by gh CLI.",
-      "repository": "GitHub plugin only. Optional owner/repo or GitHub remote URL. Leave empty to use remote.origin.url.",
-      "releaseNotesFile": "GitHub plugin (or another notes consumer plugin) can define the release notes source file, relative to the script folder.",
-      "releaseTitlePattern": "GitHub plugin only. Release title pattern. Supports {version} placeholder.",
-      "zipNamePattern": "CreateArchive plugin only. Archive name pattern for packaged release assets. Supports {version} placeholder.",
-      "nugetApiKey": "NuGet plugin only. Environment variable name containing the NuGet API key.",
-      "source": "NuGet plugin only. Feed URL passed to dotnet nuget push.",
-      "includePatterns": "CleanupArtifacts plugin only. File patterns to remove from artifactsDir (for example ['*.nupkg','*.snupkg']).",
-      "excludePatterns": "CleanupArtifacts plugin only. File patterns to keep even when includePatterns match (for example ['*.zip'])."
+    "plugins": {
+      "name": "Plugin module file name in CorePlugins (for example, DockerPush -> CorePlugins/DockerPush.psm1).",
+      "stageLabel": "Execution phase: test, qualityGate, build, or release (lowercase). continueOnError is true only for release.",
+      "enabled": "If true, the plugin is imported and Invoke-Plugin is called in the configured order.",
+      "DotNetReleaseVersion": "Reads <Version> from the first projectFiles entry; ReleasePublishGuard checks tag on HEAD matches when tagVersionMustMatchDotNetRelease is true.",
+      "projects": "DotNetTest: array of test project paths relative to Release-Package. Requires utils/TestRunner.psm1 (multi-project Cobertura aggregation).",
+      "resultsDir": "DotNetTest: optional; when multiple projects are listed, TestRunner uses Release-Package/TestResults if omitted.",
+      "projectFiles": "QualityGate: add .csproj paths when scanVulnerabilities is true (dotnet list package --vulnerable).",
+      "scanVulnerabilities": "QualityGate: false = no dotnet list; true requires projectFiles. failOnVulnerabilities optional when scan is true (default true).",
+      "coverageThreshold": "QualityGate: >0 requires line % on shared context (qualityLineCoverage, coverageLineRate, or testResult.LineRate). 0 disables.",
+      "registryUrl": "DockerPush: registry host without scheme.",
+      "credentialsEnvVar": "DockerPush / HelmPush: env var with base64(username:password).",
+      "projectName": "DockerPush: image path segment: registryUrl/projectName/service:tag.",
+      "contextPath": "DockerPush: directory containing MaksIT.Webapi and MaksIT.WebUI (repo src/).",
+      "images": "Dockerfile paths are relative to contextPath.",
+      "chartPath": "HelmPush: directory containing Chart.yaml. Keep version/appVersion as placeholders in git (e.g. 0.0.0); HelmPush overwrites with bare semver from DotNetReleaseVersion (shared.version, e.g. 3.3.4, no v) before package/push; falls back to stripping v from shared.tag if version is missing.",
+      "ociRepository": "HelmPush: OCI registry URL for helm push (e.g. oci://cr.maks-it.com/charts).",
+      "pushLatest": "Docker: also push :latest (images also get bare :3.3.4 and :v3.3.4 from DotNetReleaseVersion). Helm: oras copy chart to :latest (requires oras on PATH).",
+      "branches": "ReleasePublishGuard: allowed branches for publish (omit or [\"*\"] = any). Do not put branches on DockerPush/HelmPush/GitHub/DotNetNuGet.",
+      "requireExactTagOnHead": "ReleasePublishGuard: require git describe --tags --exact-match HEAD (vX.Y.Z).",
+      "tagVersionMustMatchDotNetRelease": "ReleasePublishGuard: tag semver must equal DotNetReleaseVersion when true.",
+      "whenRequirementsNotMet": "ReleasePublishGuard: skip (suppress publish plugins) or fail (exit 1).",
+      "requireCleanWorkingTree": "ReleasePublishGuard: block publish if git status is not clean.",
+      "ensureTagOnRemote": "ReleasePublishGuard: push tag to remoteName if missing.",
+      "remoteName": "ReleasePublishGuard: git remote for tag push (default origin).",
+      "maksit-repoutils": "Full engine and plugin docs: https://github.com/MAKS-IT-COM/maksit-repoutils (src/Release-Package/README.md)."
     }
   }
 }

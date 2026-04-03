@@ -27,6 +27,12 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 helm.sh/chart: {{ include "certs-ui.chart" . }}
 {{- end }}
 
+{{- /* Kubernetes imagePullPolicy; accepts common casing (always / IfNotPresent). */ -}}
+{{- define "certs-ui.normalizePullPolicy" -}}
+{{- $in := . | toString | trim | lower -}}
+{{- if eq $in "always" -}}Always{{- else if eq $in "never" -}}Never{{- else -}}IfNotPresent{{- end -}}
+{{- end }}
+
 {{- /* Image pull secrets (global) -> list of names) */ -}}
 {{- define "certs-ui.imagePullSecrets" -}}
 {{- $ips := default (list) .Values.global.imagePullSecrets -}}

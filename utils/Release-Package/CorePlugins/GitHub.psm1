@@ -43,7 +43,7 @@ function Get-GitHubRepositoryInternal {
         return "$($matches['owner'])/$($matches['repo'])"
     }
 
-    throw "Could not parse GitHub repo from source: $repoSource. Configure Plugins[].repository with 'owner/repo' or a GitHub URL."
+    throw "Could not parse GitHub repo from source: $repoSource. Configure plugins[].repository with 'owner/repo' or a GitHub URL."
 }
 
 function Get-ReleaseNotesInternal {
@@ -94,15 +94,15 @@ function Invoke-Plugin {
     Import-PluginDependency -ModuleName "ScriptConfig" -RequiredCommand "Assert-Command"
 
     $pluginSettings = $Settings
-    $sharedSettings = $Settings.Context
+    $sharedSettings = $Settings.context
     $githubTokenEnvVar = $pluginSettings.githubToken
     $configuredRepository = $pluginSettings.repository
     $releaseNotesFileSetting = $pluginSettings.releaseNotesFile
     $releaseTitlePatternSetting = $pluginSettings.releaseTitlePattern
-    $scriptDir = $sharedSettings.ScriptDir
-    $version = $sharedSettings.Version
-    $tag = $sharedSettings.Tag
-    $releaseDir = $sharedSettings.ReleaseDir
+    $scriptDir = $sharedSettings.scriptDir
+    $version = $sharedSettings.version
+    $tag = $sharedSettings.tag
+    $releaseDir = $sharedSettings.releaseDir
     $releaseAssetPaths = @()
 
     Assert-Command gh
@@ -123,13 +123,13 @@ function Invoke-Plugin {
     $releaseNotesFile = [System.IO.Path]::GetFullPath((Join-Path $scriptDir $releaseNotesFileSetting))
     $releaseNotes = Get-ReleaseNotesInternal -ReleaseNotesFile $releaseNotesFile -Version $version
 
-    if ($sharedSettings.PSObject.Properties['ReleaseAssetPaths'] -and $sharedSettings.ReleaseAssetPaths) {
-        $releaseAssetPaths = @($sharedSettings.ReleaseAssetPaths)
+    if ($sharedSettings.PSObject.Properties['releaseAssetPaths'] -and $sharedSettings.releaseAssetPaths) {
+        $releaseAssetPaths = @($sharedSettings.releaseAssetPaths)
     }
-    elseif ($sharedSettings.PSObject.Properties['PackageFile'] -and $sharedSettings.PackageFile) {
-        $releaseAssetPaths = @($sharedSettings.PackageFile.FullName)
-        if ($sharedSettings.PSObject.Properties['SymbolsPackageFile'] -and $sharedSettings.SymbolsPackageFile) {
-            $releaseAssetPaths += $sharedSettings.SymbolsPackageFile.FullName
+    elseif ($sharedSettings.PSObject.Properties['packageFile'] -and $sharedSettings.packageFile) {
+        $releaseAssetPaths = @($sharedSettings.packageFile.FullName)
+        if ($sharedSettings.PSObject.Properties['symbolsPackageFile'] -and $sharedSettings.symbolsPackageFile) {
+            $releaseAssetPaths += $sharedSettings.symbolsPackageFile.FullName
         }
     }
 
@@ -217,7 +217,7 @@ function Invoke-Plugin {
         }
 
         Write-Log -Level "OK" -Message "  GitHub release created successfully."
-        $sharedSettings | Add-Member -NotePropertyName PublishCompleted -NotePropertyValue $true -Force
+        $sharedSettings | Add-Member -NotePropertyName publishCompleted -NotePropertyValue $true -Force
     }
     finally {
         if ($null -ne $previousGhToken) {

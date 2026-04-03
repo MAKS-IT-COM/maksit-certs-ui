@@ -1,137 +1,268 @@
 {
 	"info": {
 		"_postman_id": "95186b61-1197-4a6e-a90f-d97223528d90",
-		"name": "LetsEncrypt Client",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "33635244"
+		"name": "LetsEncrypt Client (MaksIT.Webapi)",
+		"description": "Aligned with MaksIT.Webapi controllers: routes under /api (except /.well-known/acme-challenge). Use Identity Login first, then set collection variable accessToken from the response (tests on Login do this). JWT is required for all /api/* routes except identity login, refresh, and logout.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{accessToken}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{ "key": "baseUrl", "value": "http://localhost:8080" },
+		{ "key": "accessToken", "value": "" },
+		{ "key": "refreshToken", "value": "" },
+		{ "key": "sessionId", "value": "" },
+		{ "key": "accountId", "value": "" },
+		{ "key": "userId", "value": "" },
+		{ "key": "challenge", "value": "" },
+		{ "key": "isStaging", "value": "true" },
+		{ "key": "letsEncryptDirectory", "value": "https://acme-v02.api.letsencrypt.org/directory" }
+	],
 	"item": [
 		{
-			"name": "account",
+			"name": "Identity",
 			"item": [
 				{
-					"name": "get cache contacts",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "Accept",
-								"value": "application/json"
+					"name": "login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const j = pm.response.json();",
+									"    const token = j.token ?? j.Token;",
+									"    const refresh = j.refreshToken ?? j.RefreshToken;",
+									"    if (token) pm.collectionVariables.set('accessToken', token);",
+									"    if (refresh) pm.collectionVariables.set('refreshToken', refresh);",
+									"}"
+								],
+								"type": "text/javascript"
 							}
-						],
-						"url": {
-							"raw": "http://localhost:8080/api/Cache/GetContacts/{{accountId}}",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "8080",
-							"path": [
-								"api",
-								"Cache",
-								"GetContacts",
-								"{{accountId}}"
-							]
 						}
-					},
-					"response": []
-				},
-				{
-					"name": "set cache contacts",
+					],
 					"request": {
+						"auth": { "type": "noauth" },
 						"method": "POST",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "Accept",
-								"value": "application/json"
-							}
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Accept", "value": "application/json" }
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n  \"contacts\": [\r\n    \"maksym.sadovnychyy@gmail.com\"\r\n  ]\r\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
+							"raw": "{\n  \"username\": \"admin\",\n  \"password\": \"password\"\n}",
+							"options": { "raw": { "language": "json" } }
 						},
-						"url": {
-							"raw": "http://localhost:8080/api/Cache/SetContacts/{{accountId}}",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "8080",
-							"path": [
-								"api",
-								"Cache",
-								"SetContacts",
-								"{{accountId}}"
-							]
-						}
-					},
-					"response": []
+						"url": "{{baseUrl}}/api/identity/login"
+					}
 				},
 				{
-					"name": "host with upcoming ssl expire Copy",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"disabled": true
-							},
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"disabled": true
+					"name": "refresh",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const j = pm.response.json();",
+									"    const token = j.token ?? j.Token;",
+									"    if (token) pm.collectionVariables.set('accessToken', token);",
+									"}"
+								],
+								"type": "text/javascript"
 							}
-						],
-						"url": {
-							"raw": "http://localhost:8080/api/CertsFlow/HostsWithUpcomingSslExpiry/{{sessionId}}",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "8080",
-							"path": [
-								"api",
-								"CertsFlow",
-								"HostsWithUpcomingSslExpiry",
-								"{{sessionId}}"
-							]
 						}
-					},
-					"response": []
+					],
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Accept", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{baseUrl}}/api/identity/refresh"
+					}
+				},
+				{
+					"name": "logout",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Accept", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"token\": \"{{accessToken}}\",\n  \"logoutFromAllDevices\": false\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{baseUrl}}/api/identity/logout"
+					}
+				},
+				{
+					"name": "patch user (password)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Accept", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"password\": \"new-password\",\n  \"operations\": {\n    \"password\": \"SetField\"\n  }\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{baseUrl}}/api/identity/user/{{userId}}"
+					}
 				}
 			]
 		},
 		{
-			"name": "certs",
+			"name": "Accounts",
 			"item": [
 				{
-					"name": "letsencrypt directory",
+					"name": "list accounts",
 					"request": {
 						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{letsEncryptDirectory}}",
-							"host": [
-								"{{letsEncryptDirectory}}"
+						"header": [{ "key": "Accept", "value": "application/json" }],
+						"url": "{{baseUrl}}/api/accounts"
+					}
+				},
+				{
+					"name": "get account",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Accept", "value": "application/json" }],
+						"url": "{{baseUrl}}/api/account/{{accountId}}"
+					}
+				},
+				{
+					"name": "create account (full flow)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Accept", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"description\": \"Postman test\",\n  \"contacts\": [\"mailto:you@example.com\"],\n  \"challengeType\": \"http-01\",\n  \"hostnames\": [\"staging.example.com\"],\n  \"isStaging\": true,\n  \"agreeToS\": true\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{baseUrl}}/api/account"
+					}
+				},
+				{
+					"name": "patch account (description)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Accept", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"description\": \"Updated from Postman\",\n  \"operations\": {\n    \"description\": \"SetField\"\n  }\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{baseUrl}}/api/account/{{accountId}}"
+					}
+				},
+				{
+					"name": "delete account",
+					"request": {
+						"method": "DELETE",
+						"header": [{ "key": "Accept", "value": "application/json" }],
+						"url": "{{baseUrl}}/api/account/{{accountId}}"
+					}
+				}
+			]
+		},
+		{
+			"name": "Cache",
+			"item": [
+				{
+					"name": "download full cache (zip)",
+					"request": {
+						"method": "GET",
+						"url": "{{baseUrl}}/api/cache/download"
+					}
+				},
+				{
+					"name": "upload full cache (zip)",
+					"request": {
+						"method": "POST",
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								}
 							]
 						},
-						"description": "[https://letsencrypt.status.io/](https://letsencrypt.status.io/)"
-					},
-					"response": []
+						"url": "{{baseUrl}}/api/cache/upload"
+					}
+				},
+				{
+					"name": "delete full cache",
+					"request": {
+						"method": "DELETE",
+						"url": "{{baseUrl}}/api/cache"
+					}
+				},
+				{
+					"name": "download account cache (zip)",
+					"request": {
+						"method": "GET",
+						"url": "{{baseUrl}}/api/cache/{{accountId}}/download"
+					}
+				},
+				{
+					"name": "upload account cache (zip bytes)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "\"<base64-encoded-zip>\"",
+							"options": { "raw": { "language": "json" } }
+						},
+						"description": "API binds [FromBody] byte[] as a base64 JSON string. Replace with a real base64 zip payload.",
+						"url": "{{baseUrl}}/api/cache/{{accountId}}/upload"
+					}
+				}
+			]
+		},
+		{
+			"name": "Certs flow",
+			"item": [
+				{
+					"name": "letsencrypt directory (external)",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "GET",
+						"header": [],
+						"url": "{{letsEncryptDirectory}}",
+						"description": "Public ACME directory URL (status: https://letsencrypt.status.io/)"
+					}
 				},
 				{
 					"name": "configure-client",
@@ -140,588 +271,231 @@
 							"listen": "test",
 							"script": {
 								"exec": [
-									"// Ensure the response status code is 200 (OK)\r",
-									"if (pm.response.code === 200) {\r",
-									"    // Get the plain text response\r",
-									"    let responseBody = pm.response.text();\r",
-									"    \r",
-									"    // Remove the surrounding quotes if present\r",
-									"    responseBody = responseBody.replace(/^\"|\"$/g, '');\r",
-									"    \r",
-									"    // Check if the response body is a valid GUID\r",
-									"    if (/^[0-9a-fA-F-]{36}$/.test(responseBody)) {\r",
-									"        // Set the environment variable sessionId with the response\r",
-									"        pm.environment.set(\"sessionId\", responseBody);\r",
-									"        console.log(`sessionId set to: ${responseBody}`);\r",
-									"    } else {\r",
-									"        console.log(\"Response body is not a valid GUID\");\r",
-									"    }\r",
-									"} else {\r",
-									"    console.log(`Request failed with status code: ${pm.response.code}`);\r",
-									"}\r",
-									""
+									"if (pm.response.code !== 200) return;",
+									"let id = null;",
+									"try {",
+									"    const j = pm.response.json();",
+									"    if (typeof j === 'string') id = j.replace(/^\"|\"$/g, '');",
+									"    else if (j && j.value != null) id = String(j.value);",
+									"    else if (j && j.sessionId) id = String(j.sessionId);",
+									"} catch (e) {",
+									"    const m = pm.response.text().match(/[0-9a-fA-F]{8}-[0-9a-fA-F-]{27}/);",
+									"    if (m) id = m[0];",
+									"}",
+									"if (id && /^[0-9a-fA-F-]{36}$/.test(id)) {",
+									"    pm.collectionVariables.set('sessionId', id);",
+									"    console.log('sessionId set to', id);",
+									"}"
 								],
-								"type": "text/javascript",
-								"packages": {}
+								"type": "text/javascript"
 							}
 						}
 					],
 					"request": {
 						"method": "POST",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "Accept",
-								"value": "application/json"
-							}
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Accept", "value": "application/json" }
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"isStaging\": {{isStaging}}\r\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
+							"raw": "{\n  \"isStaging\": {{isStaging}}\n}",
+							"options": { "raw": { "language": "json" } }
 						},
-						"url": {
-							"raw": "http://localhost:8080/api/certs/configure-client",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "8080",
-							"path": [
-								"api",
-								"certs",
-								"configure-client"
-							]
-						}
-					},
-					"response": []
+						"url": "{{baseUrl}}/api/certs/configure-client"
+					}
 				},
 				{
 					"name": "terms-of-service",
 					"request": {
 						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "http://localhost:8080/api/certs/{{sessionId}}/terms-of-service",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "8080",
-							"path": [
-								"api",
-								"certs",
-								"{{sessionId}}",
-								"terms-of-service"
-							]
-						}
-					},
-					"response": []
+						"header": [{ "key": "Accept", "value": "application/json" }],
+						"url": "{{baseUrl}}/api/certs/{{sessionId}}/terms-of-service",
+						"description": "Returns base64-encoded PDF (JSON string or wrapped per API Result serializer)."
+					}
 				},
 				{
-					"name": "init",
+					"name": "init (new account)",
 					"event": [
 						{
 							"listen": "test",
 							"script": {
 								"exec": [
-									"// Ensure the response status code is 200 (OK)\r",
-									"if (pm.response.code === 200) {\r",
-									"    // Get the plain text response\r",
-									"    let responseBody = pm.response.text();\r",
-									"    \r",
-									"    // Remove the surrounding quotes if present\r",
-									"    responseBody = responseBody.replace(/^\"|\"$/g, '');\r",
-									"    \r",
-									"    // Check if the response body is a valid GUID\r",
-									"    if (/^[0-9a-fA-F-]{36}$/.test(responseBody)) {\r",
-									"        // Set the environment variable accountId with the response\r",
-									"        pm.environment.set(\"accountId\", responseBody);\r",
-									"        console.log(`accountId set to: ${responseBody}`);\r",
-									"    } else {\r",
-									"        console.log(\"Response body is not a valid GUID\");\r",
-									"    }\r",
-									"} else {\r",
-									"    console.log(`Request failed with status code: ${pm.response.code}`);\r",
-									"}\r",
-									""
+									"if (pm.response.code !== 200) return;",
+									"try {",
+									"    const j = pm.response.json();",
+									"    const v = typeof j === 'string' ? j.replace(/^\"|\"$/g, '') : (j.value != null ? String(j.value) : null);",
+									"    if (v && /^[0-9a-fA-F-]{36}$/.test(v)) pm.collectionVariables.set('accountId', v);",
+									"} catch (e) {}"
 								],
-								"type": "text/javascript",
-								"packages": {}
+								"type": "text/javascript"
 							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Accept", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"description\": \"Postman session\",\n  \"contacts\": [\"mailto:you@example.com\"]\n}",
+							"options": { "raw": { "language": "json" } }
 						},
+						"url": "{{baseUrl}}/api/certs/{{sessionId}}/init"
+					}
+				},
+				{
+					"name": "init (existing account)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Accept", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"description\": \"Postman session\",\n  \"contacts\": [\"mailto:you@example.com\"]\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{baseUrl}}/api/certs/{{sessionId}}/init/{{accountId}}"
+					}
+				},
+				{
+					"name": "new order",
+					"event": [
 						{
-							"listen": "prerequest",
+							"listen": "test",
 							"script": {
 								"exec": [
-									"// Retrieve sessionId and accountId from environment variables or global variables\r",
-									"var sessionId = pm.environment.get(\"sessionId\") || pm.globals.get(\"sessionId\");\r",
-									"var accountId = pm.environment.get(\"accountId\") || pm.globals.get(\"accountId\");\r",
-									"\r",
-									"// Base URL without the optional accountId parameter\r",
-									"var baseUrl = `http://localhost:8080/CertsFlow/Init/${sessionId}`;\r",
-									"\r",
-									"// Append the accountId if it is provided\r",
-									"if (accountId) {\r",
-									"    pm.request.url = `${baseUrl}/${accountId}`;\r",
-									"} else {\r",
-									"    pm.request.url = baseUrl;\r",
+									"if (pm.response.code !== 200) return;",
+									"const j = pm.response.json();",
+									"const arr = Array.isArray(j) ? j : (j.value && Array.isArray(j.value) ? j.value : null);",
+									"if (arr && arr.length > 0) {",
+									"    pm.collectionVariables.set('challenge', arr[0]);",
+									"    console.log('challenge token file name:', arr[0]);",
 									"}"
 								],
-								"type": "text/javascript",
-								"packages": {}
+								"type": "text/javascript"
 							}
 						}
 					],
 					"request": {
 						"method": "POST",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "Accept",
-								"value": "application/json"
-							}
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Accept", "value": "application/json" }
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n  \"contacts\": [\r\n    \"maksym.sadovnychyy@gmail.com\"\r\n  ]\r\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
+							"raw": "{\n  \"hostnames\": [\"staging.example.com\"],\n  \"challengeType\": \"http-01\"\n}",
+							"options": { "raw": { "language": "json" } }
 						},
-						"url": {
-							"raw": "http://localhost:8080/api/certs/{{sessionId}}/init/{{accountId}}",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "8080",
-							"path": [
-								"api",
-								"certs",
-								"{{sessionId}}",
-								"init",
-								"{{accountId}}"
-							]
-						}
-					},
-					"response": []
+						"url": "{{baseUrl}}/api/certs/{{sessionId}}/order"
+					}
 				},
 				{
-					"name": "order",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"// Ensure the response status code is 200 (OK)\r",
-									"if (pm.response.code === 200) {\r",
-									"    // Parse the JSON response\r",
-									"    let responseBody;\r",
-									"    try {\r",
-									"        responseBody = pm.response.json();\r",
-									"    } catch (e) {\r",
-									"        console.error(\"Failed to parse JSON response:\", e);\r",
-									"        return;\r",
-									"    }\r",
-									"\r",
-									"    // Check if the response is an array and has at least one element\r",
-									"    if (Array.isArray(responseBody) && responseBody.length > 0) {\r",
-									"        // Get the first element of the array\r",
-									"        const firstElement = responseBody[0];\r",
-									"        \r",
-									"        // Set the environment variable challenge with the first element\r",
-									"        pm.environment.set(\"challenge\", firstElement);\r",
-									"        console.log(`challenge set to: ${firstElement}`);\r",
-									"    } else {\r",
-									"        console.log(\"Response body is not an array or is empty\");\r",
-									"    }\r",
-									"} else {\r",
-									"    console.log(`Request failed with status code: ${pm.response.code}`);\r",
-									"}\r",
-									""
-								],
-								"type": "text/javascript",
-								"packages": {}
-							}
-						}
-					],
+					"name": "acme-challenge (local API)",
 					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "Accept",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\r\n  \"hostnames\": [\r\n    \"staging.maks-it.com\"\r\n  ],\r\n  \"challengeType\": \"http-01\"\r\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "http://localhost:8080/api/certs/{{sessionId}}/order",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "8080",
-							"path": [
-								"api",
-								"certs",
-								"{{sessionId}}",
-								"order"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "acme-challenge local",
-					"request": {
+						"auth": { "type": "noauth" },
 						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "http://localhost:8080/.well-known/acme-challenge/{{challenge}}",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "8080",
-							"path": [
-								".well-known",
-								"acme-challenge",
-								"{{challenge}}"
-							]
-						}
-					},
-					"response": []
+						"url": "{{baseUrl}}/.well-known/acme-challenge/{{challenge}}",
+						"description": "No JWT. Returns text/plain challenge response."
+					}
 				},
 				{
-					"name": "acme-challenge",
+					"name": "acme-challenge (public host)",
 					"request": {
+						"auth": { "type": "noauth" },
 						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "http://staging.maks-it.com/.well-known/acme-challenge/{{challenge}}",
-							"protocol": "http",
-							"host": [
-								"staging",
-								"maks-it",
-								"com"
-							],
-							"path": [
-								".well-known",
-								"acme-challenge",
-								"{{challenge}}"
-							]
-						}
-					},
-					"response": []
+						"url": "http://staging.example.com/.well-known/acme-challenge/{{challenge}}"
+					}
 				},
 				{
 					"name": "complete-challenges",
 					"request": {
 						"method": "POST",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "Accept",
-								"value": "application/json"
-							}
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Accept", "value": "application/json" }
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "http://localhost:8080/api/certs/{{sessionId}}/complete-challenges",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "8080",
-							"path": [
-								"api",
-								"certs",
-								"{{sessionId}}",
-								"complete-challenges"
-							]
-						}
-					},
-					"response": []
+						"url": "{{baseUrl}}/api/certs/{{sessionId}}/complete-challenges"
+					}
 				},
 				{
 					"name": "order-status",
 					"request": {
-						"method": "POST",
+						"method": "GET",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "Accept",
-								"value": "application/json"
-							}
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Accept", "value": "application/json" }
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n  \"hostnames\": [\r\n    \"staging.maks-it.com\"\r\n  ]\r\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
+							"raw": "{\n  \"hostnames\": [\"staging.example.com\"]\n}",
+							"options": { "raw": { "language": "json" } }
 						},
-						"url": {
-							"raw": "http://localhost:8080/api/certs/{{sessionId}}/order-status",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "8080",
-							"path": [
-								"api",
-								"certs",
-								"{{sessionId}}",
-								"order-status"
-							]
-						}
-					},
-					"response": []
+						"description": "Matches CertsFlowController: HttpGet with [FromBody] GetOrderRequest. Some clients/proxies strip GET bodies; if this fails, consider fixing the API to POST.",
+						"url": "{{baseUrl}}/api/certs/{{sessionId}}/order-status"
+					}
 				},
 				{
-					"name": "download",
+					"name": "download certificates",
 					"request": {
 						"method": "POST",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "Accept",
-								"value": "application/json"
-							}
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Accept", "value": "application/json" }
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n  \"hostnames\": [\r\n    \"staging.maks-it.com\"\r\n  ]\r\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
+							"raw": "{\n  \"hostnames\": [\"staging.example.com\"]\n}",
+							"options": { "raw": { "language": "json" } }
 						},
-						"url": {
-							"raw": "http://localhost:8080/api/certs/{{sessionId}}//certificates/download",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "8080",
-							"path": [
-								"api",
-								"certs",
-								"{{sessionId}}",
-								"",
-								"certificates",
-								"download"
-							]
-						}
-					},
-					"response": []
+						"url": "{{baseUrl}}/api/certs/{{sessionId}}/certificates/download"
+					}
 				},
 				{
-					"name": "apply",
+					"name": "apply certificates",
 					"request": {
 						"method": "POST",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "Accept",
-								"value": "application/json"
-							}
+							{ "key": "Accept", "value": "application/json" }
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\r\n  \"hostnames\": [\r\n    \"staging.maks-it.com\"\r\n  ]\r\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "http://localhost:8080/api/certs/{{sessionId}}/certificates/apply",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "8080",
-							"path": [
-								"api",
-								"certs",
-								"{{sessionId}}",
-								"certificates",
-								"apply"
-							]
-						}
-					},
-					"response": []
+						"description": "Uses accountId (not sessionId). No request body.",
+						"url": "{{baseUrl}}/api/certs/{{accountId}}/certificates/apply"
+					}
 				},
 				{
-					"name": "revoke",
+					"name": "revoke certificates",
 					"request": {
 						"method": "POST",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							},
-							{
-								"key": "Accept",
-								"value": "application/json",
-								"type": "text"
-							}
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Accept", "value": "application/json" }
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n  \"hostnames\": [\r\n    \"staging.maks-it.com\"\r\n  ]\r\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
+							"raw": "{\n  \"hostnames\": [\"staging.example.com\"]\n}",
+							"options": { "raw": { "language": "json" } }
 						},
-						"url": {
-							"raw": "http://localhost:8080/api/certs/{{sessionId}}/certificates/revoke",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "8080",
-							"path": [
-								"api",
-								"certs",
-								"{{sessionId}}",
-								"certificates",
-								"revoke"
-							]
-						}
-					},
-					"response": []
+						"url": "{{baseUrl}}/api/certs/{{sessionId}}/certificates/revoke"
+					}
 				}
 			]
 		},
 		{
-			"name": "agent",
+			"name": "Agent (via Web API)",
+			"description": "Proxied by AgentController; uses same JWT as other /api routes.",
 			"item": [
 				{
-					"name": "reload service",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "x-api-key",
-								"value": "{{agentKey}}"
-							},
-							{
-								"key": "Accept",
-								"value": "application/json"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\r\n    \"serviceName\": {{serviceName}}\r\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "http://websrv0001.corp.maks-it.com:5000/Service/Reload",
-							"protocol": "http",
-							"host": [
-								"websrv0001",
-								"corp",
-								"maks-it",
-								"com"
-							],
-							"port": "5000",
-							"path": [
-								"Service",
-								"Reload"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "hello world",
+					"name": "test (HelloWorld)",
 					"request": {
 						"method": "GET",
-						"header": [
-							{
-								"key": "x-api-key",
-								"value": "{{agentKey}}",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "http://websrv0001.corp.maks-it.com:5000/HelloWorld",
-							"protocol": "http",
-							"host": [
-								"websrv0001",
-								"corp",
-								"maks-it",
-								"com"
-							],
-							"port": "5000",
-							"path": [
-								"HelloWorld"
-							]
-						}
-					},
-					"response": []
+						"header": [{ "key": "Accept", "value": "application/json" }],
+						"url": "{{baseUrl}}/api/agent/test"
+					}
 				}
 			]
 		}

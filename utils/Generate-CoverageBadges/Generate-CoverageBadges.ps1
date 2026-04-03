@@ -10,9 +10,10 @@
     SVG badges for line, branch, and method coverage.
 
     Configuration is stored in scriptsettings.json:
-    - openReport           : Generate and open full HTML report (true/false)
-    - paths.testProject    : Relative path to test project
-    - paths.badgesDir      : Relative path to badges output directory
+    - openReport             : Generate and open full HTML report (true/false)
+    - paths.testProjects     : Array of relative paths to test projects (preferred)
+    - paths.testProject      : Single test project path (legacy; use testProjects)
+    - paths.badgesDir        : Relative path to badges output directory
     - badges               : Array of badges to generate (name, label, metric)
     - colorThresholds      : Coverage percentages for badge colors
 
@@ -81,8 +82,23 @@ $thresholds = $Settings.colorThresholds
 # Runtime options from settings
 $OpenReport = if ($null -ne $Settings.openReport) { [bool]$Settings.openReport } else { $false }
 
-# Resolve configured paths to absolute paths
-$TestProjectPath = [System.IO.Path]::GetFullPath((Join-Path $ScriptDir $Settings.paths.testProject))
+# Resolve configured paths to absolute paths (one or more test projects)
+$testProjectPaths = [System.Collections.Generic.List[string]]::new()
+$pathsNode = $Settings.paths
+if ($pathsNode.PSObject.Properties.Name -contains 'testProjects' -and $pathsNode.testProjects) {
+    foreach ($rel in @($pathsNode.testProjects)) {
+        if ([string]::IsNullOrWhiteSpace([string]$rel)) { continue }
+        $testProjectPaths.Add([System.IO.Path]::GetFullPath((Join-Path $ScriptDir $rel.Trim())))
+    }
+}
+if ($testProjectPaths.Count -eq 0 -and $pathsNode.testProject) {
+    $testProjectPaths.Add([System.IO.Path]::GetFullPath((Join-Path $ScriptDir $pathsNode.testProject)))
+}
+if ($testProjectPaths.Count -eq 0) {
+    Write-Error "Configure paths.testProjects (array of relative paths) or paths.testProject (single path) in scriptsettings.json."
+    exit 1
+}
+
 $BadgesDir = [System.IO.Path]::GetFullPath((Join-Path $ScriptDir $Settings.paths.badgesDir))
 
 # Ensure badges directory exists
@@ -163,7 +179,15 @@ function New-Badge {
 
 #region Test And Coverage
 
-$coverage = Invoke-TestsWithCoverage -TestProjectPath $TestProjectPath -KeepResults:$OpenReport
+$invokeCoverageParams = @{
+    TestProjectPath = @($testProjectPaths)
+    KeepResults     = $OpenReport
+}
+# Keep single-project results next to that project; for several projects use a shared folder under this script.
+if ($testProjectPaths.Count -gt 1) {
+    $invokeCoverageParams.ResultsDirectory = Join-Path $ScriptDir "TestResults"
+}
+$coverage = Invoke-TestsWithCoverage @invokeCoverageParams
 if (-not $coverage.Success) {
     Write-Error "Tests failed: $($coverage.Error)"
     exit 1
@@ -210,10 +234,17 @@ Write-Log -Level "STEP" -Message "Commit the badges/ folder to update README."
 if ($OpenReport -and $coverage.CoverageFile) {
     Write-LogStep -Message "Generating HTML report..."
     Assert-Command reportgenerator
-    
-    $ResultsDir = Split-Path (Split-Path $coverage.CoverageFile -Parent) -Parent
+
+    # Cobertura file(s): single path, or semicolon-separated list from merged runs.
+    $firstCobertura = if ($coverage.CoverageFiles -and $coverage.CoverageFiles.Count -gt 0) {
+        $coverage.CoverageFiles[0]
+    }
+    else {
+        ($coverage.CoverageFile -split ';')[0].Trim()
+    }
+    $ResultsDir = Split-Path (Split-Path $firstCobertura -Parent) -Parent
     $ReportDir = Join-Path $ResultsDir "report"
-    
+
     $reportGenArgs = @(
         "-reports:$($coverage.CoverageFile)"
         "-targetdir:$ReportDir"

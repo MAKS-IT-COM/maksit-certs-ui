@@ -18,11 +18,15 @@ Port-forward API example:
 ------------------------------------------------------------
 ## Images
 
-Image tag: `components.*.image.tag`, then `global.image.tag`, then Chart `appVersion`. Change tag and run `helm upgrade` to roll out.
+Image tag: `components.*.image.tag`, then `global.image.tag`, then Chart `appVersion`.
 
-`pullPolicy: Always` helps with a moving tag (e.g. latest); pinned tags often use `IfNotPresent`.
+**imagePullPolicy** resolves as: `components.*.image.pullPolicy` (if set in your values), else `global.image.pullPolicy`, else `IfNotPresent`. Values may use **`always`** / **`Always`** (normalized for the Pod spec).
 
-Pod annotation `rollme` tracks Helm release revision.
+With **`Always`**, the chart sets pod annotation **`rollme`**: by default **`r<Release.Revision>-<unixEpoch>`** so each **`helm upgrade`** bumps the revision even when the tag is unchanged. For **`helm template`** output committed to git, revision is usually **1** and epoch is frozen until you re-render — then pass **`global.rolloutNonce`** from CI (unique per deploy, e.g. pipeline id) so the applied manifest changes every image push. Pin **`global.rollme`** to a string you bump when you need a stable, deterministic rollout key.
+
+With **`IfNotPresent`** (default), **`rollme`** is omitted; the node may keep a cached layer for a mutable tag even if you replace the tag in the registry.
+
+Pod annotation **certs-ui.io/image** is the resolved `registry/repository:tag` for debugging.
 
 ------------------------------------------------------------
 ## Config

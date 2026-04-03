@@ -265,3 +265,4 @@ __pycache__/
 # SonarQube
 .scannerwork/
 .sonarlint/
+src/MaksIT.WebUI/public/pdf.worker.min.mjs

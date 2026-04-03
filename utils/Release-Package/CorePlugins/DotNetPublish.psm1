@@ -27,14 +27,14 @@ function Invoke-Plugin {
     Import-PluginDependency -ModuleName "Logging" -RequiredCommand "Write-Log"
     Import-PluginDependency -ModuleName "ScriptConfig" -RequiredCommand "Assert-Command"
 
-    $sharedSettings = $Settings.Context
-    $projectFiles = $sharedSettings.ProjectFiles
-    $artifactsDirectory = $sharedSettings.ArtifactsDirectory
+    $sharedSettings = $Settings.context
+    $projectFiles = $sharedSettings.projectFiles
+    $artifactsDirectory = $sharedSettings.artifactsDirectory
     $publishProjectPath = $null
 
     Assert-Command dotnet
 
-    if (-not $sharedSettings.PSObject.Properties['ProjectFiles'] -or $projectFiles.Count -eq 0) {
+    if (-not $sharedSettings.PSObject.Properties['projectFiles'] -or $projectFiles.Count -eq 0) {
         throw "DotNetPublish plugin requires project files in the shared context."
     }
 
@@ -63,9 +63,9 @@ function Invoke-Plugin {
 
     Write-Log -Level "OK" -Message "  Published artifact ready: $publishDir"
 
-    $sharedSettings | Add-Member -NotePropertyName PackageFile -NotePropertyValue $null -Force
-    $sharedSettings | Add-Member -NotePropertyName SymbolsPackageFile -NotePropertyValue $null -Force
-    $sharedSettings | Add-Member -NotePropertyName ReleaseArchiveInputs -NotePropertyValue @($publishDir) -Force
+    $sharedSettings | Add-Member -NotePropertyName packageFile -NotePropertyValue $null -Force
+    $sharedSettings | Add-Member -NotePropertyName symbolsPackageFile -NotePropertyValue $null -Force
+    $sharedSettings | Add-Member -NotePropertyName releaseArchiveInputs -NotePropertyValue @($publishDir) -Force
 }
 
 Export-ModuleMember -Function Invoke-Plugin
