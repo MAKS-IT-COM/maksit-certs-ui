@@ -40,30 +40,30 @@ function Get-ConfiguredPlugins {
         [psobject]$Settings
     )
 
-    if (-not $Settings.PSObject.Properties['Plugins'] -or $null -eq $Settings.Plugins) {
+    if (-not $Settings.PSObject.Properties['plugins'] -or $null -eq $Settings.plugins) {
         return @()
     }
 
     # JSON can deserialize a single plugin as one object or multiple plugins as an array.
     # Always return an array so the engine can loop without special-case logic.
-    if ($Settings.Plugins -is [System.Collections.IEnumerable] -and -not ($Settings.Plugins -is [string])) {
-        return @($Settings.Plugins)
+    if ($Settings.plugins -is [System.Collections.IEnumerable] -and -not ($Settings.plugins -is [string])) {
+        return @($Settings.plugins)
     }
 
-    return @($Settings.Plugins)
+    return @($Settings.plugins)
 }
 
-function Get-PluginStage {
+function Get-PluginStageLabel {
     param(
         [Parameter(Mandatory = $true)]
         $Plugin
     )
 
-    if (-not $Plugin.PSObject.Properties['Stage'] -or [string]::IsNullOrWhiteSpace([string]$Plugin.Stage)) {
-        return "Release"
+    if (-not $Plugin.PSObject.Properties['stageLabel'] -or [string]::IsNullOrWhiteSpace([string]$Plugin.stageLabel)) {
+        return 'release'
     }
 
-    return [string]$Plugin.Stage
+    return [string]$Plugin.stageLabel
 }
 
 function Get-PluginBranches {
@@ -88,17 +88,38 @@ function Get-PluginBranches {
     return @([string]$Plugin.branches)
 }
 
+function Test-PluginAllowedOnBranch {
+    param(
+        [Parameter(Mandatory = $true)]
+        $Plugin,
+
+        [Parameter(Mandatory = $true)]
+        [string]$CurrentBranch
+    )
+
+    $allowedBranches = Get-PluginBranches -Plugin $Plugin
+    if ($allowedBranches.Count -eq 0) {
+        return $true
+    }
+
+    if ($allowedBranches -contains '*') {
+        return $true
+    }
+
+    return $allowedBranches -contains $CurrentBranch
+}
+
 function Test-IsPublishPlugin {
     param(
         [Parameter(Mandatory = $true)]
         $Plugin
     )
 
-    if ($null -eq $Plugin -or [string]::IsNullOrWhiteSpace([string]$Plugin.Name)) {
+    if ($null -eq $Plugin -or [string]::IsNullOrWhiteSpace([string]$Plugin.name)) {
         return $false
     }
 
-    return @('GitHub', 'NuGet') -contains ([string]$Plugin.Name)
+    return @('GitHub', 'DotNetNuGet', 'DockerPush', 'HelmPush') -contains ([string]$Plugin.name)
 }
 
 function Get-PluginSettingValue {
@@ -111,7 +132,7 @@ function Get-PluginSettingValue {
     )
 
     foreach ($plugin in $Plugins) {
-        if ($null -eq $plugin -or [string]::IsNullOrWhiteSpace($plugin.Name)) {
+        if ($null -eq $plugin -or [string]::IsNullOrWhiteSpace($plugin.name)) {
             continue
         }
 
@@ -204,16 +225,15 @@ function Get-ArchiveNamePattern {
     )
 
     foreach ($plugin in $Plugins) {
-        if ($null -eq $plugin -or [string]::IsNullOrWhiteSpace($plugin.Name)) {
+        if ($null -eq $plugin -or [string]::IsNullOrWhiteSpace($plugin.name)) {
             continue
         }
 
-        if (-not $plugin.Enabled) {
+        if (-not $plugin.enabled) {
             continue
         }
 
-        $allowedBranches = Get-PluginBranches -Plugin $plugin
-        if ($allowedBranches.Count -gt 0 -and -not ($allowedBranches -contains $CurrentBranch)) {
+        if (-not (Test-PluginAllowedOnBranch -Plugin $plugin -CurrentBranch $CurrentBranch)) {
             continue
         }
 
@@ -234,7 +254,7 @@ function Resolve-PluginModulePath {
         [string]$PluginsDirectory
     )
 
-    $pluginFileName = "{0}.psm1" -f $Plugin.Name
+    $pluginFileName = "{0}.psm1" -f $Plugin.name
     $candidatePaths = @(
         (Join-Path $PluginsDirectory $pluginFileName),
         (Join-Path (Join-Path (Split-Path $PluginsDirectory -Parent) "CustomPlugins") $pluginFileName)
@@ -264,35 +284,18 @@ function Test-PluginRunnable {
         [bool]$WriteLogs = $true
     )
 
-    if ($null -eq $Plugin -or [string]::IsNullOrWhiteSpace($Plugin.Name)) {
+    if ($null -eq $Plugin -or [string]::IsNullOrWhiteSpace($Plugin.name)) {
         if ($WriteLogs) {
-            Write-Log -Level "WARN" -Message "Skipping plugin entry with no Name."
+            Write-Log -Level "WARN" -Message "Skipping plugin entry with no name."
         }
         return $false
     }
 
-    if (-not $Plugin.Enabled) {
+    if (-not $Plugin.enabled) {
         if ($WriteLogs) {
-            Write-Log -Level "WARN" -Message "Skipping plugin '$($Plugin.Name)' (disabled)."
+            Write-Log -Level "WARN" -Message "Skipping plugin '$($Plugin.name)' (disabled)."
         }
         return $false
-    }
-
-    if (Test-IsPublishPlugin -Plugin $Plugin) {
-        $allowedBranches = Get-PluginBranches -Plugin $Plugin
-        if ($allowedBranches.Count -eq 0) {
-            if ($WriteLogs) {
-                Write-Log -Level "INFO" -Message "Skipping plugin '$($Plugin.Name)' because no publish branches are configured."
-            }
-            return $false
-        }
-
-        if (-not ($allowedBranches -contains $SharedSettings.CurrentBranch)) {
-            if ($WriteLogs) {
-                Write-Log -Level "INFO" -Message "Skipping plugin '$($Plugin.Name)' on branch '$($SharedSettings.CurrentBranch)'."
-            }
-            return $false
-        }
     }
 
     $pluginModulePath = Resolve-PluginModulePath -Plugin $Plugin -PluginsDirectory $PluginsDirectory
@@ -320,8 +323,8 @@ function New-PluginInvocationSettings {
         $properties[$property.Name] = $property.Value
     }
 
-    # Plugins receive their own config plus a shared Context object that carries runtime artifacts.
-    $properties['Context'] = $SharedSettings
+    # Plugins receive their own config plus shared runtime context.
+    $properties['context'] = $SharedSettings
     return [pscustomobject]$properties
 }
 
@@ -344,8 +347,13 @@ function Invoke-ConfiguredPlugin {
         return
     }
 
+    if ((Test-IsPublishPlugin -Plugin $Plugin) -and ($SharedSettings.PSObject.Properties.Name -contains 'skipPublishPlugins') -and $SharedSettings.skipPublishPlugins) {
+        Write-Log -Level "INFO" -Message "Skipping plugin '$($Plugin.name)' (ReleasePublishGuard suppressed publish)."
+        return
+    }
+
     $pluginModulePath = Resolve-PluginModulePath -Plugin $Plugin -PluginsDirectory $PluginsDirectory
-    Write-Log -Level "STEP" -Message "Running plugin '$($Plugin.Name)'..."
+    Write-Log -Level "STEP" -Message "Running plugin '$($Plugin.name)'..."
 
     try {
         $moduleInfo = Import-Module $pluginModulePath -Force -PassThru -ErrorAction Stop
@@ -355,14 +363,14 @@ function Invoke-ConfiguredPlugin {
         $pluginSettings = New-PluginInvocationSettings -Plugin $Plugin -SharedSettings $SharedSettings
 
         & $invokeCommand -Settings $pluginSettings
-        Write-Log -Level "OK" -Message "  Plugin '$($Plugin.Name)' completed."
+        Write-Log -Level "OK" -Message "  Plugin '$($Plugin.name)' completed."
     }
     catch {
-        Write-Log -Level "ERROR" -Message "  Plugin '$($Plugin.Name)' failed: $($_.Exception.Message)"
+        Write-Log -Level "ERROR" -Message "  Plugin '$($Plugin.name)' failed: $($_.Exception.Message)"
         if (-not $ContinueOnError) {
             exit 1
         }
     }
 }
 
-Export-ModuleMember -Function Import-PluginDependency, Get-ConfiguredPlugins, Get-PluginStage, Get-PluginBranches, Test-IsPublishPlugin, Get-PluginSettingValue, Get-PluginPathListSetting, Get-PluginPathSetting, Get-ArchiveNamePattern, Resolve-PluginModulePath, Test-PluginRunnable, New-PluginInvocationSettings, Invoke-ConfiguredPlugin
+Export-ModuleMember -Function Import-PluginDependency, Get-ConfiguredPlugins, Get-PluginStageLabel, Get-PluginBranches, Test-IsPublishPlugin, Get-PluginSettingValue, Get-PluginPathListSetting, Get-PluginPathSetting, Get-ArchiveNamePattern, Resolve-PluginModulePath, Test-PluginRunnable, New-PluginInvocationSettings, Invoke-ConfiguredPlugin

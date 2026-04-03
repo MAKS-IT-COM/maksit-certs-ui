@@ -1,5 +1,7 @@
 # MaksIT.CertsUI – Modern container-native ACME client with a full WebUI experience
 
+![Line Coverage](assets/badges/coverage-lines.svg) ![Branch Coverage](assets/badges/coverage-branches.svg) ![Method Coverage](assets/badges/coverage-methods.svg)
+
 MaksIT.CertsUI is a powerful, container-native ACMEv2 client built to simplify and automate the entire lifecycle of HTTPS certificates issued by Let’s Encrypt. It is an independent, unofficial project and is not affiliated with or endorsed by Let’s Encrypt or ISRG.
 
 Designed for modern infrastructure, it combines a robust WebAPI, intuitive WebUI, and lightweight edge Agent to deliver fully automated certificate issuance, renewal, and deployment across Docker, Podman, and Kubernetes environments. MaksIT.CertsUI supports the HTTP-01 challenge and follows the official [Let’s Encrypt guidelines](https://letsencrypt.org/docs/) while implementing recommended security and operational best practices.
@@ -18,7 +20,8 @@ If you find this project useful, please consider supporting its development:
 
 - [MaksIT.CertsUI – Modern container-native ACME client with a full WebUI experience](#maksitcertsui--modern-container-native-acme-client-with-a-full-webui-experience)
   - [Table of Contents](#table-of-contents)
-  - [Versions History](#versions-history)
+  - [Changelog](#changelog)
+  - [Contributing](#contributing)
   - [Architecture](#architecture)
     - [Current Limitations](#current-limitations)
     - [Architecture Scheme](#architecture-scheme)
@@ -43,18 +46,13 @@ If you find this project useful, please consider supporting its development:
   - [Contact](#contact)
 
 
-## Versions History
+## Changelog
 
-* 29 Jun, 2019 - V1.0.0
-* 01 Nov, 2019 - V2.0.0 (Dependency Injection pattern implementation)
-* 31 May, 2024 - V3.0.0 (Webapi and containerization)
-* 11 Aug, 2024 - V3.1.0 (Release)
-* 11 Sep, 2025 - V3.2.0 New WebUI with authentication
-* 15 Nov, 2025 - V3.3.0 Pre release
-* 22 Nov, 2025 - V3.3.1 Public release
-* 20 Dec, 2025 - V3.3.2 Minimal helm chart and documentation improvements
-* 20 Dec, 2025 - V3.3.3 Relicense project from GPL-3.0 to Apache-2.0
+Version history and release notes live in [CHANGELOG.md](CHANGELOG.md).
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, pull request expectations, and security reporting.
 
 ---
 
@@ -619,7 +617,9 @@ Helm OCI support enables you to pull and install Helm charts directly from conta
 
 ### 2. Prepare Namespace, Secrets, and ConfigMap
 
-Before installing the Helm chart, create a dedicated namespace and provide the required secrets and configuration for the MaksIT.CertsUI Webapi.
+By default, the chart creates the server Secret, server ConfigMap, and client ConfigMap from Helm values (`certsServerSecrets`, `certsServerConfig`, `certsClientRuntime`) as defined in [`src/helm/values.yaml`](src/helm/values.yaml). Set those keys in your `custom-values.yaml` (see the next section) and you can skip the manual `kubectl` resources below.
+
+If you prefer to manage Secrets and ConfigMaps yourself, create them in the namespace and point the chart at them with `components.server.secretsFile.existingSecret`, `components.server.configMapFile.existingConfigMap`, and `components.client.configMapFile.existingConfigMap` (leave the templated `content` unused for that component).
 
 **Step 1: Create Namespace**
 
@@ -629,16 +629,18 @@ kubectl create namespace certs-ui
 
 **Step 2: Create the Secret (`appsecrets.json`)**
 
-Replace the placeholder values with your actual secrets. This secret contains authentication and agent keys required by the Webapi.
+Replace the placeholder values with your actual secrets. This secret contains authentication and agent keys required by the Webapi (same shape as the chart’s templated `appsecrets.json`).
 
 ```json
 {
-  "Auth": {
-    "Secret": "<your-auth-secret>",
-    "Pepper": "<your-pepper>"
-},
-  "Agent": {
-    "AgentKey": "<your-agent-key>"
+  "Configuration": {
+    "Auth": {
+      "Secret": "<your-auth-secret>",
+      "Pepper": "<your-pepper>"
+    },
+    "Agent": {
+      "AgentKey": "<your-agent-key>"
+    }
   }
 }
 ```
@@ -646,12 +648,14 @@ Replace the placeholder values with your actual secrets. This secret contains au
 ```bash
 kubectl create secret generic certs-ui-server-secrets \
   --from-literal=appsecrets.json='{
-    "Auth": {
-      "Secret": "<your-auth-secret>",
-      "Pepper": "<your-pepper>"
-    },
-    "Agent": {
-      "AgentKey": "<your-agent-key>"
+    "Configuration": {
+      "Auth": {
+        "Secret": "<your-auth-secret>",
+        "Pepper": "<your-pepper>"
+      },
+      "Agent": {
+        "AgentKey": "<your-agent-key>"
+      }
     }
   }' \
   -n certs-ui
@@ -669,10 +673,11 @@ Edit the values as needed for your environment. This configmap contains applicat
 {
   "Logging": {
     "LogLevel": {
-    "Default": "Information",
-    "Microsoft.AspNetCore": "Warning"
-  }
-},
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
   "Configuration": {
     "Auth": {
       "Issuer": "<your-issuer>",
@@ -704,6 +709,7 @@ kubectl create configmap certs-ui-server-configmap \
         "Microsoft.AspNetCore": "Warning"
       }
     },
+    "AllowedHosts": "*",
     "Configuration": {
       "Auth": {
         "Issuer": "<your-issuer>",
@@ -730,74 +736,75 @@ kubectl create configmap certs-ui-server-configmap \
 **Note:**  
 Replace all JWT-related placeholder values `<your-issuer>`, `<your-audience>` and `<your-agent-hostname>` with your environment-specific values.
 
-**Step 4: Create the ConfigMap (`config.json`)**
+**Step 4: Create the ConfigMap (`config.js`)**
 
-Edit the values as needed for your environment. This configmap contains client settings to connect backend.
+Edit the values as needed for your environment. This ConfigMap supplies the WebUI runtime config. When using Helm values instead, set `certsClientRuntime.apiUrl` (see the next section).
 
-```bash
+```javascript
 window.RUNTIME_CONFIG = {
-  API_URL: "http://<your-server-hostname>/api"
+  API_URL: "http://<your-public-hostname>/api"
 };
 ```
+
+Use the URL your **browser** will call for the API (often the reverse proxy or ingress hostname, not an internal ClusterIP).
 
 ```bash
 kubectl create configmap certs-ui-client-configmap \
   --from-literal=config.js='
     window.RUNTIME_CONFIG = {
-      API_URL: "http://<your-server-hostname>/api"
+      API_URL: "http://<your-public-hostname>/api"
     };' \
   -n certs-ui
 ```
 
 **Note:**  
-Replace `<your-server-hostname>` with the actual hostname or IP address where your MaksIT.CertsUI server is configured.  
-This ConfigMap provides the client-side runtime configuration for the WebUI to connect to the backend API.
+Replace `<your-public-hostname>` with the hostname or IP users use to reach the app (including TLS and port if not 80/443).
 
 ### 3. Create a Minimal Custom Values File
 
-Below is a minimal example of a `custom-values.yaml` for most users. It sets the storage class for persistent volumes, and configures the reverse proxy service. You can further customize this file as needed for your environment.
+Below is a minimal `custom-values.yaml` aligned with the chart’s value schema in [`src/helm/values.yaml`](src/helm/values.yaml). It sets the client API URL, storage class for server PVCs, and optional registry pull secrets.
 
 ```yaml
 global:
-  imagePullSecrets: []  # Keep empty
+  imagePullSecrets: []
+
+certsClientRuntime:
+  apiUrl: "https://certs-ui.example.com/api"
 
 components:
   server:
     persistence:
       storageClass: local-path
-
-  reverseproxy:
-    service:
-      enabled: true
-      type: ClusterIP
-      port: 8080
-      targetPort: 8080
 ```
+
+Override **`certsServerSecrets`** and **`certsServerConfig`** here for production (JWT issuer/audience, agent hostname, ACME endpoints, and auth secrets). Chart defaults are placeholders only.
+
+**Services:** The chart renders one `Service` per component (`server`, `client`, `reverseproxy`). Each `service` block supports `enabled`, `type`, `port`, and `targetPort` only. For Cilium LB-IPAM, MetalLB, or cloud load balancers, use a separate manifest or your platform’s pattern so you can set annotations, `loadBalancerIP`, and session affinity; point that Service at the **reverseproxy** pods (`app.kubernetes.io/component: reverseproxy`).
 
 ### 4. Install the Helm Chart
 
-Install the MaksIT.CertsUI chart using your custom values file.
+Install or upgrade the MaksIT.CertsUI chart using your custom values file (`helm upgrade --install` creates the release on first run).
 
 **On Linux:**
 
 ```bash
-helm upgrade certs-ui oci://cr.maks-it.com/charts/certs-ui \
+helm upgrade --install certs-ui oci://cr.maks-it.com/charts/certs-ui \
   -n certs-ui \
   -f custom-values.yaml \
-  --version 3.3.3 \
+  --version X.Y.Z
 ```
 
-**On Windows PowerShell:*
+**On Windows PowerShell:**
 
 ```powershell
-helm upgrade certs-ui oci://cr.maks-it.com/charts/certs-ui `
+helm upgrade --install certs-ui oci://cr.maks-it.com/charts/certs-ui `
   -n certs-ui `
   -f custom-values.yaml `
-  --version 3.3.3 `
+  --version X.Y.Z
 ```
 
 **Note:**
-Chart version follows app version. To install a specific version, use the `--version` flag:
+`Chart.yaml` in the repository uses placeholder `version` / `appVersion` (`0.0.0`); the release pipeline sets both from the app semver when pushing the chart. When installing from your registry, pass `--version` with the chart version you published (same semver as the app release, e.g. `3.3.4`).
 
 ### 5. Uninstall the Helm Chart
 
@@ -806,15 +813,13 @@ To uninstall the MaksIT.CertsUI chart and remove all associated resources, run t
 **On Linux:**
 
 ```bash
-helm uninstall certs-ui oci://cr.maks-it.com/charts/certs-ui \
-  -n certs-ui
+helm uninstall certs-ui -n certs-ui
 ```
 
 **On Windows PowerShell:**
 
 ```powershell
-helm uninstall certs-ui oci://cr.maks-it.com/charts/certs-ui `
-  -n certs-ui-test
+helm uninstall certs-ui -n certs-ui
 ```
 
 ---

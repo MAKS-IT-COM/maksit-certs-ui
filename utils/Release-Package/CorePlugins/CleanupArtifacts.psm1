@@ -69,8 +69,8 @@ function Invoke-Plugin {
     Import-PluginDependency -ModuleName "Logging" -RequiredCommand "Write-Log"
 
     $pluginSettings = $Settings
-    $sharedSettings = $Settings.Context
-    $artifactsDirectory = $sharedSettings.ArtifactsDirectory
+    $sharedSettings = $Settings.context
+    $artifactsDirectory = $sharedSettings.artifactsDirectory
     $patterns = Get-CleanupPatternsInternal -ConfiguredPatterns $pluginSettings.includePatterns
     $excludePatterns = Get-ExcludePatternsInternal -ConfiguredPatterns $pluginSettings.excludePatterns
 

@@ -1,4 +1,4 @@
-﻿using MaksIT.Core.Webapi.Models;
+using MaksIT.Core.Webapi.Models;
 using MaksIT.LetsEncrypt.Entities;
 using MaksIT.Models.LetsEncryptServer.Account.Requests;
 using MaksIT.Models.LetsEncryptServer.Account.Responses;
@@ -185,7 +185,7 @@ public class AccountService(
       return loadAccountResult.ToResultOfType<GetAccountResponse?>(_ => null);
     }
 
-    return Result<GetAccountResponse?>.Ok(CreateGetAccountResponse(accountId, cache));
+    return Result<GetAccountResponse?>.Ok(CreateGetAccountResponse(accountId, loadAccountResult.Value));
   }
 
   public async Task<Result> DeleteAccountAsync(Guid accountId) {

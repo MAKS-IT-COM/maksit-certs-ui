@@ -3,7 +3,7 @@
 
 <#
 .SYNOPSIS
-    NuGet publish plugin.
+    .NET NuGet publish plugin.
 
 .DESCRIPTION
     This plugin publishes the package artifact from shared runtime
@@ -27,18 +27,18 @@ function Invoke-Plugin {
     Import-PluginDependency -ModuleName "ScriptConfig" -RequiredCommand "Assert-Command"
 
     $pluginSettings = $Settings
-    $sharedSettings = $Settings.Context
+    $sharedSettings = $Settings.context
     $nugetApiKeyEnvVar = $pluginSettings.nugetApiKey
-    $packageFile = $sharedSettings.PackageFile
+    $packageFile = $sharedSettings.packageFile
 
     Assert-Command dotnet
 
     if (-not $packageFile) {
-        throw "NuGet plugin requires a NuGet package artifact. Ensure DotNetPack produced a .nupkg before running NuGet."
+        throw "DotNetNuGet plugin requires a NuGet package artifact. Ensure DotNetPack produced a .nupkg before running DotNetNuGet."
     }
 
     if ([string]::IsNullOrWhiteSpace($nugetApiKeyEnvVar)) {
-        throw "NuGet plugin requires 'nugetApiKey' in scriptsettings.json."
+        throw "DotNetNuGet plugin requires 'nugetApiKey' in scriptsettings.json."
     }
 
     $nugetApiKey = [System.Environment]::GetEnvironmentVariable($nugetApiKeyEnvVar)
@@ -53,15 +53,18 @@ function Invoke-Plugin {
         $pluginSettings.source
     }
 
-    Write-Log -Level "STEP" -Message "Pushing to NuGet.org..."
+    Write-Log -Level "STEP" -Message "Pushing package to NuGet feed..."
     dotnet nuget push $packageFile.FullName -k $nugetApiKey -s $nugetSource --skip-duplicate
 
     if ($LASTEXITCODE -ne 0) {
-        throw "Failed to push the package to NuGet."
+        throw "Failed to push the package to NuGet feed."
     }
 
     Write-Log -Level "OK" -Message "  NuGet push completed."
-    $sharedSettings | Add-Member -NotePropertyName PublishCompleted -NotePropertyValue $true -Force
+    $sharedSettings | Add-Member -NotePropertyName publishCompleted -NotePropertyValue $true -Force
 }
 
 Export-ModuleMember -Function Invoke-Plugin
+
+
+
