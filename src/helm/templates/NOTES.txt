@@ -18,15 +18,17 @@ Port-forward API example:
 ------------------------------------------------------------
 ## Images
 
-Image tag: `components.*.image.tag`, then `global.image.tag`, then Chart `appVersion`.
+Image tag: **`global.image.tag` when set**, else **`components.*.image.tag`**. There is **no** fallback to Chart `appVersion`; set tags explicitly (chart default is `latest` per component when **`global.image.tag`** is omitted). To force one tag for all images, uncomment **`global.image.tag`** in **`values.yaml`** (see commented examples).
 
-**imagePullPolicy** resolves as: `components.*.image.pullPolicy` (if set in your values), else `global.image.pullPolicy`, else `IfNotPresent`. Values may use **`always`** / **`Always`** (normalized for the Pod spec).
+**imagePullPolicy**: **`global.image.pullPolicy` when set**, else **`components.*.image.pullPolicy`**, else **`IfNotPresent`** in the template. Chart **`values.yaml`** sets per-component **`pullPolicy: IfNotPresent`** and omits **`global.image.pullPolicy`** so components win by default. Uncomment the example under **`global.image`** to override all. Values may use **`always`** / **`Always`** (normalized for the Pod spec).
 
 With **`Always`**, the chart sets pod annotation **`rollme`**: by default **`r<Release.Revision>-<unixEpoch>`** so each **`helm upgrade`** bumps the revision even when the tag is unchanged. For **`helm template`** output committed to git, revision is usually **1** and epoch is frozen until you re-render — then pass **`global.rolloutNonce`** from CI (unique per deploy, e.g. pipeline id) so the applied manifest changes every image push. Pin **`global.rollme`** to a string you bump when you need a stable, deterministic rollout key.
 
 With **`IfNotPresent`** (default), **`rollme`** is omitted; the node may keep a cached layer for a mutable tag even if you replace the tag in the registry.
 
 Pod annotation **certs-ui.io/image** is the resolved `registry/repository:tag` for debugging.
+
+Optional per workload under **`components.<name>`**: **`livenessProbe`**, **`readinessProbe`**, **`resources`** (standard Kubernetes container fields). Omit a key to leave it unset.
 
 ------------------------------------------------------------
 ## Config

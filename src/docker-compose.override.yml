@@ -13,7 +13,6 @@ services:
     container_name: certs-ui-client
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - LETSENCRYPT_SERVER=http://localhost:8080
     volumes:
       - ./MaksIT.WebUI:/app
     networks:

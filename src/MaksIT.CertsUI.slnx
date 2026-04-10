@@ -1,0 +1,22 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Documentation/">
+    <File Path="../CHANGELOG.md" />
+    <File Path="../CONTRIBUTING.md" />
+    <File Path="../LICENSE.md" />
+    <File Path="../README.md" />
+  </Folder>
+  <Project Path="docker-compose.dcproj">
+    <Build Solution="*|Any CPU" />
+  </Project>
+  <Project Path="LetsEncrypt.Tests/LetsEncrypt.Tests.csproj" />
+  <Project Path="LetsEncrypt/LetsEncrypt.csproj" />
+  <Project Path="MaksIT.Models/MaksIT.Models.csproj" />
+  <Project Path="MaksIT.Webapi.Tests/MaksIT.Webapi.Tests.csproj" />
+  <Project Path="MaksIT.Webapi/MaksIT.Webapi.csproj" />
+  <Project Path="ReverseProxy/ReverseProxy.csproj" />
+</Solution>

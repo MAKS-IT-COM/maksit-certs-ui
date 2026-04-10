@@ -18,14 +18,14 @@ Large or architectural changes are best discussed first (see [Contact](#contact)
 
 - [.NET SDK](https://dotnet.microsoft.com/download) compatible with the `TargetFramework` values in the `.csproj` files under `src/` (the main solution currently targets **.NET 10**).
 - Optional but recommended for end-to-end checks: **Docker** or **Podman**, as in the README installation sections.
-- **Visual Studio 2022** or another editor with C# support works well; the solution file is `src/MaksIT.CertsUI.sln`.
+- **Visual Studio 2022** (17.14+) or another editor with C# support works well; the solution file is `src/MaksIT.CertsUI.slnx` (SLNX; requires a recent `dotnet` SDK, e.g. 9.0.200+).
 
 ### Build
 
 From the repository root:
 
 ```bash
-dotnet build src/MaksIT.CertsUI.sln -c Release
+dotnet build src/MaksIT.CertsUI.slnx -c Release
 ```
 
 Use `Debug` while iterating locally if you prefer.

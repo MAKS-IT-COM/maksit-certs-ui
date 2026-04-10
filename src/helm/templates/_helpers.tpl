@@ -25,6 +25,7 @@ app.kubernetes.io/name: {{ include "certs-ui.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 helm.sh/chart: {{ include "certs-ui.chart" . }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{- /* Kubernetes imagePullPolicy; accepts common casing (always / IfNotPresent). */ -}}
@@ -44,12 +45,15 @@ imagePullSecrets:
 {{- end }}
 {{- end }}
 
-{{- /* image tag: component, global.image.tag, Chart.AppVersion */ -}}
+{{- /* image tag: global.image.tag when set (non-empty), else components.*.image.tag. No Chart.AppVersion. */ -}}
 {{- define "certs-ui.component.imageTag" -}}
 {{- $root := .root }}
 {{- $comp := .comp }}
 {{- $g := default dict $root.Values.global.image }}
-{{- $comp.image.tag | default $g.tag | default $root.Chart.AppVersion }}
+{{- $gt := $g.tag | default "" | toString | trim -}}
+{{- $ct := $comp.image.tag | default "" | toString | trim -}}
+{{- $tag := ternary $gt $ct (ne $gt "") }}
+{{- required "certs-ui: set global.image.tag and/or each components.*.image.tag" $tag }}
 {{- end }}
 
 {{- define "certs-ui.podLabels" -}}

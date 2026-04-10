@@ -1,10 +1,13 @@
 global:
   imagePullSecrets: []
   image:
-    tag: "" # used if component image.tag is empty; else Chart appVersion
-    # pullPolicy: always    # optional; default IfNotPresent. Use always (any casing) for same-tag registry updates.
-  # rollme: ""              # optional; when Always — fixed rollme; bump manually to roll
-  # rolloutNonce: ""       # optional; when Always — set per CI run (e.g. build id) if you apply frozen manifests (git-rendered YAML); changes rollme without re-helm timing
+    # Uncomment to override every component (global wins when set). Otherwise use each components.*.image.
+    # No Chart.appVersion.
+    # tag: "latest"
+    # pullPolicy: IfNotPresent
+  # Optional rollout tuning (see NOTES): pin a fixed pod annotation or add a nonce for frozen/git-rendered manifests.
+  # rollme: ""
+  # rolloutNonce: ""
 
 nameOverride: ""
 fullnameOverride: ""
@@ -47,7 +50,8 @@ components:
     image:
       registry: cr.maks-it.com
       repository: certs-ui/server
-      tag: ""
+      tag: latest
+      pullPolicy: IfNotPresent
     env:
       - name: ASPNETCORE_ENVIRONMENT
         value: Production
@@ -143,7 +147,8 @@ components:
     image:
       registry: cr.maks-it.com
       repository: certs-ui/client
-      tag: ""
+      tag: latest
+      pullPolicy: IfNotPresent
     service:
       enabled: true
       type: ClusterIP
@@ -159,12 +164,24 @@ components:
         window.RUNTIME_CONFIG = {
           API_URL: {{ .Values.certsClientRuntime.apiUrl | toJson }}
         };
+    livenessProbe:
+      tcpSocket:
+        port: http
+      initialDelaySeconds: 10
+      periodSeconds: 10
+    readinessProbe:
+      tcpSocket:
+        port: http
+      initialDelaySeconds: 5
+      periodSeconds: 5
+    resources: {}
 
   reverseproxy:
     image:
       registry: cr.maks-it.com
       repository: certs-ui/reverseproxy
-      tag: ""
+      tag: latest
+      pullPolicy: IfNotPresent
     env:
       - name: ASPNETCORE_ENVIRONMENT
         value: Production
@@ -175,3 +192,14 @@ components:
       type: ClusterIP
       port: 8080
       targetPort: 8080
+    livenessProbe:
+      tcpSocket:
+        port: http
+      initialDelaySeconds: 15
+      periodSeconds: 10
+    readinessProbe:
+      tcpSocket:
+        port: http
+      initialDelaySeconds: 5
+      periodSeconds: 5
+    resources: {}

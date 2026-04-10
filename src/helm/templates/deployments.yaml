@@ -1,8 +1,11 @@
 {{- $root := . -}}
-{{- $globalPull := $root.Values.global.image.pullPolicy | default "" }}
+{{- $gimg := $root.Values.global.image | default dict -}}
+{{- $globalPull := $gimg.pullPolicy | default "" | toString | trim }}
 {{- range $compName, $comp := .Values.components }}
 {{- $imageTag := include "certs-ui.component.imageTag" (dict "root" $root "comp" $comp) }}
-{{- $pullPolicy := include "certs-ui.normalizePullPolicy" (coalesce $comp.image.pullPolicy $globalPull "IfNotPresent") | trim }}
+{{- $compPull := $comp.image.pullPolicy | default "" | toString | trim }}
+{{- $pullRaw := ternary $globalPull $compPull (ne $globalPull "") }}
+{{- $pullPolicy := include "certs-ui.normalizePullPolicy" (default "IfNotPresent" $pullRaw) | trim }}
 {{- $alwaysPull := eq $pullPolicy "Always" }}
 {{- $rollEpoch := now | unixEpoch | toString }}
 {{- $rollRev := $root.Release.Revision | toString }}
@@ -16,6 +19,8 @@
 {{- $secretName := ternary $sf.existingSecret (printf "%s-%s-secrets" (include "certs-ui.fullname" $root) $compName) (ne ($sf.existingSecret | default "") "") }}
 {{- $hasCm := or (ne ($cf.existingConfigMap | default "") "") (and $cf.key (hasKey $cf "content")) }}
 {{- $hasSecret := or (ne ($sf.existingSecret | default "") "") (and $sf.key (hasKey $sf "content")) }}
+{{- $svc := default dict $comp.service }}
+{{- $tgt := default 8080 $svc.targetPort }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -53,8 +58,6 @@ spec:
         - name: {{ $compName }}
           image: "{{ $comp.image.registry }}/{{ $comp.image.repository }}:{{ $imageTag }}"
           imagePullPolicy: {{ $pullPolicy }}
-          {{ $svc := default dict $comp.service }}
-          {{ $tgt := default 8080 $svc.targetPort }}
           ports:
             - name: http
               containerPort: {{ $tgt }}
@@ -64,6 +67,18 @@ spec:
             - name: {{ .name }}
               value: {{ .value | quote }}
             {{- end }}
+          {{- end }}
+          {{- with $comp.livenessProbe }}
+          livenessProbe:
+{{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $comp.readinessProbe }}
+          readinessProbe:
+{{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $comp.resources }}
+          resources:
+{{- toYaml . | nindent 12 }}
           {{- end }}
           {{- $p := default dict $comp.persistence -}}
           {{- $vols := default (list) $p.volumes -}}
