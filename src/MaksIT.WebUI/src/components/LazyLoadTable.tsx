@@ -4,11 +4,11 @@ interface LazyLoadTableColumnProps {
     key: string
     title: string
     dataIndex: string
-    renderColumn?: (value: any) => React.ReactNode
+    renderColumn?: (value: unknown) => React.ReactNode
 }
 
 interface LazyLoadTableProps {
-    data: any[]
+    data: Record<string, unknown>[]
     columns: LazyLoadTableColumnProps[]
     loadMore: () => void
     colspan?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
@@ -69,7 +69,9 @@ const LazyLoadTable: FC<LazyLoadTableProps> = (props) => {
             >
               {columns.map((column, colIndex) => (
                 <td className={'py-2 px-4 border-b'} key={colIndex}>
-                  {column.renderColumn ? column.renderColumn(row[column.dataIndex]) : row[column.dataIndex]}
+                  {column.renderColumn
+                    ? column.renderColumn(row[column.dataIndex])
+                    : String(row[column.dataIndex] ?? '')}
                 </td>
               ))}
             </tr>

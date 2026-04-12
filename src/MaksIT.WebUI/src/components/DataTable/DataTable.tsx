@@ -54,6 +54,30 @@ const DEFAULT_COL_WIDTH = 150
 const HEADER_ROWS = 2
 const ROW_HEIGHT = 40
 
+/** Normalizes rawd to a valid PagedResponse; treats undefined or invalid data (e.g. error payloads) as empty. */
+function normalizePagedResponse<T>(rawd: PagedResponse<T> | undefined): PagedResponse<T> {
+  if (rawd != null && Array.isArray(rawd.items)) {
+    return {
+      items: rawd.items,
+      pageNumber: rawd.pageNumber ?? 0,
+      pageSize: rawd.pageSize ?? 0,
+      totalCount: rawd.totalCount ?? 0,
+      totalPages: rawd.totalPages ?? 0,
+      hasPreviousPage: rawd.hasPreviousPage ?? false,
+      hasNextPage: rawd.hasNextPage ?? false
+    }
+  }
+  return {
+    items: [],
+    totalCount: 0,
+    pageNumber: 0,
+    pageSize: 0,
+    totalPages: 0,
+    hasPreviousPage: false,
+    hasNextPage: false
+  }
+}
+
 const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>) => {
   const {
     rawd,
@@ -75,18 +99,20 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
   } = props
 
   const {
-    items = [],
-    pageNumber = 0,
-    pageSize = 0,
-    totalCount = 0,
-    totalPages = 0,
-    hasPreviousPage = false,
-    hasNextPage = false,
-  } = rawd || {}
+    items,
+    pageNumber,
+    pageSize,
+    totalCount,
+    totalPages,
+    hasPreviousPage,
+    hasNextPage,
+  } = normalizePagedResponse(rawd)
 
   const gridRef = useRef<MultiGrid>(null)
-  
+  const filterMeasureRef = useRef<HTMLDivElement>(null)
+
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null)
+  const [measuredFilterRowHeight, setMeasuredFilterRowHeight] = useState(0)
   const filterValues = useRef<Record<string, Record<string, string>>>({})
 
   const [colWidths, setColWidths] = useState<number[]>(() => {
@@ -127,6 +153,32 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
       gridRef.current.forceUpdateGrids()
     }
   }, [colWidths, storageKey])
+
+  // Measure filter row content in a hidden node, then set height so row can animate from 0
+  useEffect(() => {
+    const el = filterMeasureRef.current
+    if (!el || columns.length === 0) return
+    const padding = 12
+    const updateHeight = () => {
+      const contentHeight = el.offsetHeight
+      if (contentHeight <= 0) return
+      const total = contentHeight + padding
+      setMeasuredFilterRowHeight((prev) => (prev !== total ? total : prev))
+    }
+    const ro = new ResizeObserver(() => {
+      updateHeight()
+      gridRef.current?.recomputeGridSize()
+    })
+    ro.observe(el)
+    updateHeight()
+    return () => ro.disconnect()
+  }, [columns, colWidths])
+
+  useEffect(() => {
+    if (measuredFilterRowHeight && gridRef.current) {
+      gridRef.current.recomputeGridSize()
+    }
+  }, [measuredFilterRowHeight])
 
   const debouncedOnFilterChange = useMemo(
     () => (onFilterChange ? debounce(onFilterChange, 500) : undefined),
@@ -292,10 +344,20 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
     // Filter row
     if (rowIndex === 1) {
       return isActionCol ? (
-        <div key={key} style={style} className={commonClasses} />
+        <div
+          key={key}
+          style={{ ...style, transition: 'height 0.25s ease-out' }}
+          className={commonClasses}
+        />
       ) : (
-        <div key={key} style={style} className={commonClasses}>
-          {col.filter({ columnId: col.id }, handleFilterChange)}
+        <div
+          key={key}
+          style={{ ...style, transition: 'height 0.25s ease-out' }}
+          className={'box-border flex min-w-0 items-stretch overflow-hidden border-b border-r border-gray-200 px-2 py-1'}
+        >
+          <div className={'w-full min-w-0 self-start'}>
+            {col.filter({ columnId: col.id }, handleFilterChange)}
+          </div>
         </div>
       )
     }
@@ -378,7 +440,24 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
   }
 
   return (
-    <div className={`col-span-${colspan} flex flex-col h-full w-full`}>
+    <div className={`col-span-${colspan} flex flex-col h-full w-full relative`}>
+      {/* Off-screen node to measure filter row content height so row can start at 0 and animate */}
+      {columns[0] && (
+        <div
+          ref={filterMeasureRef}
+          aria-hidden={true}
+          style={{
+            position: 'absolute',
+            left: -9999,
+            top: 0,
+            width: colWidths[1],
+            visibility: 'hidden',
+            pointerEvents: 'none',
+          }}
+        >
+          {columns[0].filter({ columnId: columns[0].id }, handleFilterChange)}
+        </div>
+      )}
       <div className={'flex-1'}>
         <AutoSizer>
           {({ height, width }) => (
@@ -391,7 +470,7 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
               fixedRowCount={HEADER_ROWS}
               height={height}
               rowCount={items.length + HEADER_ROWS}
-              rowHeight={({ index }) => index === 1 ? ROW_HEIGHT * 2 : ROW_HEIGHT}
+              rowHeight={({ index }) => index === 1 ? measuredFilterRowHeight : ROW_HEIGHT}
               width={width}
               onScroll={({ scrollTop, clientHeight, scrollHeight }) =>
                 handleGridScroll({ scrollTop, clientHeight, scrollHeight })

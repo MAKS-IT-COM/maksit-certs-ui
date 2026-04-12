@@ -1,11 +1,12 @@
 import js from '@eslint/js'
+import { defineConfig } from 'eslint/config'
 import globals from 'globals'
 import react from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 
-export default tseslint.config(
+export default defineConfig(
   { ignores: ['dist'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
@@ -29,6 +30,7 @@ export default tseslint.config(
       ],
 
       ...reactHooks.configs.recommended.rules,
+      'react-hooks/set-state-in-effect': 'off',
       
       // react-refresh plugin rules
       'react-refresh/only-export-components': [
@@ -45,6 +47,7 @@ export default tseslint.config(
       // @typescript-eslint plugin rules
       '@typescript-eslint/no-unused-vars': ['warn', { 'argsIgnorePattern': '^_', 'ignoreRestSiblings': true }],
       '@typescript-eslint/no-empty-object-type': 'off',
+      'react-hooks/refs': 'off',
     },
   },
 )

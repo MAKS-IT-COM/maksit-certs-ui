@@ -2,6 +2,7 @@ import { debounce } from 'lodash'
 import { CircleX } from 'lucide-react'
 import { ChangeEvent, FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FieldContainer } from './FieldContainer'
+import { getInputClasses } from './editorStyles'
 
 export interface SelectBoxComponentOption {
   value: string | number
@@ -58,13 +59,11 @@ const SelectBoxComponent: FC<SelectBoxComponentProps> = (props) => {
 
   // Refs to store previous values to detect changes
   const initRef = useRef(false)
-  const prevValue = useRef(value)
   const prevFilterValue = useRef(filterValue)
 
   // Update the selected value and notify parent via onValueChange callback.
   const handleValueChange = useCallback(
     (newValue: string | number) => {
-      prevValue.current = newValue
       // Simulate a ChangeEvent with the new value
       onChange?.({ target: { value: newValue } } as ChangeEvent<HTMLInputElement>)
     },
@@ -104,33 +103,20 @@ const SelectBoxComponent: FC<SelectBoxComponentProps> = (props) => {
     [filterFields, debounceOnFilterChange, showDropdown, handleValueChange, disabled]
   )
 
-  // Effect to sync external value with filter text and trigger filtering.
+  const selectedOption = options.find((option) => option.value === value)
+  const inputValue = showDropdown ? filterValue : (selectedOption?.label ?? '')
+
+  // Fetch the selected option when the parent provides only the id.
   useEffect(() => {
-    // When value is cleared, also clear the filter.
-    if (value === '') {
-      if (prevValue.current !== value) {
-        // Simulate clearing the filter input.
-        handleFilterChange({ target: { value: '' } } as ChangeEvent<HTMLInputElement>)
-      }
+    if (value === '' || selectedOption) {
       return
     }
 
-    // Find the option that matches the current value.
-    const selectedOption = options.find((option) => option.value === value)
-    if (selectedOption) {
-      if (filterValue !== selectedOption.label) {
-        setFilterValue(selectedOption.label) // Only update if the filterValue is different.
-      }
-      return
-    }
-
-    // If the value does not correspond to an existing option,
-    // trigger filtering using the idField.
     if (debounceOnFilterChange && !initRef.current) {
       debounceOnFilterChange(`${idField} == "${value}"`)
       initRef.current = true
     }
-  }, [value, filterValue, options, idField, debounceOnFilterChange, handleFilterChange])
+  }, [value, selectedOption, idField, debounceOnFilterChange])
 
   // Handle click on an option from the dropdown.
   const handleOptionClick = (optionValue: string | number) => {
@@ -174,13 +160,10 @@ const SelectBoxComponent: FC<SelectBoxComponentProps> = (props) => {
         <div className={'relative'}>
           <input
             type={'text'}
-            value={filterValue}
+            value={inputValue}
             onChange={handleFilterChange}
             placeholder={placeholder}
-            className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline
-        ${errorText ? 'border-red-500' : ''}
-        ${disabled ? 'bg-gray-100 text-gray-500 cursor-default' : 'bg-white'}
-        ${readOnly && !disabled ? 'text-gray-500 cursor-default' : ''}`}
+            className={getInputClasses({ errorText, disabled, readOnly })}
             disabled={readOnly || disabled}
             // Open dropdown when input is focused.
             onFocus={() => { if (!disabled) setShowDropdown(true) }}

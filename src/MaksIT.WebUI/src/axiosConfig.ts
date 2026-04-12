@@ -1,12 +1,17 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- axios config bags use dynamic fields (skipLoader) */
 import axios from 'axios'
 import { readIdentity } from './localStorage/identity'
 import { ApiRoutes, GetApiRoute } from './AppMap'
 import { store } from './redux/store'
-import { refreshJwt } from './redux/slices/identitySlice'
+import { refreshJwt, clearIdentity } from './redux/slices/identitySlice'
 import { hideLoader, showLoader } from './redux/slices/loaderSlice'
 import { addToast } from './components/Toast/addToast'
 import { ProblemDetails } from './models/ProblemDetails'
 
+
+interface RequestOptions {
+  skipLoader?: boolean
+}
 
 // Create an Axios instance
 const axiosInstance = axios.create({
@@ -16,17 +21,25 @@ const axiosInstance = axios.create({
 let isRefreshing = false
 let refreshPromise: Promise<unknown> | null = null
 
+const getExcludeUrls = () => [
+  GetApiRoute(ApiRoutes.identityLogin).route,
+  GetApiRoute(ApiRoutes.identityRefresh).route
+]
+
+const isAuthExcludedUrl = (url: string | undefined) =>
+  url !== undefined && getExcludeUrls().includes(url)
+
 // Add a request interceptor
 axiosInstance.interceptors.request.use(
   async config => {
-    // Dispatch request
-    store.dispatch(showLoader())
+    // Dispatch request (unless explicitly skipped)
+    const skipLoader = (config as any).skipLoader as boolean | undefined
+    if (!skipLoader) {
+      store.dispatch(showLoader())
+    }
 
     // List of URLs to exclude from adding Bearer token
-    const excludeUrls = [
-      GetApiRoute(ApiRoutes.identityLogin).route,
-      GetApiRoute(ApiRoutes.identityRefresh).route
-    ]
+    const excludeUrls = getExcludeUrls()
 
     // Check if the URL is in the exclude list
     if (config.url && excludeUrls.includes(config.url)) {
@@ -50,8 +63,15 @@ axiosInstance.interceptors.request.use(
           if (newIdentity) {
             config.headers.Authorization = `${newIdentity.tokenType} ${newIdentity.token}`
           }
+          else {
+            // Refresh failed (e.g. 401); identity was cleared by identitySlice. Do not send request with expired token.
+            store.dispatch(clearIdentity())
+            if (!skipLoader) store.dispatch(hideLoader())
+            return Promise.reject(new Error('Session expired. Please sign in again.'))
+          }
         }
-      } else {
+      }
+      else {
         config.headers.Authorization = `${identity.tokenType} ${identity.token}`
       }
     }
@@ -60,7 +80,10 @@ axiosInstance.interceptors.request.use(
   },
   error => {
     // Handle request error
-    store.dispatch(hideLoader())
+    const skipLoader = (error.config as any)?.skipLoader as boolean | undefined
+    if (!skipLoader) {
+      store.dispatch(hideLoader())
+    }
     return Promise.reject(error)
   }
 )
@@ -68,26 +91,67 @@ axiosInstance.interceptors.request.use(
 // Add a response interceptor
 axiosInstance.interceptors.response.use(
   response => {
-    // Dispatch request end
-    store.dispatch(hideLoader())
+    // Dispatch request end (unless explicitly skipped)
+    const skipLoader = (response.config as any)?.skipLoader as boolean | undefined
+    if (!skipLoader) {
+      store.dispatch(hideLoader())
+    }
     return response
   },
-  error => {
-    // Handle response error
-    store.dispatch(hideLoader())
-    
-    if (error.response) {
-      const contentType = error.response.headers['content-type']
+  async error => {
+    const originalRequest = error.config
 
-      if (contentType && contentType.includes('application/problem+json')) {
-        const problem = error.response.data as ProblemDetails
-        addToast(`${problem.title}: ${problem.detail}`, 'error')
-      }
-      else if (error.response.status === 401) {
-        const problem = error.response.data as ProblemDetails
-        addToast(`${problem.title}: ${problem.detail}`, 'error') 
+    const skipLoader = (originalRequest as any)?.skipLoader as boolean | undefined
+    if (!skipLoader) {
+      store.dispatch(hideLoader())
+    }
+
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retryAfterRefresh && !isAuthExcludedUrl(originalRequest.url)) {
+      const identity = readIdentity()
+      if (identity && new Date(identity.refreshTokenExpiresAt) > new Date()) {
+        originalRequest._retryAfterRefresh = true
+        try {
+          if (!isRefreshing) {
+            isRefreshing = true
+            refreshPromise = store.dispatch(refreshJwt())
+              .finally(() => { isRefreshing = false })
+          }
+          await refreshPromise
+          const newIdentity = readIdentity()
+          if (newIdentity) {
+            originalRequest.headers.Authorization = `${newIdentity.tokenType} ${newIdentity.token}`
+            return axiosInstance(originalRequest)
+          }
+        }
+        catch {
+          // Refresh failed (e.g. 401); clear identity so UI redirects to login
+          store.dispatch(clearIdentity())
+        }
       }
     }
+
+    if (error.response) {
+      const contentType = error.response.headers['content-type']
+      const data = error.response.data
+
+      if (contentType && contentType.includes('application/problem+json')) {
+        const problem = data as ProblemDetails
+        const detail = problem.detail ?? ''
+        const errors = problem.errors
+          ? Object.entries(problem.errors)
+            .flatMap(([key, msgs]) => (msgs ?? []).map(m => `${key}: ${m}`))
+            .join('; ')
+          : ''
+        const message = [detail, errors].filter(Boolean).join(' ') || problem.title || 'Request failed'
+        addToast(message, 'error')
+      }
+      else if (error.response.status === 401) {
+        const problem = data as ProblemDetails
+        const message = problem.detail ?? problem.title ?? 'Unauthorized'
+        addToast(message, 'error')
+      }
+    }
+
     return Promise.reject(error)
   }
 )
@@ -98,14 +162,24 @@ axiosInstance.interceptors.response.use(
  * @param timeout Optional timeout in milliseconds to override the default.
  * @returns The response data, or undefined if an error occurs.
  */
-const getData = async <TResponse>(url: string, timeout?: number): Promise<TResponse | undefined> => {
+const getData = async <TResponse>(
+  url: string,
+  timeout?: number,
+  options?: RequestOptions
+): Promise<TResponse | undefined> => {
   try {
-    const response = await axiosInstance.get<TResponse>(url, {
+    const config: any = {
       headers: {
         'Content-Type': 'application/json'
       },
       ...(timeout ? { timeout } : {})
-    })
+    }
+
+    if (options?.skipLoader) {
+      config.skipLoader = true
+    }
+
+    const response = await axiosInstance.get<TResponse>(url, config)
     return response.data
   } catch {
     // Error is already handled by interceptors, so just return undefined
@@ -120,14 +194,25 @@ const getData = async <TResponse>(url: string, timeout?: number): Promise<TRespo
  * @param timeout Optional timeout in milliseconds to override the default.
  * @returns The response data, or undefined if an error occurs.
  */
-const postData = async <TRequest, TResponse>(url: string, data?: TRequest, timeout?: number): Promise<TResponse | undefined> => {
+const postData = async <TRequest, TResponse>(
+  url: string,
+  data?: TRequest,
+  timeout?: number,
+  options?: RequestOptions
+): Promise<TResponse | undefined> => {
   try {
-    const response = await axiosInstance.post<TResponse>(url, data, {
+    const config: any = {
       headers: {
         'Content-Type': 'application/json'
       },
       ...(timeout ? { timeout } : {})
-    })
+    }
+
+    if (options?.skipLoader) {
+      config.skipLoader = true
+    }
+
+    const response = await axiosInstance.post<TResponse>(url, data, config)
 
     return response.data
   } catch {
@@ -143,14 +228,25 @@ const postData = async <TRequest, TResponse>(url: string, data?: TRequest, timeo
  * @param timeout Optional timeout in milliseconds to override the default.
  * @returns The response data, or undefined if an error occurs.
  */
-const patchData = async <TRequest, TResponse>(url: string, data: TRequest, timeout?: number): Promise<TResponse | undefined> => {
+const patchData = async <TRequest, TResponse>(
+  url: string,
+  data: TRequest,
+  timeout?: number,
+  options?: RequestOptions
+): Promise<TResponse | undefined> => {
   try {
-    const response = await axiosInstance.patch<TResponse>(url, data, {
+    const config: any = {
       headers: {
         'Content-Type': 'application/json'
       },
       ...(timeout ? { timeout } : {})
-    })
+    }
+
+    if (options?.skipLoader) {
+      config.skipLoader = true
+    }
+
+    const response = await axiosInstance.patch<TResponse>(url, data, config)
     return response.data
   } catch {
     // Error is already handled by interceptors, so just return undefined
@@ -165,14 +261,25 @@ const patchData = async <TRequest, TResponse>(url: string, data: TRequest, timeo
  * @param timeout Optional timeout in milliseconds to override the default.
  * @returns The response data, or undefined if an error occurs.
  */
-const putData = async <TRequest, TResponse>(url: string, data: TRequest, timeout?: number): Promise<TResponse | undefined> => {
+const putData = async <TRequest, TResponse>(
+  url: string,
+  data: TRequest,
+  timeout?: number,
+  options?: RequestOptions
+): Promise<TResponse | undefined> => {
   try {
-    const response = await axiosInstance.put<TResponse>(url, data, {
+    const config: any = {
       headers: {
         'Content-Type': 'application/json'
       },
       ...(timeout ? { timeout } : {})
-    })
+    }
+
+    if (options?.skipLoader) {
+      config.skipLoader = true
+    }
+
+    const response = await axiosInstance.put<TResponse>(url, data, config)
     return response.data
   } catch {
     // Error is already handled by interceptors, so just return undefined
@@ -186,14 +293,24 @@ const putData = async <TRequest, TResponse>(url: string, data: TRequest, timeout
  * @param timeout Optional timeout in milliseconds to override the default.
  * @returns The response data, or undefined if an error occurs.
  */
-const deleteData = async <TResponse>(url: string, timeout?: number): Promise<TResponse | undefined> => {
+const deleteData = async <TResponse>(
+  url: string,
+  timeout?: number,
+  options?: RequestOptions
+): Promise<TResponse | undefined> => {
   try {
-    const response = await axiosInstance.delete<TResponse>(url, {
+    const config: any = {
       headers: {
         'Content-Type': 'application/json'
       },
       ...(timeout ? { timeout } : {})
-    })
+    }
+
+    if (options?.skipLoader) {
+      config.skipLoader = true
+    }
+
+    const response = await axiosInstance.delete<TResponse>(url, config)
     return response.data
   } catch {
     // Error is already handled by interceptors, so just return undefined
@@ -211,15 +328,22 @@ const deleteData = async <TResponse>(url: string, timeout?: number): Promise<TRe
 const postBinary = async <TResponse>(
   url: string,
   data: Blob | ArrayBuffer | Uint8Array,
-  timeout?: number
+  timeout?: number,
+  options?: RequestOptions
 ): Promise<TResponse | undefined> => {
   try {
-    const response = await axiosInstance.post<TResponse>(url, data, {
+    const config: any = {
       headers: {
         'Content-Type': 'application/octet-stream'
       },
       ...(timeout ? { timeout } : {})
-    })
+    }
+
+    if (options?.skipLoader) {
+      config.skipLoader = true
+    }
+
+    const response = await axiosInstance.post<TResponse>(url, data, config)
     return response.data
   } catch {
     // Error is already handled by interceptors, so just return undefined
@@ -237,13 +361,20 @@ const postBinary = async <TResponse>(
 const getBinary = async (
   url: string,
   timeout?: number,
-  as: 'arraybuffer' | 'blob' = 'arraybuffer'
+  as: 'arraybuffer' | 'blob' = 'arraybuffer',
+  options?: RequestOptions
 ): Promise<{ data: ArrayBuffer | Blob, headers: Record<string, string> } | undefined> => {
   try {
-    const response = await axiosInstance.get(url, {
+    const config: any = {
       responseType: as,
       ...(timeout ? { timeout } : {})
-    })
+    }
+
+    if (options?.skipLoader) {
+      config.skipLoader = true
+    }
+
+    const response = await axiosInstance.get(url, config)
 
     return {
       data: response.data,
@@ -268,7 +399,8 @@ const getBinary = async (
 const postFormData = async <TResponse>(
   url: string,
   form: FormData | Record<string, string | Blob | File | (string | Blob | File)[]>,
-  timeout?: number
+  timeout?: number,
+  options?: RequestOptions
 ): Promise<TResponse | undefined> => {
   try {
     const formData =
@@ -286,10 +418,16 @@ const postFormData = async <TResponse>(
           return fd
         })()
 
-    const response = await axiosInstance.post<TResponse>(url, formData, {
+    const config: any = {
       // Do NOT set Content-Type; the browser will set the correct multipart boundary
       ...(timeout ? { timeout } : {})
-    })
+    }
+
+    if (options?.skipLoader) {
+      config.skipLoader = true
+    }
+
+    const response = await axiosInstance.post<TResponse>(url, formData, config)
 
     return response.data
   } catch {
@@ -314,7 +452,8 @@ const postFile = async <TResponse>(
   fieldName: string = 'file',
   filename?: string,
   extraFields?: Record<string, string>,
-  timeout?: number
+  timeout?: number,
+  options?: RequestOptions
 ): Promise<TResponse | undefined> => {
   const fd = new FormData()
   const inferredName = filename ?? (file instanceof File ? file.name : 'file')
@@ -324,8 +463,30 @@ const postFile = async <TResponse>(
     Object.entries(extraFields).forEach(([k, v]) => fd.append(k, v))
   }
 
-  return postFormData<TResponse>(url, fd, timeout)
+  return postFormData<TResponse>(url, fd, timeout, options)
 }
+
+/** Options that disable the global loader for a request (for background/UI-only fetches). */
+const noLoaderOptions: RequestOptions = { skipLoader: true }
+
+/**
+ * GET without showing the global loader. Use for background fetches (e.g. table filters, remote labels).
+ */
+const getDataWithoutLoader = async <TResponse>(
+  url: string,
+  timeout?: number
+): Promise<TResponse | undefined> =>
+  getData<TResponse>(url, timeout, noLoaderOptions)
+
+/**
+ * POST without showing the global loader. Use for background fetches (e.g. remote selects, table filters).
+ */
+const postDataWithoutLoader = async <TRequest, TResponse>(
+  url: string,
+  data?: TRequest,
+  timeout?: number
+): Promise<TResponse | undefined> =>
+  postData<TRequest, TResponse>(url, data, timeout, noLoaderOptions)
 
 export {
   axiosInstance,
@@ -337,5 +498,7 @@ export {
   postBinary,
   getBinary,
   postFormData,
-  postFile
+  postFile,
+  getDataWithoutLoader,
+  postDataWithoutLoader
 }

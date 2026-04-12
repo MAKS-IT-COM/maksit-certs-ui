@@ -15,13 +15,10 @@ import { enumToArr, parseAclEntries } from '../../functions'
 import { Role } from '../../models/identity/Role'
 import { AclEntry } from '../../functions/acl/parseAclEntry'
 
-
 interface IdentityRole {
   value: string | number,
   label: string
 }
-
-
 
 interface Identity extends LoginResponse {
   userId?: string,
@@ -32,15 +29,36 @@ interface Identity extends LoginResponse {
 }
 
 interface IdentityState {
-    identity: Identity | null
-    showUserOffcanvas: boolean
-    status: 'idle' | 'loading' | 'failed'
+  identity: Identity | null
+  showUserOffcanvas: boolean
+  status: 'idle' | 'loading' | 'failed'
+  /** Indicates whether identity has been hydrated from localStorage at least once. */
+  hydrated: boolean
+}
+
+/** API JSON may be camelCase or PascalCase; normalize so Authorization and axios see stable keys. */
+const normalizeLoginResponse = (raw: LoginResponse | undefined): LoginResponse | undefined => {
+  if (!raw) return undefined
+  const r = raw as Record<string, unknown>
+  const str = (camel: keyof LoginResponse, pascal: string) => {
+    const v = r[camel] ?? r[pascal]
+    if (v == null) return ''
+    return typeof v === 'string' ? v : String(v)
+  }
+  return {
+    tokenType: str('tokenType', 'TokenType'),
+    token: str('token', 'Token'),
+    expiresAt: str('expiresAt', 'ExpiresAt'),
+    refreshToken: str('refreshToken', 'RefreshToken'),
+    refreshTokenExpiresAt: str('refreshTokenExpiresAt', 'RefreshTokenExpiresAt'),
+  }
 }
 
 const initialState: IdentityState = {
   identity: null,
   showUserOffcanvas: false,
   status: 'idle',
+  hydrated: false,
 }
 
 const login = createAsyncThunk(
@@ -70,14 +88,15 @@ const logout = createAsyncThunk(
 
 const refreshJwt = createAsyncThunk(
   'auth/refreshJwt',
-  async () => {
+  async (force?: boolean) => {
     const identity = readIdentity()
     if (!identity || new Date(identity.refreshTokenExpiresAt) < new Date())
       return
 
     const apiRoute = GetApiRoute(ApiRoutes.identityRefresh)
     const response = await postData<RefreshTokenRequest, LoginResponse>(apiRoute.route, {
-      refreshToken: identity.refreshToken
+      refreshToken: identity.refreshToken,
+      force
     })
 
     return response
@@ -85,14 +104,17 @@ const refreshJwt = createAsyncThunk(
 )
 
 const enrichStateWithJwtContent = (token: string, identity: Identity) => {
-  const jwtContent = jwtDecode(token) as never
+  const jwtContent = jwtDecode(token) as Record<string, unknown>
 
   if (jwtContent) {
     if (jwtContent[Claims.NameIdentifier])
-      identity.userId = jwtContent[Claims.NameIdentifier]
+      identity.userId = jwtContent[Claims.NameIdentifier] as string
 
-    if (jwtContent[Claims.Name])
-      identity.username = jwtContent[Claims.Name]
+    if (identity.username == null || identity.username?.trim() === '') {
+      const nameClaim = jwtContent[Claims.Name] as string | undefined
+      const usernameClaim = (jwtContent['username'] ?? jwtContent['preferred_username']) as string | undefined
+      identity.username = (usernameClaim?.trim()) ? usernameClaim : nameClaim
+    }
 
     if (jwtContent[Claims.Role]) {
 
@@ -104,9 +126,9 @@ const enrichStateWithJwtContent = (token: string, identity: Identity) => {
       })
 
       const jwtRoles: string[] = Array.isArray(jwtContent[Claims.Role])
-        ? jwtContent[Claims.Role]
+        ? jwtContent[Claims.Role] as string[]
         : jwtContent[Claims.Role]
-          ? [jwtContent[Claims.Role]]
+          ? [jwtContent[Claims.Role] as string]
           : []
 
       const identityRoles: IdentityRole [] = []
@@ -117,15 +139,15 @@ const enrichStateWithJwtContent = (token: string, identity: Identity) => {
         }
       })
 
-      identity.roles = identityRoles 
+      identity.roles = identityRoles
     }
 
     if (jwtContent[Claims.AclEntry]) {
       const jwtAcls: string[] = Array.isArray(jwtContent[Claims.AclEntry])
-        ? jwtContent[Claims.AclEntry]
+        ? jwtContent[Claims.AclEntry] as string[]
         : jwtContent[Claims.AclEntry]
-          ? [jwtContent[Claims.AclEntry]]
-          : [] 
+          ? [jwtContent[Claims.AclEntry] as string]
+          : []
 
       if (jwtAcls?.includes('global:admin') ?? false) {
         jwtAcls.splice(jwtAcls.indexOf('global:admin'), 1)
@@ -145,40 +167,52 @@ const identitySlice = createSlice({
   initialState,
   reducers: {
     setIdentityFromLocalStorage: (state) => {
-      const identity = readIdentity()
+      const raw = readIdentity()
+      const identity = normalizeLoginResponse(raw)
 
-      if (identity) {
+      if (identity?.token && identity.refreshTokenExpiresAt) {
+        writeIdentity(identity)
         state.identity = {
           isGlobalAdmin: false,
           ...identity
         }
         enrichStateWithJwtContent(identity.token, state.identity)
       }
+
+      state.hydrated = true
     },
     setShowUserOffcanvas: (state) => {
       state.showUserOffcanvas = true
     },
     setHideUserOffcanvas: (state) => {
       state.showUserOffcanvas = false
+    },
+    /** Clears identity from state and localStorage (e.g. after refresh failed with 401). Does not call logout API. */
+    clearIdentity: (state) => {
+      state.identity = null
+      state.showUserOffcanvas = false
+      state.status = 'idle'
+      removeIdentity()
     }
   },
   extraReducers: (builder) => {
     builder
-        
+
       // Login
       .addCase(login.pending, (state) => {
         state.status = 'loading'
       })
       .addCase(login.fulfilled, (state, action: PayloadAction<LoginResponse | undefined>) => {
         state.status = 'idle'
-        if (action.payload) {
-          state.identity = { 
+        const payload = normalizeLoginResponse(action.payload)
+        if (payload?.token && payload.refreshTokenExpiresAt) {
+          state.identity = {
             isGlobalAdmin: false,
-            ...action.payload
+            ...payload
           }
-          writeIdentity(action.payload)
+          writeIdentity(payload)
 
-          enrichStateWithJwtContent(action.payload.token, state.identity)
+          enrichStateWithJwtContent(payload.token, state.identity)
         }
       })
       .addCase(login.rejected, (state) => {
@@ -206,32 +240,34 @@ const identitySlice = createSlice({
       })
       .addCase(refreshJwt.fulfilled, (state, action: PayloadAction<LoginResponse | undefined>) => {
         state.status = 'idle'
-        
-        if (action.payload) {
+
+        const payload = normalizeLoginResponse(action.payload)
+        if (payload?.token && payload.refreshTokenExpiresAt) {
           state.identity = {
             isGlobalAdmin: false,
-            ...action.payload
+            ...payload
           }
-          writeIdentity(action.payload)
+          writeIdentity(payload)
 
-          enrichStateWithJwtContent(action.payload.token, state.identity)
+          enrichStateWithJwtContent(payload.token, state.identity)
         }
         else {
           state.identity = null
+          state.showUserOffcanvas = false
           removeIdentity()
         }
       })
       .addCase(refreshJwt.rejected, (state) => {
-        state.status = 'failed'
-
+        state.status = 'idle'
         state.identity = null
+        state.showUserOffcanvas = false
         removeIdentity()
       })
   },
 })
 
 export { login, logout, refreshJwt }
-export const { setIdentityFromLocalStorage, setShowUserOffcanvas, setHideUserOffcanvas } = identitySlice.actions
+export const { setIdentityFromLocalStorage, setShowUserOffcanvas, setHideUserOffcanvas, clearIdentity } = identitySlice.actions
 export const selectIdentity = (state: RootState) => state
 
 export default identitySlice.reducer

@@ -5,7 +5,7 @@ import { GetAccountResponse } from '../models/letsEncryptServer/account/response
 import { ApiRoutes, GetApiRoute } from '../AppMap'
 import { ButtonComponent, CheckBoxComponent, RadioGroupComponent, SelectBoxComponent, TextBoxComponent } from '../components/editors'
 import { ChallengeType } from '../entities/ChallengeType'
-import z, { array, boolean, object, Schema, string } from 'zod'
+import z, { array, boolean, object, string, ZodType } from 'zod'
 import { useFormState } from '../hooks/useFormState'
 import { enumToArr } from '../functions'
 import { PostAccountRequest, PostAccountRequestSchema } from '../models/letsEncryptServer/account/requests/PostAccountRequest'
@@ -45,7 +45,7 @@ const RegisterFormProto = (): RegisterFormProps => ({
   agreeToS: false,
 })
 
-const RegisterFormSchema: Schema<RegisterFormProps> = object({
+const RegisterFormSchema: ZodType<RegisterFormProps> = object({
   description: string(),
   
   contact: string(),

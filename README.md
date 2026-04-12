@@ -22,6 +22,9 @@ If you find this project useful, please consider supporting its development:
   - [Table of Contents](#table-of-contents)
   - [Changelog](#changelog)
   - [Contributing](#contributing)
+  - [Patch and delta reference](#patch-and-delta-reference)
+  - [Login and refresh token architecture](#login-and-refresh-token-architecture)
+  - [Reverse proxy routing (YARP)](#reverse-proxy-routing-yarp)
   - [Architecture](#architecture)
     - [Current Limitations](#current-limitations)
     - [Architecture Scheme](#architecture-scheme)
@@ -53,6 +56,43 @@ Version history and release notes live in [CHANGELOG.md](CHANGELOG.md).
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, pull request expectations, and security reporting.
+
+## Patch and delta reference
+
+How PATCH payloads (deltas) are built and applied is documented in **[assets/docs/PATCH_DELTA_REFERENCE.md](assets/docs/PATCH_DELTA_REFERENCE.md)**. It matches the **MaksIT.Core** contract and is aligned with the same topic in **MaksIT-Vault** (this repo focuses on **account** PATCH and **`hostnames`** in the WebUI).
+
+- [TL;DR (start here)](assets/docs/PATCH_DELTA_REFERENCE.md#tldr-start-here)
+- [1. Core contract (MaksIT.Core)](assets/docs/PATCH_DELTA_REFERENCE.md#1-core-contract-maksitcore)
+- [2. Backend (BE) rules](assets/docs/PATCH_DELTA_REFERENCE.md#2-backend-be-rules)
+- [3. Frontend (FE) rules](assets/docs/PATCH_DELTA_REFERENCE.md#3-frontend-fe-rules)
+- [4. Payload examples](assets/docs/PATCH_DELTA_REFERENCE.md#4-payload-examples)
+- [5. Quick reference](assets/docs/PATCH_DELTA_REFERENCE.md#5-quick-reference)
+- [6. Related docs](assets/docs/PATCH_DELTA_REFERENCE.md#6-related-docs)
+- [7. Current implementation vs reference](assets/docs/PATCH_DELTA_REFERENCE.md#7-current-implementation-vs-reference-maksit-certsui)
+
+## Login and refresh token architecture
+
+How login, JWT access tokens, refresh tokens, axios interceptors, and logout interact is documented in **[assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md)**. It is **aligned** with the same topic in **MaksIT-Vault** when both repos sit side by side; see the doc’s “Related” section for the sibling link. **Certs WebAPI** uses a **settings-backed** user store (not Vault’s database/ACL stack); **2FA** is **not** implemented on the Certs backend (the WebUI login fields are disabled).
+
+- [1. Overview](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md#1-overview)
+- [2. Token model](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md#2-token-model)
+- [3. Backend flow](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md#3-backend-flow)
+- [4. Frontend flow](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md#4-frontend-flow)
+- [5. API summary](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md#5-api-summary)
+- [6. Sequence overview](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md#6-sequence-overview)
+- [7. Security notes](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md#7-security-notes)
+- [8. Key files reference](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md#8-key-files-reference)
+
+## Reverse proxy routing (YARP)
+
+How the **YARP** edge splits **ACME challenge**, **Swagger**, **WebAPI**, and **WebUI** traffic is documented in **[assets/docs/REVERSE_PROXY_ROUTING.md](assets/docs/REVERSE_PROXY_ROUTING.md)**. It is aligned with **MaksIT-Vault** for the same deployment pattern; Certs adds **`/.well-known/acme-challenge/`** routing for HTTP-01.
+
+- [Route table](assets/docs/REVERSE_PROXY_ROUTING.md#route-table)
+- [HTTP-01 (Let’s Encrypt)](assets/docs/REVERSE_PROXY_ROUTING.md#http-01-lets-encrypt)
+- [Kubernetes (Helm)](assets/docs/REVERSE_PROXY_ROUTING.md#kubernetes-helm)
+- [Automation and clients](assets/docs/REVERSE_PROXY_ROUTING.md#automation-and-clients)
+- [Direct vs proxied ports (local dev)](assets/docs/REVERSE_PROXY_ROUTING.md#direct-vs-proxied-ports-local-dev)
+- [Related files](assets/docs/REVERSE_PROXY_ROUTING.md#related-files)
 
 ---
 
@@ -307,18 +347,18 @@ In the project root (`/opt/Compose/MaksIT.CertsUI`), create a new file named `do
 ```bash
 sudo tee /opt/Compose/MaksIT.CertsUI/docker-compose.yml <<EOF
 services:
-  reverse-proxy:
+  reverseproxy:
     image: cr.maks-it.com/certs-ui/reverseproxy:latest
-    container_name: reverse-proxy
+    container_name: reverseproxy
     ports:
       - "8080:8080"
     depends_on:
-      - certs-ui-client
-      - certs-ui-server
+      - client
+      - server
     networks:
       - certs-ui-network
 
-  certs-ui-client:
+  client:
     image: cr.maks-it.com/certs-ui/client:latest
     container_name: certs-ui-client
     volumes:
@@ -326,7 +366,7 @@ services:
     networks:
       - certs-ui-network
 
-  certs-ui-server:
+  server:
     image: cr.maks-it.com/certs-ui/server:latest
     container_name: certs-ui-server
     environment:
@@ -416,9 +456,9 @@ podman compose -f docker-compose.yml up --build
 ```
 
 This command builds and starts the following services:
-- **reverse-proxy**: Exposes both `certs-ui-client` and `certs-ui-server` on the same hostname.
-- **certs-ui-client**: The WebUI for managing certificates.
-- **certs-ui-server**: The backend server handling ACME logic and certificate management.
+- **reverseproxy**: YARP edge on port 8080; routes `/api`, `/.well-known/`, and the SPA to **`server`** / **`client`** (same layout as `src/docker-compose.yml` in this repo).
+- **client**: WebUI (Vite) — Compose service name used by YARP (`http://client:5173/` inside the stack).
+- **server**: WebAPI — Compose service name used by YARP (`http://server:5000/` inside the stack).
 
 **Stop the services:**
 
@@ -542,18 +582,18 @@ In the project root (`C:\Compose\MaksIT.CertsUI`), create a new file named `dock
 ```powershell
 Set-Content -Path 'C:\Compose\MaksIT.CertsUI\docker-compose.yml' -Value @'
 services:
-  reverse-proxy:
+  reverseproxy:
     image: cr.maks-it.com/certs-ui/reverseproxy:latest
-    container_name: reverse-proxy
+    container_name: reverseproxy
     ports:
       - "8080:8080"
     depends_on:
-      - certs-ui-client
-      - certs-ui-server
+      - client
+      - server
     networks:
       - certs-ui-network
 
-  certs-ui-client:
+  client:
     image: cr.maks-it.com/certs-ui/client:latest
     container_name: certs-ui-client
     volumes:
@@ -561,7 +601,7 @@ services:
     networks:
       - certs-ui-network
 
-  certs-ui-server:
+  server:
     image: cr.maks-it.com/certs-ui/server:latest
     container_name: certs-ui-server
     environment:
@@ -591,9 +631,9 @@ docker compose -f docker-compose.yml up --build
 ```
 
 This command builds and starts the following services:
-- **reverse-proxy**: Exposes both `certs-ui-client` and `certs-ui-server` on the same hostname.
-- **certs-ui-client**: The WebUI for managing certificates.
-- **certs-ui-server**: The backend server handling ACME logic and certificate management.
+- **reverseproxy**: YARP edge on port 8080; routes `/api`, `/.well-known/`, and the SPA to **`server`** / **`client`** (same layout as `src/docker-compose.yml` in this repo).
+- **client**: WebUI (Vite) — Compose service name used by YARP (`http://client:5173/` inside the stack).
+- **server**: WebAPI — Compose service name used by YARP (`http://server:5000/` inside the stack).
 
 **Stop the services:**
 

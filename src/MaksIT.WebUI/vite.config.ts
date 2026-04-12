@@ -10,7 +10,7 @@ export default defineConfig({
   ],
   server: {
     host: '0.0.0.0',
-    allowedHosts: ['certs-ui-client'],
+    allowedHosts: ['client'],
     watch: {
       usePolling: true,
     },

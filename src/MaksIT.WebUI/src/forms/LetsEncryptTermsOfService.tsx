@@ -69,7 +69,7 @@ const LetsEncryptTermsOfService: FC = () => {
           {error && <div className={'shrink-0 text-red-600'}>{error}</div>}
           {objectUrl && !error && (
             <iframe
-              title={"Let's Encrypt Terms of Service PDF"}
+              title={'Let\'s Encrypt Terms of Service PDF'}
               src={objectUrl}
               className={
                 'min-h-0 w-full flex-1 rounded border border-gray-200 bg-gray-50'

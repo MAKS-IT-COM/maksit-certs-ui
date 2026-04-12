@@ -1,4 +1,4 @@
-import { PatchOperation } from '../../models/PatchOperation.js'
+import { COLLECTION_ITEM_OPERATION, PatchOperation } from '../../models/PatchOperation.js'
 import { deepCopy } from './deepCopy.js'
 import { deepEqual } from './deepEqual.js'
 
@@ -9,7 +9,7 @@ export type Identifiable<I extends string | number = string | number> = {
 }
 
 type OperationBag<K extends string = string> = {
-  operations?: Partial<Record<K | 'collectionItemOperation', PatchOperation>>
+  operations?: Partial<Record<K | typeof COLLECTION_ITEM_OPERATION, PatchOperation>>
 }
 
 type EnsureId<T extends Identifiable> = { id?: T['id'] }
@@ -230,8 +230,11 @@ export const deepDelta = <T extends Record<string, unknown>>(
 
       // --- PRIMITIVE / TYPE CHANGED ---
       if (!deepEqual(formValue, backupValue)) {
-        ;(parentDelta as Delta<T>)[key] = formValue as Delta<T>[typeof key]
-        setOp(parentDelta, key, formValue === null ? PatchOperation.RemoveField : PatchOperation.SetField)
+        const isNullish = formValue === null || formValue === undefined
+        if (!isNullish) {
+          ;(parentDelta as Delta<T>)[key] = formValue as Delta<T>[typeof key]
+        }
+        setOp(parentDelta, key, isNullish ? PatchOperation.RemoveField : PatchOperation.SetField)
       }
     }
   }
@@ -284,6 +287,23 @@ export const deepDelta = <T extends Record<string, unknown>>(
       (policy?.idFieldKey ??
         (typeof identityKey === 'string' ? identityKey : 'id')) as keyof U & string
 
+    /**
+     * Decides which field to use for the identity in the delta payload.
+     *
+     * Rules:
+     * - If the item has a real `id` (server-assigned), always emit it as `id`
+     *   so the backend can match and update/remove correctly.
+     * - Otherwise fall back to the policy's idFieldKey (e.g. "_deltaId") so
+     *   synthetic identities never go into `id` where a Guid is expected.
+     */
+    const getIdFieldForItem = (item: U): keyof U & string => {
+      const directId = (item as Identifiable).id
+      if (directId !== null && directId !== undefined && String(directId).length > 0) {
+        return 'id' as keyof U & string
+      }
+      return idFieldKey
+    }
+
     const sameRoot = (f: U, b: U): boolean => {
       if (!rootKey) return true
       return (f as PlainObject)[rootKey] === (b as PlainObject)[rootKey]
@@ -309,7 +329,7 @@ export const deepDelta = <T extends Record<string, unknown>>(
       if (fid === null || fid === undefined) {
         const addItem = {} as DeltaArrayItem<U>
         Object.assign(addItem, formItem as Partial<U>)
-        addItem.operations = { collectionItemOperation: PatchOperation.AddToCollection }
+        addItem.operations = { [COLLECTION_ITEM_OPERATION]: PatchOperation.AddToCollection }
 
         // normalize children as AddToCollection
         for (const ck of childrenKeys) {
@@ -318,7 +338,7 @@ export const deepDelta = <T extends Record<string, unknown>>(
             const normalized = (v as Identifiable[]).map(child => {
               const c = {} as DeltaArrayItem<Identifiable>
               Object.assign(c, child as Partial<Identifiable>)
-              c.operations = { collectionItemOperation: PatchOperation.AddToCollection }
+              c.operations = { [COLLECTION_ITEM_OPERATION]: PatchOperation.AddToCollection }
               return c
             })
             ;(addItem as PlainObject)[ck] = normalized
@@ -334,8 +354,8 @@ export const deepDelta = <T extends Record<string, unknown>>(
       if (!backupItem) {
         const addItem = {} as DeltaArrayItem<U>
         Object.assign(addItem, formItem as Partial<U>)
-        ;(addItem as PlainObject)[idFieldKey] = fid as IdLike // store identity for server convenience
-        addItem.operations = { collectionItemOperation: PatchOperation.AddToCollection }
+        ;(addItem as PlainObject)[getIdFieldForItem(formItem)] = fid as IdLike // store identity
+        addItem.operations = { [COLLECTION_ITEM_OPERATION]: PatchOperation.AddToCollection }
 
         for (const ck of childrenKeys) {
           const v = (addItem as PlainObject)[ck]
@@ -343,7 +363,7 @@ export const deepDelta = <T extends Record<string, unknown>>(
             const normalized = (v as Identifiable[]).map(child => {
               const c = {} as DeltaArrayItem<Identifiable>
               Object.assign(c, child as Partial<Identifiable>)
-              c.operations = { collectionItemOperation: PatchOperation.AddToCollection }
+              c.operations = { [COLLECTION_ITEM_OPERATION]: PatchOperation.AddToCollection }
               return c
             })
             ;(addItem as PlainObject)[ck] = normalized
@@ -357,13 +377,14 @@ export const deepDelta = <T extends Record<string, unknown>>(
       // 1.c) Re-parenting: root changed
       if (!sameRoot(formItem, backupItem)) {
         const removeItem = {} as DeltaArrayItem<U>
-        ;(removeItem as PlainObject)[idFieldKey] = fid as IdLike
-        removeItem.operations = { collectionItemOperation: PatchOperation.RemoveFromCollection }
+        ;(removeItem as PlainObject)[getIdFieldForItem(backupItem)] = fid as IdLike
+        removeItem.operations = { [COLLECTION_ITEM_OPERATION]: PatchOperation.RemoveFromCollection }
         arrayDelta.push(removeItem)
 
         const addItem = {} as DeltaArrayItem<U>
         Object.assign(addItem, formItem as Partial<U>)
-        addItem.operations = { collectionItemOperation: PatchOperation.AddToCollection }
+        ;(addItem as PlainObject)[getIdFieldForItem(formItem)] = fid as IdLike
+        addItem.operations = { [COLLECTION_ITEM_OPERATION]: PatchOperation.AddToCollection }
 
         if (dropChildren) {
           for (const ck of childrenKeys) {
@@ -378,7 +399,7 @@ export const deepDelta = <T extends Record<string, unknown>>(
               const normalized = (v as Identifiable[]).map(child => {
                 const c = {} as DeltaArrayItem<Identifiable>
                 Object.assign(c, child as Partial<Identifiable>)
-                c.operations = { collectionItemOperation: PatchOperation.AddToCollection }
+                c.operations = { [COLLECTION_ITEM_OPERATION]: PatchOperation.AddToCollection }
                 return c
               })
               ;(addItem as PlainObject)[ck] = normalized
@@ -399,7 +420,7 @@ export const deepDelta = <T extends Record<string, unknown>>(
         if (roleBecameNull) {
           const removeItem = {} as DeltaArrayItem<U>
           ;(removeItem as PlainObject)[idFieldKey] = fid as IdLike
-          removeItem.operations = { collectionItemOperation: PatchOperation.RemoveFromCollection }
+          removeItem.operations = { [COLLECTION_ITEM_OPERATION]: PatchOperation.RemoveFromCollection }
           arrayDelta.push(removeItem)
           continue
         }
@@ -407,7 +428,7 @@ export const deepDelta = <T extends Record<string, unknown>>(
 
       // 1.e) Field-level diff
       const itemDeltaBase = {} as (PlainObject & OperationBag & { id?: U['id'] })
-      ;(itemDeltaBase as PlainObject)[idFieldKey] = fid as IdLike
+      ;(itemDeltaBase as PlainObject)[getIdFieldForItem(formItem)] = fid as IdLike
 
       calculateDelta(
         formItem as PlainObject,
@@ -427,8 +448,8 @@ export const deepDelta = <T extends Record<string, unknown>>(
       if (bid === null || bid === undefined) continue
       if (!formMap.has(bid as string | number)) {
         const removeItem = {} as DeltaArrayItem<U>
-        ;(removeItem as PlainObject)[idFieldKey] = bid as IdLike
-        removeItem.operations = { collectionItemOperation: PatchOperation.RemoveFromCollection }
+        ;(removeItem as PlainObject)[getIdFieldForItem(backupItem)] = bid as IdLike
+        removeItem.operations = { [COLLECTION_ITEM_OPERATION]: PatchOperation.RemoveFromCollection }
         arrayDelta.push(removeItem)
       }
     }

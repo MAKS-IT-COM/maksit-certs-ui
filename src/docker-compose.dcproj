@@ -6,8 +6,9 @@
     <DockerPublishLocally>False</DockerPublishLocally>
     <ProjectGuid>0233e43f-435d-4309-b20c-ecd4bfbd2e63</ProjectGuid>
     <DockerLaunchAction>LaunchBrowser</DockerLaunchAction>
+    <!-- reverseproxy is the only service with host port mappings; server/client are internal-only. Swagger is served via YARP at /swagger. -->
     <DockerServiceUrl>{Scheme}://localhost:{ServicePort}/swagger</DockerServiceUrl>
-    <DockerServiceName>maksit-certs-ui</DockerServiceName>
+    <DockerServiceName>reverseproxy</DockerServiceName>
   </PropertyGroup>
   <ItemGroup>
     <None Include="docker-compose.override.yml">

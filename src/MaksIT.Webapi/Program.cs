@@ -5,7 +5,9 @@ using MaksIT.Webapi;
 using MaksIT.Webapi.Authorization.Filters;
 using MaksIT.Webapi.BackgroundServices;
 using MaksIT.Webapi.Services;
+using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,11 +35,17 @@ builder.Services.Configure<Configuration>(configurationSection);
 // Add logging
 builder.Logging.AddConsoleLogger();
 
-// Add services to the container.
+// JSON: camelCase property names (matches TypeScript models and MaksIT-Vault). MaksIT.Results ObjectResult must use the same options.
+static void ConfigureJsonSerializerOptions(JsonSerializerOptions options) {
+  options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+  options.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+}
+
 builder.Services.AddControllers()
-  .AddJsonOptions(options => {
-    options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
-  });
+  .AddJsonOptions(options => ConfigureJsonSerializerOptions(options.JsonSerializerOptions));
+
+builder.Services.AddOptions<JsonOptions>().Configure(o =>
+  ConfigureJsonSerializerOptions(o.JsonSerializerOptions));
 
 // Add custom authorization filter
 builder.Services.AddScoped<JwtAuthorizationFilter>();

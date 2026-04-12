@@ -13,7 +13,7 @@ const Authorization: FC<AuthorizationProps> = (props) => {
   const navigate = useNavigate()
   const location = useLocation()
   const dispatch = useAppDispatch()
-  const { identity } = useAppSelector((state) => state.identity)
+  const { identity, hydrated } = useAppSelector((state) => state.identity)
 
   const isTokenExpired = useMemo(() => {
     if (!identity || !identity.refreshTokenExpiresAt)
@@ -23,16 +23,23 @@ const Authorization: FC<AuthorizationProps> = (props) => {
   }, [identity])
 
   useEffect(() => {
-    // Load identity from local storage on mount
-    dispatch(setIdentityFromLocalStorage())
-  }, [dispatch])
+    // Load identity from local storage on first mount
+    if (!hydrated) {
+      dispatch(setIdentityFromLocalStorage())
+    }
+  }, [dispatch, hydrated])
 
   useEffect(() => {
+    if (!hydrated) return
+
     if (isTokenExpired) {
-      // Optionally, pass the current location for redirect after login
       navigate('/login', { replace: true, state: { from: location } })
     }
-  }, [isTokenExpired, navigate, location])
+  }, [hydrated, isTokenExpired, navigate, location])
+
+  if (!hydrated) {
+    return <></>
+  }
 
   return !isTokenExpired
     ? children

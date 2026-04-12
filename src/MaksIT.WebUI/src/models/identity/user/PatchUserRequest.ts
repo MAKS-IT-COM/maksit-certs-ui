@@ -1,4 +1,4 @@
-import { object, RefinementCtx, Schema, z } from 'zod'
+import { object, RefinementCtx, ZodType, z } from 'zod'
 import { PatchRequestModelBase, PatchRequestModelBaseSchema } from '../../PatchRequestModelBase'
 import { PatchUserEntityScopeRequest, PatchUserEntityScopeRequestSchema } from './PatchUserEntityScopeRequest'
 
@@ -60,7 +60,7 @@ const PatchUserChangePasswordRequestSchemaRefine = (data: PatchUserChangePasswor
   }
 }
 
-export const PatchUserChangePasswordRequestSchema: Schema<PatchUserChangePasswordRequest> = PatchRequestModelBaseSchema.and(
+export const PatchUserChangePasswordRequestSchema: ZodType<PatchUserChangePasswordRequest> = PatchRequestModelBaseSchema.and(
   object({
     password: z.string(),
     confirmPassword: z.string().optional()

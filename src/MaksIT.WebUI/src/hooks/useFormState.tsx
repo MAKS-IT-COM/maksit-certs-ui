@@ -1,25 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Schema } from 'zod'
+import { useCallback, useMemo, useState } from 'react'
+import { ZodType } from 'zod'
 import { $ZodIssue } from 'zod/v4/core'
 import { deepCopy } from '../functions/deep'
 
 interface UseFormStateProps<FormState> {
-  initialState: FormState;
-  validationSchema: Schema<unknown>;
+  initialState: FormState
+  validationSchema: ZodType<FormState>
 }
 
 type IsPlainObject<T> = T extends object
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-? T extends Function
-  ? false
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  : T extends Array<any>
+  ?
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+  T extends Function
     ? false
-    : true
-: false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    : T extends Array<any>
+      ? false
+      : true
+  : false
 
-type Decrement<N extends number> = [never, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9][N];
+type Decrement<N extends number> = [never, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9][N]
 
 type Path<T, Depth extends number = 5> = Depth extends 0
 ? never
@@ -32,25 +32,22 @@ type Path<T, Depth extends number = 5> = Depth extends 0
   : never;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const useFormState = <T extends Record<string, any>>(props: UseFormStateProps<T>) => {
+const useFormState = <T extends Record<string, any>,>(props: UseFormStateProps<T>) => {
   const {
     initialState,
     validationSchema
   } = props
   
   const [formState, setFormState] = useState(initialState)
-  const [errors, setErrors] = useState<Partial<Record<Path<T>, string>>>({} as Partial<Record<Path<T>, string>>)
-  const [formIsValid, setFormIsValid] = useState<boolean>(true)
 
   // Memoize the validation schema
   const memoizedValidationSchema = useMemo(() => validationSchema, [validationSchema])
 
-  const validateForm = useCallback(() => {
-    
-    const validationResult = memoizedValidationSchema.safeParse(formState)
+  const validationResult = useMemo(() => {
+    return memoizedValidationSchema.safeParse(formState)
+  }, [formState, memoizedValidationSchema])
 
-    setFormIsValid(validationResult.success)
-
+  const errors = useMemo(() => {
     if (!validationResult.success) {
       const validationErrors = validationResult.error.issues
 
@@ -63,23 +60,16 @@ const useFormState = <T extends Record<string, any>>(props: UseFormStateProps<T>
         return acc
       }
 
-      const newErrors = flattenErrors(validationErrors)
-      setErrors(newErrors)
-
-      return
+      return flattenErrors(validationErrors)
     }
 
-    // Reset errors on successful validation
-    setErrors(Object.keys(formState).reduce((acc, key) => ({
+    return Object.keys(formState).reduce((acc, key) => ({
       ...acc,
       [key]: ''
-    }), {} as Partial<Record<Path<T>, string>>))
+    }), {} as Partial<Record<Path<T>, string>>)
+  }, [formState, validationResult])
 
-  }, [formState, memoizedValidationSchema])
-
-  useEffect(() => {
-    validateForm()
-  }, [formState, validateForm])
+  const formIsValid = validationResult.success
 
   /**
    * Handles input change for nested objects

@@ -3,7 +3,7 @@ import { FormContainer, FormContent, FormFooter, FormHeader } from '../component
 import { ButtonComponent, CheckBoxComponent, TextBoxComponent } from '../components/editors'
 import { GetAccountResponse } from '../models/letsEncryptServer/account/responses/GetAccountResponse'
 import { useFormState } from '../hooks/useFormState'
-import { array, boolean, object, Schema, string } from 'zod'
+import { array, boolean, object, string, ZodType } from 'zod'
 import { PlusIcon, TrashIcon } from 'lucide-react'
 import { getData, patchData } from '../axiosConfig'
 import { ApiRoutes, GetApiRoute } from '../AppMap'
@@ -23,7 +23,7 @@ const EditAccountHostnameFormProto = (): EditAccountHostnameFormProps => ({
   hostname: ''
 })
 
-const EditAccountHostnameFormSchema: Schema<EditAccountHostnameFormProps> = object({
+const EditAccountHostnameFormSchema: ZodType<EditAccountHostnameFormProps> = object({
   isDisabled: boolean(),
   hostname: string()
 })
@@ -50,7 +50,7 @@ const RegisterFormProto = (): EditAccountFormProps => ({
   hostnames: [],
 })
 
-const RegisterFormSchema: Schema<EditAccountFormProps> = object({
+const RegisterFormSchema: ZodType<EditAccountFormProps> = object({
   isDisabled: boolean(),
   description: string(),
   

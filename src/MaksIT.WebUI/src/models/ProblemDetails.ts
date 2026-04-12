@@ -3,6 +3,8 @@ export interface ProblemDetails {
   title?: string;
   detail?: string;
   instance?: string;
+  /** Validation errors: property name -> list of messages (ASP.NET ValidationProblemDetails) */
+  errors?: Record<string, string[]>;
   extensions: { [key: string]: never };
 }
 

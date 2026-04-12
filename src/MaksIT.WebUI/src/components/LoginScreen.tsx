@@ -1,4 +1,4 @@
-import { FC, useEffect, KeyboardEvent } from 'react'
+import React, { useEffect, KeyboardEvent } from 'react'
 import { LoginRequest, LoginRequestSchema } from '../models/identity/login/LoginRequest'
 import { useAppDispatch, useAppSelector } from '../redux/hooks'
 import { login } from '../redux/slices/identitySlice'
@@ -6,7 +6,11 @@ import { useFormState } from '../hooks/useFormState'
 import { useNavigate } from 'react-router-dom'
 import { ButtonComponent, TextBoxComponent } from './editors'
 
-const LoginScreen: FC = () => {
+const LoginScreen: React.FC = () => {
+  /* Backend has no 2FA support yet — re-enable when API is ready.
+  const [use2FA, setUse2FA] = useState(false)
+  const [use2FARecovery, setUse2FARecovery] = useState(false)
+  */
 
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
@@ -29,6 +33,15 @@ const LoginScreen: FC = () => {
       navigate('/', { replace: true })
     }
   }, [identity, navigate])
+
+  /*
+  const handleUse2FA = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUse2FA(e.target.checked)
+    if (!e.target.checked) {
+      setUse2FARecovery(false)
+    }
+  }
+  */
 
   const handleLogin = () => {
     if (!formIsValid) return
@@ -57,12 +70,14 @@ const LoginScreen: FC = () => {
         <img src={'/logo.png'} alt={'Logo'} className={'h-10 w-auto'} />
       </a>
 
+
       <div className={'w-full max-w-md bg-white rounded-lg shadow-md p-8 space-y-6'} onKeyDown={handleSubmit} tabIndex={0}>
         {/* App logo and name above form */}
         <div className={'flex justify-center items-center space-x-3 mb-2'}>
           <img src={'/certs-ui-logo-only.png'} alt={'CertsUI'} className={'h-12 w-auto'} />
           <span className={'text-2xl font-bold text-gray-800 select-none'}>{import.meta.env.VITE_APP_TITLE}</span>
         </div>
+
         {/* Form */}
         <div className={'space-y-4'}>
           <div className={'space-y-4'}>
@@ -73,6 +88,7 @@ const LoginScreen: FC = () => {
               onChange={(e) => handleInputChange('username', e.target.value)}
               errorText={errors.username}
             />
+
             <TextBoxComponent
               label={'Password'}
               placeholder={'Password...'}
@@ -82,6 +98,43 @@ const LoginScreen: FC = () => {
               errorText={errors.password}
             />
           </div>
+
+          {/*
+          Backend has no 2FA support yet — restore useState, handleUse2FA, CheckBox import, and this block when API is ready.
+
+          <div className={'flex items-center gap-4'}>
+            <CheckBoxComponent label={'Use 2FA'} value={use2FA} onChange={handleUse2FA} />
+            {use2FA && (
+              <CheckBoxComponent
+                label={'Use 2FA Recovery'}
+                value={use2FARecovery}
+                onChange={(e) => setUse2FARecovery(e.target.checked)}
+              />
+            )}
+          </div>
+          {use2FA && (
+            <div className={'space-y-4'}>
+              {use2FARecovery ? (
+                <TextBoxComponent
+                  label={'2FA Recovery Code'}
+                  placeholder={'Recovery code...'}
+                  value={formState.twoFactorRecoveryCode}
+                  onChange={(e) => handleInputChange('twoFactorRecoveryCode', e.target.value)}
+                  errorText={errors.twoFactorRecoveryCode}
+                />
+              ) : (
+                <TextBoxComponent
+                  label={'2FA Code'}
+                  placeholder={'Authentication code...'}
+                  value={formState.twoFactorCode}
+                  onChange={(e) => handleInputChange('twoFactorCode', e.target.value)}
+                  errorText={errors.twoFactorCode}
+                />
+              )}
+            </div>
+          )}
+          */}
+
           {/* Submit */}
           <ButtonComponent
             label={'Sign in'}

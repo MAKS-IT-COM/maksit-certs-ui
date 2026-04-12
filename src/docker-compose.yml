@@ -1,18 +1,25 @@
+# Naming: maksit-certs-ui-<role> for containers and local images (parallel to maksit-vault-* in the Vault repo).
+# DOCKER_REGISTRY is optional (e.g. cr.example.com/); YARP still targets Compose service names client / server in appsettings.json.
+name: maksit-certs-ui
+
 services:
-  reverse-proxy:
-    image: ${DOCKER_REGISTRY-}reverse-proxy
+  reverseproxy:
+    container_name: maksit-certs-ui-reverseproxy
+    image: ${DOCKER_REGISTRY-}maksit-certs-ui-reverseproxy
     build:
       context: .
       dockerfile: ReverseProxy/Dockerfile
 
-  certs-ui-client:
-    image: ${DOCKER_REGISTRY-}certs-ui-client
+  client:
+    container_name: maksit-certs-ui-client
+    image: ${DOCKER_REGISTRY-}maksit-certs-ui-client
     build:
       context: .
       dockerfile: MaksIT.WebUI/Dockerfile
 
-  certs-ui-server:
-    image: ${DOCKER_REGISTRY-}certs-ui-server
+  server:
+    container_name: maksit-certs-ui-server
+    image: ${DOCKER_REGISTRY-}maksit-certs-ui-server
     build:
       context: .
       dockerfile: MaksIT.Webapi/Dockerfile

@@ -1,38 +1,39 @@
+# See docker-compose.yml header for maksit-certs-ui-* container/image naming (no clash with maksit-vault-*).
+networks:
+  maksit-certs-ui-network:
+    driver: bridge
+
 services:
-  reverse-proxy:
-    container_name: reverse-proxy
+  reverseproxy:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_HTTP_PORTS: "8080"
     ports:
       - "8080:8080"
-    depends_on:
-      - certs-ui-client
-      - certs-ui-server
     networks:
-      - maks-it
+      - maksit-certs-ui-network
+    depends_on:
+      - client
+      - server
 
-  certs-ui-client:
-    container_name: certs-ui-client
+  client:
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      ASPNETCORE_ENVIRONMENT: Development
     volumes:
       - ./MaksIT.WebUI:/app
     networks:
-      - maks-it
+      - maksit-certs-ui-network
 
-  certs-ui-server:
-    container_name: certs-ui-server
+  server:
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_HTTP_PORTS=5000
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_HTTP_PORTS: "5000"
     volumes:
-      - D:\Compose\MaksIT.CertsUI\acme:/acme
-      - D:\Compose\MaksIT.CertsUI\cache:/cache
-      - D:\Compose\MaksIT.CertsUI\data:/data
-      - D:\Compose\MaksIT.CertsUI\tmp:/tmp
-      - D:\Compose\MaksIT.CertsUI\configMap\appsettings.json:/configMap/appsettings.json:ro
-      - D:\Compose\MaksIT.CertsUI\secrets\appsecrets.json:/secrets/appsecrets.json:ro
+      - D:/Compose/MaksIT.CertsUI/acme:/acme
+      - D:/Compose/MaksIT.CertsUI/cache:/cache
+      - D:/Compose/MaksIT.CertsUI/data:/data
+      - D:/Compose/MaksIT.CertsUI/tmp:/tmp
+      - D:/Compose/MaksIT.CertsUI/configMap/appsettings.json:/configMap/appsettings.json:ro
+      - D:/Compose/MaksIT.CertsUI/secrets/appsecrets.json:/secrets/appsecrets.json:ro
     networks:
-      - maks-it
-
-networks:
-  maks-it:
-    driver: bridge
+      - maksit-certs-ui-network

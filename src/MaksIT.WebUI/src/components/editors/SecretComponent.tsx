@@ -4,6 +4,7 @@ import { TrngResponse } from '../../models/TrngResponse'
 import { getData } from '../../axiosConfig'
 import { ApiRoutes, GetApiRoute } from '../../AppMap'
 import { FieldContainer } from './FieldContainer'
+import { getInputClasses } from './editorStyles'
 
 
 interface PasswordGeneratorProps {
@@ -122,11 +123,7 @@ const SecretComponent: FC<PasswordGeneratorProps> = (props) => {
           value={value}
           onChange={handleOnChange}
           placeholder={placeholder}
-          className={`
-            shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline
-            ${errorText ? 'border-red-500' : ''}
-            ${readOnly ? 'bg-gray-100 text-gray-500' : ''}
-          `}
+          className={getInputClasses({ errorText, readOnly })}
           readOnly={readOnly}
         />
 

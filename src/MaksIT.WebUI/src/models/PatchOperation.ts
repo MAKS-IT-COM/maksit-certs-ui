@@ -20,3 +20,6 @@ export enum PatchOperation {
   /// </summary>
   RemoveFromCollection,
 }
+
+/** Key for per-item collection operations in PATCH payloads. Must match backend Constants.CollectionItemOperation. */
+export const COLLECTION_ITEM_OPERATION = 'collectionItemOperation' as const

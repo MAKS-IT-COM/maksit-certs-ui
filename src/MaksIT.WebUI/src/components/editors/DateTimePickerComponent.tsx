@@ -4,6 +4,7 @@ import { ButtonComponent } from './ButtonComponent'
 import { TextBoxComponent } from './TextBoxComponent'
 import { CircleX } from 'lucide-react'
 import { FieldContainer } from './FieldContainer'
+import { getInputClasses } from './editorStyles'
 
 const DISPLAY_FORMAT = 'yyyy-MM-dd HH:mm'
 
@@ -36,15 +37,6 @@ const DateTimePickerComponent: FC<DateTimePickerComponentProps> = ({
   const [tempDate, setTempDate] = useState<Date>(parsedValue || new Date())
 
   const dropdownRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (value !== prevValueRef.current) {
-      const newDate = parsedValue || new Date()
-      setCurrentViewDate(newDate)
-      setTempDate(newDate)
-      prevValueRef.current = value
-    }
-  }, [value, parsedValue])
 
   const formatForDisplay = (date: Date) => format(date, DISPLAY_FORMAT)
 
@@ -82,6 +74,18 @@ const DateTimePickerComponent: FC<DateTimePickerComponentProps> = ({
       prevValueRef.current = isoString
     }
     setShowDropdown(false)
+  }
+
+  const handleOpen = () => {
+    if (readOnly || disabled) {
+      return
+    }
+
+    const newDate = parsedValue || new Date()
+    setCurrentViewDate(newDate)
+    setTempDate(newDate)
+    prevValueRef.current = value
+    setShowDropdown(true)
   }
 
   const actionButtons = () => {
@@ -125,12 +129,10 @@ const DateTimePickerComponent: FC<DateTimePickerComponentProps> = ({
         <input
           type={'text'}
           value={value ? formatForDisplay(parsedValue!) : ''}
-          onFocus={() => !readOnly && !disabled && setShowDropdown(true)}
+          onFocus={handleOpen}
           readOnly
           placeholder={placeholder}
-          className={`shadow appearance-none border rounded w-full px-3 py-2 text-gray-700 leading-tight focus:outline-none focus:shadow-outline ${
-            errorText ? 'border-red-500' : ''
-          } ${disabled ? 'bg-gray-100 text-gray-500 cursor-default' : 'bg-white'}${readOnly && !disabled ? ' text-gray-500 cursor-default' : ''}`}
+          className={getInputClasses({ errorText, disabled, readOnly })}
           disabled={disabled}
         />
 
@@ -140,22 +142,22 @@ const DateTimePickerComponent: FC<DateTimePickerComponentProps> = ({
         </div>
 
         {showDropdown && !readOnly && !disabled && (
-          <div className={'absolute left-0 right-0 bg-white border border-gray-300 rounded mt-1 w-full shadow-lg z-10'}>
-            <div className={'flex justify-between items-center px-3 py-2'}>
-              <button onClick={handlePrevMonth} type={'button'}>
+          <div className={'absolute left-0 top-full mt-1 w-72 min-w-0 bg-white border border-gray-300 rounded shadow-lg z-10'}>
+            <div className={'flex justify-between items-center px-2 py-1.5'}>
+              <button onClick={handlePrevMonth} type={'button'} className={'rounded py-1 px-2 text-gray-700 hover:bg-gray-100'}>
                 &lt;
               </button>
-              <span>{format(currentViewDate, 'MMMM yyyy')}</span>
-              <button onClick={handleNextMonth} type={'button'}>
+              <span className={'text-sm'}>{format(currentViewDate, 'MMMM yyyy')}</span>
+              <button onClick={handleNextMonth} type={'button'} className={'rounded py-1 px-2 text-gray-700 hover:bg-gray-100'}>
                 &gt;
               </button>
             </div>
-            <div className={'grid grid-cols-7 gap-1 px-3 py-2'}>
+            <div className={'grid grid-cols-7 gap-0.5 px-2 pb-1.5'}>
               {daysArray.map((day) => (
                 <div
                   key={day}
                   onClick={() => handleDayClick(day)}
-                  className={`p-2 cursor-pointer text-center ${
+                  className={`p-1.5 cursor-pointer text-center text-sm ${
                     tempDate.getDate() === day &&
                     tempDate.getMonth() === currentViewDate.getMonth() &&
                     tempDate.getFullYear() === currentViewDate.getFullYear()
@@ -167,7 +169,7 @@ const DateTimePickerComponent: FC<DateTimePickerComponentProps> = ({
                 </div>
               ))}
             </div>
-            <div className={'px-3 py-2'}>
+            <div className={'px-2 py-1.5'}>
               <TextBoxComponent
                 label={'Time'}
                 type={'time'}
@@ -177,7 +179,7 @@ const DateTimePickerComponent: FC<DateTimePickerComponentProps> = ({
                 readOnly={readOnly}
               />
             </div>
-            <div className={'px-3 py-2 gap-2 flex justify-between'}>
+            <div className={'px-2 py-1.5 gap-2 flex justify-between'}>
               <ButtonComponent label={'Clear'} buttonHierarchy={'secondary'} onClick={handleClear} />
               <ButtonComponent label={'Confirm'} buttonHierarchy={'primary'} onClick={handleConfirm} />
             </div>

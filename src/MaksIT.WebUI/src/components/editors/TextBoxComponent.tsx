@@ -1,6 +1,7 @@
 import { Eye, EyeOff } from 'lucide-react'
 import { ChangeEvent, FC, useEffect, useRef, useState } from 'react'
 import { FieldContainer } from './FieldContainer'
+import { getInputClasses } from './editorStyles'
 
 interface TextBoxComponentProps {
   label: string
@@ -49,20 +50,16 @@ const TextBoxComponent: FC<TextBoxComponentProps> = (props) => {
   // Se il type è "textarea", comportamento invariato
   if (type === 'textarea') {
     return (
-      <div className={`${colspan ? `col-span-${colspan}` : 'w-full'}`}>
-        <label className={'block text-gray-700 text-sm font-bold mb-2'}>{label}</label>
+      <FieldContainer colspan={colspan} label={label} errorText={errorText}>
         <textarea
           value={value}
           onChange={handleOnChange}
           placeholder={placeholder}
-          className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline ${
-            errorText ? 'border-red-500' : ''
-          } ${disabled ? 'bg-gray-100 text-gray-500 cursor-default' : 'bg-white'}${readOnly && !disabled ? ' text-gray-500 cursor-default' : ''}`}
+          className={getInputClasses({ errorText, disabled, readOnly })}
           readOnly={readOnly}
           disabled={disabled}
         />
-        {errorText && <p className={'text-red-500 text-xs italic mt-2'}>{errorText}</p>}
-      </div>
+      </FieldContainer>
     )
   }
 
@@ -79,9 +76,7 @@ const TextBoxComponent: FC<TextBoxComponentProps> = (props) => {
             value={value}
             onChange={handleOnChange}
             placeholder={placeholder}
-            className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline ${
-              errorText ? 'border-red-500' : ''
-            } ${disabled ? 'bg-gray-100 text-gray-500 cursor-default' : 'bg-white'}${readOnly && !disabled ? ' text-gray-500 cursor-default' : ''}`}
+            className={getInputClasses({ errorText, disabled, readOnly, extra: 'pr-10' })}
             readOnly={readOnly}
             disabled={disabled}
           />
@@ -103,9 +98,7 @@ const TextBoxComponent: FC<TextBoxComponentProps> = (props) => {
           value={value}
           onChange={handleOnChange}
           placeholder={placeholder}
-          className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline ${
-            errorText ? 'border-red-500' : ''
-          } ${disabled ? 'bg-gray-100 text-gray-500 cursor-default' : 'bg-white'}${readOnly && !disabled ? ' text-gray-500 cursor-default' : ''}`}
+          className={getInputClasses({ errorText, disabled, readOnly })}
           readOnly={readOnly}
           disabled={disabled}
         />
