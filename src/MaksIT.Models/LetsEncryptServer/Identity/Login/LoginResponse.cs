@@ -9,4 +9,7 @@ public class LoginResponse : ResponseModelBase {
   public required DateTime ExpiresAt { get; set; }
   public required string RefreshToken { get; set; }
   public required DateTime RefreshTokenExpiresAt { get; set; }
+
+  /// <summary>Actual login username; use this for display so it is not replaced by a display name (e.g. "Organization Admin") from the JWT name claim.</summary>
+  public string? Username { get; set; }
 }

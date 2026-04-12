@@ -7,25 +7,14 @@ import { LoginRequest } from '../../models/identity/login/LoginRequest'
 import { ApiRoutes, GetApiRoute } from '../../AppMap'
 import { LogoutRequest } from '../../models/identity/logout/LogoutRequest'
 import { LogoutResponse } from '../../models/identity/logout/LogoutResponse'
-import { readIdentity, removeIdentity, writeIdentity } from '../../localStorage/identity'
+import { readIdentity, removeIdentity, writeIdentity, normalizeLoginResponse } from '../../localStorage/identity'
 import { RefreshTokenRequest } from '../../models/identity/login/RefreshTokenRequest'
 import { jwtDecode } from 'jwt-decode'
 import { Claims } from '../../models/identity/Claims'
-import { enumToArr, parseAclEntries } from '../../functions'
-import { Role } from '../../models/identity/Role'
-import { AclEntry } from '../../functions/acl/parseAclEntry'
-
-interface IdentityRole {
-  value: string | number,
-  label: string
-}
 
 interface Identity extends LoginResponse {
   userId?: string,
   username?: string
-  roles?: IdentityRole []
-  isGlobalAdmin: boolean
-  acls?: AclEntry []
 }
 
 interface IdentityState {
@@ -34,24 +23,6 @@ interface IdentityState {
   status: 'idle' | 'loading' | 'failed'
   /** Indicates whether identity has been hydrated from localStorage at least once. */
   hydrated: boolean
-}
-
-/** API JSON may be camelCase or PascalCase; normalize so Authorization and axios see stable keys. */
-const normalizeLoginResponse = (raw: LoginResponse | undefined): LoginResponse | undefined => {
-  if (!raw) return undefined
-  const r = raw as Record<string, unknown>
-  const str = (camel: keyof LoginResponse, pascal: string) => {
-    const v = r[camel] ?? r[pascal]
-    if (v == null) return ''
-    return typeof v === 'string' ? v : String(v)
-  }
-  return {
-    tokenType: str('tokenType', 'TokenType'),
-    token: str('token', 'Token'),
-    expiresAt: str('expiresAt', 'ExpiresAt'),
-    refreshToken: str('refreshToken', 'RefreshToken'),
-    refreshTokenExpiresAt: str('refreshTokenExpiresAt', 'RefreshTokenExpiresAt'),
-  }
 }
 
 const initialState: IdentityState = {
@@ -104,62 +75,26 @@ const refreshJwt = createAsyncThunk(
 )
 
 const enrichStateWithJwtContent = (token: string, identity: Identity) => {
-  const jwtContent = jwtDecode(token) as Record<string, unknown>
+  let jwtContent: Record<string, unknown>
+  try {
+    jwtContent = jwtDecode(token) as Record<string, unknown>
+  } catch {
+    return
+  }
 
   if (jwtContent) {
     if (jwtContent[Claims.NameIdentifier])
       identity.userId = jwtContent[Claims.NameIdentifier] as string
 
+    // Keep the original username: prefer username from login/refresh response, then JWT claims (do not replace with a display name like "Organization Admin" from the name claim)
     if (identity.username == null || identity.username?.trim() === '') {
       const nameClaim = jwtContent[Claims.Name] as string | undefined
       const usernameClaim = (jwtContent['username'] ?? jwtContent['preferred_username']) as string | undefined
       identity.username = (usernameClaim?.trim()) ? usernameClaim : nameClaim
     }
-
-    if (jwtContent[Claims.Role]) {
-
-      const appKnownRoles = enumToArr(Role)?.map(item => {
-        return {
-          value: item.value,
-          label: item.displayValue
-        }
-      })
-
-      const jwtRoles: string[] = Array.isArray(jwtContent[Claims.Role])
-        ? jwtContent[Claims.Role] as string[]
-        : jwtContent[Claims.Role]
-          ? [jwtContent[Claims.Role] as string]
-          : []
-
-      const identityRoles: IdentityRole [] = []
-      jwtRoles.forEach(identityRole => {
-        const foundRole = appKnownRoles.find(role => role.label === identityRole)
-        if (foundRole) {
-          identityRoles.push(foundRole)
-        }
-      })
-
-      identity.roles = identityRoles
-    }
-
-    if (jwtContent[Claims.AclEntry]) {
-      const jwtAcls: string[] = Array.isArray(jwtContent[Claims.AclEntry])
-        ? jwtContent[Claims.AclEntry] as string[]
-        : jwtContent[Claims.AclEntry]
-          ? [jwtContent[Claims.AclEntry] as string]
-          : []
-
-      if (jwtAcls?.includes('global:admin') ?? false) {
-        jwtAcls.splice(jwtAcls.indexOf('global:admin'), 1)
-        identity.isGlobalAdmin = true
-      }
-      else {
-        identity.isGlobalAdmin = false
-      }
-
-      identity.acls = parseAclEntries(jwtAcls)
-    }
   }
+
+  console.log('Enriched identity:', identity)
 }
 
 const identitySlice = createSlice({
@@ -167,13 +102,10 @@ const identitySlice = createSlice({
   initialState,
   reducers: {
     setIdentityFromLocalStorage: (state) => {
-      const raw = readIdentity()
-      const identity = normalizeLoginResponse(raw)
+      const identity = readIdentity()
 
-      if (identity?.token && identity.refreshTokenExpiresAt) {
-        writeIdentity(identity)
+      if (identity) {
         state.identity = {
-          isGlobalAdmin: false,
           ...identity
         }
         enrichStateWithJwtContent(identity.token, state.identity)
@@ -204,15 +136,14 @@ const identitySlice = createSlice({
       })
       .addCase(login.fulfilled, (state, action: PayloadAction<LoginResponse | undefined>) => {
         state.status = 'idle'
-        const payload = normalizeLoginResponse(action.payload)
-        if (payload?.token && payload.refreshTokenExpiresAt) {
+        const normalized = normalizeLoginResponse(action.payload)
+        if (normalized) {
           state.identity = {
-            isGlobalAdmin: false,
-            ...payload
+            ...normalized
           }
-          writeIdentity(payload)
+          writeIdentity(normalized)
 
-          enrichStateWithJwtContent(payload.token, state.identity)
+          enrichStateWithJwtContent(normalized.token, state.identity)
         }
       })
       .addCase(login.rejected, (state) => {
@@ -241,17 +172,17 @@ const identitySlice = createSlice({
       .addCase(refreshJwt.fulfilled, (state, action: PayloadAction<LoginResponse | undefined>) => {
         state.status = 'idle'
 
-        const payload = normalizeLoginResponse(action.payload)
-        if (payload?.token && payload.refreshTokenExpiresAt) {
+        const normalized = normalizeLoginResponse(action.payload)
+        if (normalized) {
           state.identity = {
-            isGlobalAdmin: false,
-            ...payload
+            ...normalized
           }
-          writeIdentity(payload)
+          writeIdentity(normalized)
 
-          enrichStateWithJwtContent(payload.token, state.identity)
+          enrichStateWithJwtContent(normalized.token, state.identity)
         }
         else {
+          // Refresh API returned error (e.g. 401 Invalid refresh token); treat as logged out
           state.identity = null
           state.showUserOffcanvas = false
           removeIdentity()

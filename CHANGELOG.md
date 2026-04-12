@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.5] - 2026-04-12
+
+### Changed
+
+- `CachedHostname` now uses a C# 12 primary constructor (same public construction as before).
+
+### Fixed
+
+- `RegistrationCache` loads cached PEM certificates via `X509CertificateLoader.LoadCertificate` and disposes them with `using` where certificates are parsed for expiry and host listing.
+- `RegistrationCache.TryGetCachedCertificate` returns `false` when the cached entry has no private key blob, avoiding a null argument when importing key material.
+
 ## [3.3.4] - 2026-04-01
 
 ### Added

@@ -130,7 +130,8 @@ public class IdentityService(
       Token = tokenDomain.Token,
       ExpiresAt = claims.ExpiresAt.Value,
       RefreshToken = tokenDomain.RefreshToken,
-      RefreshTokenExpiresAt = tokenDomain.RefreshTokenExpiresAt
+      RefreshTokenExpiresAt = tokenDomain.RefreshTokenExpiresAt,
+      Username = user.Name
     };
 
     return Result<LoginResponse?>.Ok(response);
@@ -166,7 +167,8 @@ public class IdentityService(
         Token = tokenDomain.Token,
         ExpiresAt = tokenDomain.ExpiresAt,
         RefreshToken = tokenDomain.RefreshToken,
-        RefreshTokenExpiresAt = tokenDomain.RefreshTokenExpiresAt
+        RefreshTokenExpiresAt = tokenDomain.RefreshTokenExpiresAt,
+        Username = user.Name
       });
     }
 
@@ -212,7 +214,8 @@ public class IdentityService(
       Token = tokenDomain.Token,
       ExpiresAt = claims.ExpiresAt.Value,
       RefreshToken = tokenDomain.RefreshToken,
-      RefreshTokenExpiresAt = tokenDomain.RefreshTokenExpiresAt
+      RefreshTokenExpiresAt = tokenDomain.RefreshTokenExpiresAt,
+      Username = user.Name
     });
   }
 

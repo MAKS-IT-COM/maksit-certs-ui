@@ -41,7 +41,7 @@ public class RegistrationCache {
       var (subject, cachedChert) = result;
 
       if (cachedChert.Cert != null && !cachedChert.IsDisabled) {
-        var cert = new X509Certificate2(Encoding.ASCII.GetBytes(cachedChert.Cert));
+        using var cert = X509CertificateLoader.LoadCertificate(Encoding.ASCII.GetBytes(cachedChert.Cert));
 
         // if it is about to expire, we need to refresh
         if ((cert.NotAfter - DateTime.UtcNow).TotalDays < days)
@@ -63,7 +63,7 @@ public class RegistrationCache {
       var (subject, cachedChert) = result;
 
       if (cachedChert.Cert != null) {
-        var cert = new X509Certificate2(Encoding.ASCII.GetBytes(cachedChert.Cert));
+        using var cert = X509CertificateLoader.LoadCertificate(Encoding.ASCII.GetBytes(cachedChert.Cert));
 
         hosts.Add(new CachedHostname(
           subject,
@@ -93,9 +93,12 @@ public class RegistrationCache {
       return false;
     }
 
-    var cert = new X509Certificate2(Encoding.ASCII.GetBytes(cache.Cert));
+    using var cert = X509CertificateLoader.LoadCertificate(Encoding.ASCII.GetBytes(cache.Cert));
 
     if ((cert.NotAfter - DateTime.UtcNow).TotalDays < 30)
+      return false;
+
+    if (cache.Private is null)
       return false;
 
     var rsa = new RSACryptoServiceProvider(4096);
@@ -106,6 +109,7 @@ public class RegistrationCache {
       Private = rsa.ExportCspBlob(true),
       PrivatePem = rsa.ExportRSAPrivateKeyPem()
     };
+    
     return true;
   }
 
@@ -128,13 +132,15 @@ public class RegistrationCache {
     if (CachedCerts == null)
       return result;
 
-    foreach (var kvp in CachedCerts) {
+    foreach (var kvp in CachedCerts)
+    {
       var hostname = kvp.Key;
       var cert = kvp.Value;
       if (!string.IsNullOrEmpty(cert.Cert) && !string.IsNullOrEmpty(cert.PrivatePem)) {
         result[hostname] = $"{cert.Cert}\n{cert.PrivatePem}";
       }
     }
+    
     return result;
   }
 }
