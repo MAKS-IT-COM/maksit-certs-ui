@@ -1,7 +1,7 @@
-﻿using MaksIT.Core.Security.JWK;
-using MaksIT.LetsEncrypt.Models.Responses;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
-
+using MaksIT.Core.Security.JWK;
+using MaksIT.LetsEncrypt.Models.Responses;
 
 namespace MaksIT.LetsEncrypt.Entities.LetsEncrypt;
 
@@ -13,4 +13,11 @@ public class State {
   public RegistrationCache? Cache { get; set; }
   public Jwk? Jwk { get; set; }
   public RSA? Rsa { get; set; }
+
+  /// <summary>Returns the session account key pair when both RSA and JWK are present (after <c>Init</c>).</summary>
+  public bool TryGetAccountKey([NotNullWhen(true)] out RSA? rsa, [NotNullWhen(true)] out Jwk? jwk) {
+    rsa = Rsa;
+    jwk = Jwk;
+    return rsa is not null && jwk is not null;
+  }
 }

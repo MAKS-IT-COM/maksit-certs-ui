@@ -187,27 +187,37 @@ public class CertsFlowService(
 
     var challengesResult = await NewOrderAsync(sessionId, hostnames, challengeType);
 
-    if (!challengesResult.IsSuccess)
+    if (!challengesResult.IsSuccess) {
+      await TryPersistRegistrationCacheFromSessionAsync(sessionId);
       return challengesResult.ToResultOfType<Guid?>(_ => null);
+    }
 
     if (challengesResult.Value?.Count > 0) {
       var challengeResult = await CompleteChallengesAsync(sessionId);
-      if (!challengeResult.IsSuccess)
+      if (!challengeResult.IsSuccess) {
+        await TryPersistRegistrationCacheFromSessionAsync(sessionId);
         return challengeResult.ToResultOfType<Guid?>(default);
+      }
     }
 
     var getOrderResult = await GetOrderAsync(sessionId, hostnames);
-    if (!getOrderResult.IsSuccess)
+    if (!getOrderResult.IsSuccess) {
+      await TryPersistRegistrationCacheFromSessionAsync(sessionId);
       return getOrderResult.ToResultOfType<Guid?>(default);
+    }
 
     var certsResult = await GetCertificatesAsync(sessionId, hostnames);
-    if (!certsResult.IsSuccess)
+    if (!certsResult.IsSuccess) {
+      await TryPersistRegistrationCacheFromSessionAsync(sessionId);
       return certsResult.ToResultOfType<Guid?>(default);
+    }
 
     if (!isStaging) {
       var applyCertsResult = await ApplyCertificatesAsync(accountId.Value);
-      if (!applyCertsResult.IsSuccess)
+      if (!applyCertsResult.IsSuccess) {
+        await TryPersistRegistrationCacheFromSessionAsync(sessionId);
         return applyCertsResult.ToResultOfType<Guid?>(_ => null);
+      }
     }
 
     return Result<Guid?>.Ok(initResult.Value);
@@ -234,6 +244,16 @@ public class CertsFlowService(
       return Result<string?>.NotFound(null);
     var fileContent = File.ReadAllText(Path.Combine(_acmePath, fileName));
     return Result<string?>.Ok(fileContent);
+  }
+
+  private async Task TryPersistRegistrationCacheFromSessionAsync(Guid sessionId) {
+    var cacheResult = letsEncryptService.GetRegistrationCache(sessionId);
+    if (!cacheResult.IsSuccess || cacheResult.Value == null)
+      return;
+
+    var saveResult = await cacheService.SaveToCacheAsync(cacheResult.Value.AccountId, cacheResult.Value);
+    if (!saveResult.IsSuccess)
+      logger.LogWarning("Could not persist registration cache after ACME flow step for account {AccountId}.", cacheResult.Value.AccountId);
   }
 
   private void DeleteExporedChallenges() {

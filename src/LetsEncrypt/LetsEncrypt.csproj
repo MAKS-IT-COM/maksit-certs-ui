@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="LetsEncrypt.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="MaksIT.Core" Version="1.6.5" />
     <PackageReference Include="MaksIT.Results" Version="2.0.1" />
     <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.5" />

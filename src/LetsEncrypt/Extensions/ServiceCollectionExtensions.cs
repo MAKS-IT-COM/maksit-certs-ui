@@ -14,6 +14,7 @@ public static class ServiceCollectionExtensions {
     };
 
     services.AddSingleton(config);
+    services.AddSingleton<AcmeSessionStore>();
     services.AddHttpClient<ILetsEncryptService, LetsEncryptService>();
   }
 }

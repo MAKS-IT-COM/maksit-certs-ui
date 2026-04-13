@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace MaksIT.LetsEncrypt.Models.Responses;
 public class AuthorizationChallengeError {
-  public string Type { get; set; }
+  public string? Type { get; set; }
 
-  public string Detail { get; set; }
+  public string? Detail { get; set; }
 }

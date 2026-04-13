@@ -23,6 +23,13 @@ public class RegistrationCache {
 
 
   public Dictionary<string, CertificateCache>? CachedCerts { get; set; }
+
+  /// <summary>
+  /// Earliest UTC instant when renewal may be attempted again for each hostname (e.g. after ACME rate limit).
+  /// Keys use the same DNS names as <see cref="CachedCerts"/>.
+  /// </summary>
+  public Dictionary<string, DateTimeOffset>? AcmeRenewalNotBeforeUtcByHostname { get; set; }
+
   public byte[]? AccountKey { get; set; }
   public string? Id { get; set; }
   public Jwk? Key { get; set; }
@@ -75,6 +82,36 @@ public class RegistrationCache {
     }
 
     return hosts.ToArray();
+  }
+
+  /// <summary>
+  /// True if the hostname must not be renewed yet due to a stored ACME cooldown.
+  /// </summary>
+  public bool IsHostnameInAcmeCooldown(string hostname, out DateTimeOffset notBeforeUtc) {
+    notBeforeUtc = default;
+    if (AcmeRenewalNotBeforeUtcByHostname == null)
+      return false;
+
+    foreach (var kvp in AcmeRenewalNotBeforeUtcByHostname) {
+      if (!string.Equals(kvp.Key, hostname, StringComparison.OrdinalIgnoreCase))
+        continue;
+      if (kvp.Value <= DateTimeOffset.UtcNow)
+        return false;
+      notBeforeUtc = kvp.Value;
+      return true;
+    }
+
+    return false;
+  }
+
+  public void ClearAcmeCooldownForHostname(string hostname) {
+    if (AcmeRenewalNotBeforeUtcByHostname == null)
+      return;
+
+    var key = AcmeRenewalNotBeforeUtcByHostname.Keys
+      .FirstOrDefault(k => string.Equals(k, hostname, StringComparison.OrdinalIgnoreCase));
+    if (key != null)
+      AcmeRenewalNotBeforeUtcByHostname.Remove(key);
   }
 
   /// <summary>

@@ -71,14 +71,36 @@ namespace MaksIT.Webapi.BackgroundServices {
         return Result.Ok();
       }
 
+      var cooldownSkipped = new List<(string Hostname, DateTimeOffset NotBeforeUtc)>();
+      var eligible = new List<string>();
+      foreach (var hostname in toRenew) {
+        if (cache.IsHostnameInAcmeCooldown(hostname, out var notBefore)) {
+          cooldownSkipped.Add((hostname, notBefore));
+          continue;
+        }
+        eligible.Add(hostname);
+      }
+
+      if (cooldownSkipped.Count > 0) {
+        var sample = cooldownSkipped[0];
+        _logger.LogInformation(
+          "Skipping {SkippedCount} hostname(s) in ACME cooldown for account {AccountId} (e.g. {ExampleHost} until {NotBeforeUtc:u} UTC).",
+          cooldownSkipped.Count, cache.AccountId, sample.Hostname, sample.NotBeforeUtc);
+      }
+
+      if (!eligible.Any()) {
+        _logger.LogInformation("All due certificates for account {AccountId} are in ACME cooldown; no renewal attempted.", cache.AccountId);
+        return Result.Ok();
+      }
+
       var fullFlowResult = await _certsFlowService.FullFlow(
-          cache.IsStaging, cache.AccountId, cache.Description, cache.Contacts, cache.ChallengeType, toRenew.ToArray()
+          cache.IsStaging, cache.AccountId, cache.Description, cache.Contacts, cache.ChallengeType, eligible.ToArray()
       );
 
       if (!fullFlowResult.IsSuccess)
         return fullFlowResult;
 
-      _logger.LogInformation($"Certificates renewed for account {cache.AccountId}: {string.Join(", ", toRenew)}");
+      _logger.LogInformation("Certificates renewed for account {AccountId}: {Hostnames}", cache.AccountId, string.Join(", ", eligible));
 
       return Result.Ok();
     }
