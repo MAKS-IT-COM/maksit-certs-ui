@@ -6,11 +6,11 @@ import { LoginScreen } from './components/LoginScreen'
 import { Authorization } from './components/Authorization'
 import { UserOffcanvas } from './components/UserOffcanvas'
 import { UserButton } from './components/UserButton'
-import { Toast } from './components/Toast'
 import { UtilitiesPage } from './pages/UtilitiesPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { LetsEncryptTermsOfServicePage } from './pages/LetsEncryptTermsOfServicePage'
-import { UserPage } from './pages/UserPage'
+import { Users } from './pages/Users'
+import { ApiKeys } from './pages/ApiKeys'
 
 
 declare global {
@@ -116,46 +116,27 @@ const AppMap: AppMapType[] = [
   },
 
   {
+    title: 'Users',
+    routes: ['/users'],
+    page: Users,
+    linkArea: [LinkArea.SideMenu],
+  },
+  {
     title: 'User',
     routes: ['/user/:userId'],
-    page: UserPage
+    page: Users,
   },
-  // {
-  //   title: 'About',
-  //   routes: ['/about'],
-  //   page: Home
-  // },
-
-  // {
-  //   title: 'Organizations',
-  //   routes: ['/organizations', '/organization/:organizationId'],
-  //   page: Organizations,
-  //   linkArea: [LinkArea.SideMenu]
-  // },
-  // {
-  //   title: 'Applications',
-  //   routes: ['/applications'],
-  //   page: Applications,
-  //   linkArea: [LinkArea.SideMenu]
-  // },
-  // {
-  //   title: 'Secrets',
-  //   routes: ['/secrets'],
-  //   page: Secrets,
-  //   linkArea: [LinkArea.SideMenu]
-  // },
-  // {
-  //   title: 'Users',
-  //   routes: ['/users'],
-  //   page: Users,
-  //   linkArea: [LinkArea.SideMenu]
-  // },
-  // {
-  //   title: 'API Keys',
-  //   routes: ['/apikeys'],
-  //   page: ApiKeys,
-  //   linkArea: [LinkArea.SideMenu]
-  // }
+  {
+    title: 'API keys',
+    routes: ['/apikeys'],
+    page: ApiKeys,
+    linkArea: [LinkArea.SideMenu],
+  },
+  {
+    title: 'API key',
+    routes: ['/apikeys/:apiKeyId'],
+    page: ApiKeys,
+  },
 ]
 
 // AGENT_TEST = 'api/agent/test',
@@ -201,11 +182,22 @@ enum ApiRoutes {
   generateSecret = 'GET|/secret/generatesecret',
 
   // Identity
+  identitySearch = 'POST|/identity/search',
+  identityGet = 'GET|/identity/user/{userId}',
+  identityPost = 'POST|/identity/user',
   identityPatch = 'PATCH|/identity/user/{userId}',
+  identityDelete = 'DELETE|/identity/user/{userId}',
 
   identityLogin = 'POST|/identity/login',
   identityRefresh = 'POST|/identity/refresh',
   identityLogout = 'POST|/identity/logout',
+
+  // API keys
+  apikeySearch = 'POST|/apikey/search',
+  apikeyPost = 'POST|/apikey',
+  apikeyGet = 'GET|/apikey/{apiKeyId}',
+  apikeyPatch = 'PATCH|/apikey/{apiKeyId}',
+  apikeyDelete = 'DELETE|/apikey/{apiKeyId}',
 }
 
 const GetMenuItems = (linkArea: LinkArea) => {
@@ -232,7 +224,6 @@ const GetRoutes = () => {
           ) : (
             <Page />
           )}
-          <Toast />
         </>
       )
 

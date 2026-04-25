@@ -1,21 +1,18 @@
 import { object, RefinementCtx, ZodType, z } from 'zod'
 import { PatchRequestModelBase, PatchRequestModelBaseSchema } from '../../PatchRequestModelBase'
-import { PatchUserEntityScopeRequest, PatchUserEntityScopeRequestSchema } from './PatchUserEntityScopeRequest'
 
-
-// Enable/Disable Two Factor
+/** Enable/disable 2FA (sent without other patch fields; Vault parity). */
 export interface PatchUserEnabeleTwoFactorRequest extends PatchRequestModelBase {
   twoFactorEnabled: boolean
 }
 
-// Change password
+/** Change password */
 export interface PatchUserChangePasswordRequest extends PatchRequestModelBase {
-    password: string,
-    confirmPassword?: string 
+  password: string
+  confirmPassword?: string
 }
 
 const PatchUserChangePasswordRequestSchemaRefine = (data: PatchUserChangePasswordRequest, ctx: RefinementCtx) => {
-  // Password policy validation
   const password = data.password
   const passwordPolicy = [
     {
@@ -50,7 +47,6 @@ const PatchUserChangePasswordRequestSchemaRefine = (data: PatchUserChangePasswor
     }
   })
 
-  // Password confirmation validation
   if (data.password !== data.confirmPassword) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -63,36 +59,19 @@ const PatchUserChangePasswordRequestSchemaRefine = (data: PatchUserChangePasswor
 export const PatchUserChangePasswordRequestSchema: ZodType<PatchUserChangePasswordRequest> = PatchRequestModelBaseSchema.and(
   object({
     password: z.string(),
-    confirmPassword: z.string().optional()
+    confirmPassword: z.string().optional(),
   })
 ).superRefine(PatchUserChangePasswordRequestSchemaRefine)
 
-// Update other parameters
+/** User patch (Certs API: active flag and 2FA toggle use operations where applicable). */
 export interface PatchUserRequest extends PatchRequestModelBase {
-    username?: string
-    email?: string
-    mobileNumber?: string
-    isActive?: boolean
-    isGlobalAdmin?: boolean
-    entityScopes?: PatchUserEntityScopeRequest[]
-}
-
-export const patchUserRequestProto: PatchUserRequest = {
-  username:  '',
-  email:  '',
-  mobileNumber:  '',
-  isActive: undefined,
-  isGlobalAdmin: undefined,
-  organizationRoles: undefined
+  isActive?: boolean
+  twoFactorEnabled?: boolean
 }
 
 export const PatchUserRequestSchema: z.Schema<PatchUserRequest> = PatchRequestModelBaseSchema.and(
   object({
-    username: z.string().min(1).optional(),
-    email: z.string().email().optional(),
-    mobileNumber:  z.string().optional(),
     isActive: z.boolean().optional(),
-    isGlobalAdmin: z.boolean().optional(),
-    organizationRoles:  z.array(PatchUserEntityScopeRequestSchema).optional()
+    twoFactorEnabled: z.boolean().optional(),
   })
 )

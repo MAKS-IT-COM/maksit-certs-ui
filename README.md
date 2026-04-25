@@ -25,6 +25,7 @@ If you find this project useful, please consider supporting its development:
   - [Patch and delta reference](#patch-and-delta-reference)
   - [Login and refresh token architecture](#login-and-refresh-token-architecture)
   - [Reverse proxy routing (YARP)](#reverse-proxy-routing-yarp)
+  - [High availability architecture](#high-availability-architecture)
   - [Architecture](#architecture)
     - [Current Limitations](#current-limitations)
     - [Architecture Scheme](#architecture-scheme)
@@ -45,6 +46,7 @@ If you find this project useful, please consider supporting its development:
     - [3. Create a Minimal Custom Values File](#3-create-a-minimal-custom-values-file)
     - [4. Install the Helm Chart](#4-install-the-helm-chart)
     - [5. Uninstall the Helm Chart](#5-uninstall-the-helm-chart)
+  - [Run E2E Against k3s Ingress (PowerShell)](#run-e2e-against-k3s-ingress-powershell)
   - [MaksIT.CertsUI Interface Overview](#maksitcertsui-interface-overview)
   - [Contact](#contact)
 
@@ -94,6 +96,16 @@ How the **YARP** edge splits **ACME challenge**, **Swagger**, **WebAPI**, and **
 - [Direct vs proxied ports (local dev)](assets/docs/REVERSE_PROXY_ROUTING.md#direct-vs-proxied-ports-local-dev)
 - [Related files](assets/docs/REVERSE_PROXY_ROUTING.md#related-files)
 
+## High availability architecture
+
+High-availability behavior for ACME coordination, challenge coherence, leases, background services, and Kubernetes probes is documented in **[assets/docs/HA_ARCHITECTURE.md](assets/docs/HA_ARCHITECTURE.md)**.
+
+- [Goals and runtime model](assets/docs/HA_ARCHITECTURE.md#goals)
+- [Lease design](assets/docs/HA_ARCHITECTURE.md#lease-design)
+- [HTTP-01 coherence design](assets/docs/HA_ARCHITECTURE.md#http-01-coherence-design)
+- [Kubernetes behavior](assets/docs/HA_ARCHITECTURE.md#kubernetes-behavior)
+- [Files involved](assets/docs/HA_ARCHITECTURE.md#files-involved)
+
 ---
 
 ## Architecture
@@ -105,18 +117,15 @@ This solution provides automated, secure management of Let's Encrypt certificate
 
 
 - **Single Agent Support:**  
-  The current implementation supports only a single MaksIT.CertsUI Agent instance. High-availability (HA) or multi-agent deployments are not supported at this time. (Multi-agent/HA support may be added in future releases.)
-
-- **No HA Mode:**  
-  There is no built-in high-availability mode for the WebAPI or Agent components. This is by design, as the solution targets environments where a single edge proxy and agent are sufficient, and additional complexity is unnecessary.
+  The current implementation supports only a single MaksIT.CertsUI Agent instance. Multi-agent edge deployments are not supported at this time.
 
 - **HTTP-01 Challenge Only:**  
   Only the HTTP-01 ACME challenge type is supported. DNS-01 and other challenge types are not implemented.
 
-- **Single Kubernetes Replica:**  
-  The solution is intended for use with a single Kubernetes replica for the MaksIT.CertsUI server and MaksIT.WebUI components.
+- **Optional Dedicated Worker Split:**  
+  ACME write coordination is implemented through PostgreSQL runtime leases in the main server process. A dedicated ACME worker deployment/chart split is optional and not implemented in this repository yet.
 
-These limitations are intentional to keep the architecture simple and reliable for typical edge proxy scenarios. Future releases may introduce additional features based on user demand.
+The server component supports HA replicas with DB-backed coordination. See [High availability architecture](#high-availability-architecture) for details.
 
 ### Architecture Scheme
 
@@ -228,7 +237,7 @@ The Webapi is designed for deployment in secure environments such as Kubernetes 
 - This architecture supports secure automation even when the edge server is not directly accessible from the public internet.
 
 
-> **Note:** Currently, only HTTP-01 challenges and a single Kubernetes replica are supported by this solution.
+> **Note:** Currently, only HTTP-01 challenges are supported. The server supports multi-replica Kubernetes deployments with PostgreSQL-backed coordination.
 
 
 ---
@@ -247,7 +256,6 @@ Podman Compose usage to orchestrate multiple **MaksIT.CertsUI** services on Linu
 
 - Create these folders:
   - `/opt/Compose/MaksIT.CertsUI/acme`
-  - `/opt/Compose/MaksIT.CertsUI/cache`
   - `/opt/Compose/MaksIT.CertsUI/data`
   - `/opt/Compose/MaksIT.CertsUI/tmp`
   - `/opt/Compose/MaksIT.CertsUI/configMap`
@@ -258,7 +266,6 @@ Bash command to use:
 
 ```bash
 sudo mkdir -p /opt/Compose/MaksIT.CertsUI/acme \
-  /opt/Compose/MaksIT.CertsUI/cache \
   /opt/Compose/MaksIT.CertsUI/data \
   /opt/Compose/MaksIT.CertsUI/tmp \
   /opt/Compose/MaksIT.CertsUI/configMap \
@@ -274,6 +281,9 @@ Create the following files in the appropriate folders:
 sudo tee /opt/Compose/MaksIT.CertsUI/secrets/appsecrets.json > /dev/null <<EOF
 {
   "Configuration": {
+    "CertsEngineConfiguration": {
+      "ConnectionString": "Host=postgres;Port=5432;Database=maksit_certs;Username=maksit;Password=maksit;SslMode=Prefer"
+    },
     "Auth": {
       "Secret": "<your-auth-secret>",
       "Pepper": "<your-pepper>"
@@ -287,7 +297,7 @@ EOF
 ```
 
 **Note:**  
-Replace placeholder values `<your-auth-secret>`, `<your-pepper>`, `<your-agent-key>`, with secure, your environment-specific values.
+PostgreSQL is configured as **`Configuration:CertsEngineConfiguration:ConnectionString`** — same structural pattern as MaksIT.Vault’s **`Configuration:VaultEngineConfiguration:ConnectionString`**. For Docker Compose, use the Postgres service hostname (here `postgres`) and credentials that match the `postgres` service. The host also accepts legacy **`ConnectionStrings:Certs`** if needed. Replace placeholder values `<your-auth-secret>`, `<your-pepper>`, `<your-agent-key>`, with secure, your environment-specific values.
 Make sure `<your-agent-key>` matches the key configured in your agent deployment.
 
 **2. Create the file  `/opt/Compose/MaksIT.CertsUI/configMap/appsettings.json` with this command:**
@@ -315,17 +325,15 @@ sudo tee /opt/Compose/MaksIT.CertsUI/configMap/appsettings.json <<EOF
     },
     "Production": "https://acme-v02.api.letsencrypt.org/directory",
     "Staging": "https://acme-staging-v02.api.letsencrypt.org/directory",
-    "CacheFolder": "/cache",
     "AcmeFolder": "/acme",
-    "DataFolder": "/data",
-    "SettingsFile": "/data/settings.json"
+    "DataFolder": "/data"
   }
 }
 EOF
 ```
 
 **Note:**  
-Replace all JWT-related placeholder values `<your-issuer>`, `<your-audience>` and `<your-agent-hostname>` with your environment-specific values.
+`DataFolder` holds ACME subscriber agreement PDFs and an empty `init` bootstrap marker (users and registration data live in PostgreSQL). Replace all JWT-related placeholder values `<your-issuer>`, `<your-audience>` and `<your-agent-hostname>` with your environment-specific values.
 
 **3. Create the file `/opt/Compose/MaksIT.CertsUI/client/config.js` with this command:**
 
@@ -374,7 +382,6 @@ services:
       - ASPNETCORE_HTTP_PORTS=5000
     volumes:
       - /opt/Compose/MaksIT.CertsUI/acme:/acme
-      - /opt/Compose/MaksIT.CertsUI/cache:/cache
       - /opt/Compose/MaksIT.CertsUI/data:/data
       - /opt/Compose/MaksIT.CertsUI/tmp:/tmp
       - /opt/Compose/MaksIT.CertsUI/configMap/appsettings.json:/configMap/appsettings.json:ro
@@ -394,8 +401,8 @@ EOF
 **1. Run Podman compose in Rootfull mode (The only supported by podman-compose):**
 
 ```bash
-sudo chown -R 1654:1654 /opt/Compose/MaksIT.CertsUI/{data,cache,acme}
-sudo chmod -R 775 /opt/Compose/MaksIT.CertsUI/{data,cache,acme}
+sudo chown -R 1654:1654 /opt/Compose/MaksIT.CertsUI/{data,acme}
+sudo chmod -R 775 /opt/Compose/MaksIT.CertsUI/{data,acme}
 
 sudo chown -R 1654:1654 /opt/Compose/MaksIT.CertsUI/tmp
 sudo chmod 1777 /opt/Compose/MaksIT.CertsUI/tmp
@@ -442,8 +449,8 @@ host_gid = 525942
 Apply correct ownership and permissions to the volumes:
 
 ```bash
-sudo chown -R 525942:525942 /opt/Compose/MaksIT.CertsUI/{data,cache,acme}
-sudo chmod -R 775 /opt/Compose/MaksIT.CertsUI/{data,cache,acme}
+sudo chown -R 525942:525942 /opt/Compose/MaksIT.CertsUI/{data,acme}
+sudo chmod -R 775 /opt/Compose/MaksIT.CertsUI/{data,acme}
 
 sudo chown -R 525942:525942 /opt/Compose/MaksIT.CertsUI/tmp
 sudo chmod 1777 /opt/Compose/MaksIT.CertsUI/tmp
@@ -480,7 +487,6 @@ Use Docker Compose to orchestrate multiple **MaksIT.CertsUI** services on Window
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (includes Docker Compose)
 - Create these folders:
   - `C:\Compose\MaksIT.CertsUI\acme`
-  - `C:\Compose\MaksIT.CertsUI\cache`
   - `C:\Compose\MaksIT.CertsUI\data`
   - `C:\Compose\MaksIT.CertsUI\tmp`
   - `C:\Compose\MaksIT.CertsUI\configMap`
@@ -491,7 +497,6 @@ Powershell command to use:
 ```powershell
 New-Item -Path `
   'C:\Compose\MaksIT.CertsUI\acme', `
-  'C:\Compose\MaksIT.CertsUI\cache', `
   'C:\Compose\MaksIT.CertsUI\data', `
   'C:\Compose\MaksIT.CertsUI\tmp', `
   'C:\Compose\MaksIT.CertsUI\configMap', `
@@ -509,6 +514,9 @@ Create the following files in the appropriate folders:
 Set-Content -Path 'C:\Compose\MaksIT.CertsUI\secrets\appsecrets.json' -Value @'
 {
   "Configuration": {
+    "CertsEngineConfiguration": {
+      "ConnectionString": "Host=postgres;Port=5432;Database=maksit_certs;Username=maksit;Password=maksit;SslMode=Prefer"
+    },
     "Auth": {
       "Secret": "<your-auth-secret>",
       "Pepper": "<your-pepper>"
@@ -522,7 +530,7 @@ Set-Content -Path 'C:\Compose\MaksIT.CertsUI\secrets\appsecrets.json' -Value @'
 ```
 
 **Note:**  
-Replace placeholder values `<your-auth-secret>`, `<your-pepper>`, `<your-agent-key>`, with secure, your environment-specific values.
+PostgreSQL is **`Configuration:CertsEngineConfiguration:ConnectionString`** (same pattern as MaksIT.Vault **`VaultEngineConfiguration:ConnectionString`**). For Docker Compose, use the Postgres service hostname (here `postgres`) and credentials that match the `postgres` service. Legacy **`ConnectionStrings:Certs`** is still supported. Replace placeholder values `<your-auth-secret>`, `<your-pepper>`, `<your-agent-key>`, with secure, your environment-specific values.
 Make sure `<your-agent-key>` matches the key configured in your agent deployment.
 
 **2. Create the file  `C:\Compose\MaksIT.CertsUI\configMap\appsettings.json` with this command:**
@@ -550,17 +558,15 @@ Set-Content -Path 'C:\Compose\MaksIT.CertsUI\configMap\appsettings.json' -Value 
     },
     "Production": "https://acme-v02.api.letsencrypt.org/directory",
     "Staging": "https://acme-staging-v02.api.letsencrypt.org/directory",
-    "CacheFolder": "/cache",
     "AcmeFolder": "/acme",
-    "DataFolder": "/data",
-    "SettingsFile": "/data/settings.json"
+    "DataFolder": "/data"
   }
 }
 '@
 ```
 
 **Note:**  
-Replace all JWT-related placeholder values `<your-issuer>`, `<your-audience>` and `<your-agent-hostname>` with your environment-specific values.
+`DataFolder` holds ACME subscriber agreement PDFs and an empty `init` bootstrap marker (users and registration data live in PostgreSQL). Replace all JWT-related placeholder values `<your-issuer>`, `<your-audience>` and `<your-agent-hostname>` with your environment-specific values.
 
 **3. Create the file `C:\Compose\MaksIT.CertsUI\client\config.js` with this command:**
 
@@ -609,7 +615,6 @@ services:
       - ASPNETCORE_HTTP_PORTS=5000
     volumes:
       - C:\Compose\MaksIT.CertsUI\acme:/acme
-      - C:\Compose\MaksIT.CertsUI\cache:/cache
       - C:\Compose\MaksIT.CertsUI\data:/data
       - C:\Compose\MaksIT.CertsUI\tmp:/tmp
       - C:\Compose\MaksIT.CertsUI\configMap\appsettings.json:/configMap/appsettings.json:ro
@@ -669,11 +674,14 @@ kubectl create namespace certs-ui
 
 **Step 2: Create the Secret (`appsecrets.json`)**
 
-Replace the placeholder values with your actual secrets. This secret contains authentication and agent keys required by the Webapi (same shape as the chart’s templated `appsecrets.json`).
+Replace the placeholder values with your actual secrets. This secret contains the PostgreSQL connection string, authentication, and agent keys required by the Webapi (same shape as the chart’s templated `appsecrets.json`, comparable to MaksIT.Vault’s `appsecrets.json`).
 
 ```json
 {
   "Configuration": {
+    "CertsEngineConfiguration": {
+      "ConnectionString": "Host=<postgres-host>;Port=5432;Database=maksit_certs;Username=<user>;Password=<password>;SslMode=Prefer"
+    },
     "Auth": {
       "Secret": "<your-auth-secret>",
       "Pepper": "<your-pepper>"
@@ -689,6 +697,9 @@ Replace the placeholder values with your actual secrets. This secret contains au
 kubectl create secret generic certs-ui-server-secrets \
   --from-literal=appsecrets.json='{
     "Configuration": {
+      "CertsEngineConfiguration": {
+        "ConnectionString": "Host=<postgres-host>;Port=5432;Database=maksit_certs;Username=<user>;Password=<password>;SslMode=Prefer"
+      },
       "Auth": {
         "Secret": "<your-auth-secret>",
         "Pepper": "<your-pepper>"
@@ -702,7 +713,7 @@ kubectl create secret generic certs-ui-server-secrets \
 ```
 
 **Note:**  
-Replace placeholder values `<your-auth-secret>`, `<your-pepper>`, `<your-agent-key>`, with secure, your environment-specific values.
+Replace `<postgres-host>`, `<user>`, `<password>`, and the auth placeholders with your environment-specific values. Replace placeholder values `<your-auth-secret>`, `<your-pepper>`, `<your-agent-key>`, with secure values.
 Make sure `<your-agent-key>` matches the key configured in your agent deployment.
 
 **Step 3: Create the ConfigMap (`appsettings.json`)**
@@ -732,10 +743,8 @@ Edit the values as needed for your environment. This configmap contains applicat
     },
     "Production": "https://acme-v02.api.letsencrypt.org/directory",
     "Staging": "https://acme-staging-v02.api.letsencrypt.org/directory",
-    "CacheFolder": "/cache",
     "AcmeFolder": "/acme",
-    "DataFolder": "/data",
-    "SettingsFile": "/data/settings.json"
+    "DataFolder": "/data"
   }
 }
 ```
@@ -764,10 +773,8 @@ kubectl create configmap certs-ui-server-configmap \
       },
       "Production": "https://acme-v02.api.letsencrypt.org/directory",
       "Staging": "https://acme-staging-v02.api.letsencrypt.org/directory",
-      "CacheFolder": "/cache",
       "AcmeFolder": "/acme",
-      "DataFolder": "/data",
-      "SettingsFile": "/data/settings.json"
+      "DataFolder": "/data"
     }
   }' \
   -n certs-ui
@@ -817,7 +824,7 @@ components:
       storageClass: local-path
 ```
 
-Override **`certsServerSecrets`** and **`certsServerConfig`** here for production (JWT issuer/audience, agent hostname, ACME endpoints, and auth secrets). Chart defaults are placeholders only.
+Override **`certsServerSecrets`** (including **`certsServerSecrets.certsEngineConfiguration.connectionString`** for PostgreSQL, Vault-shaped like **`VaultEngineConfiguration:ConnectionString`**) and **`certsServerConfig`** here for production (JWT issuer/audience, agent hostname, ACME endpoints, and auth secrets). Chart defaults are placeholders only.
 
 **Services:** The chart renders one `Service` per component (`server`, `client`, `reverseproxy`). Each `service` block supports `enabled`, `type`, `port`, and `targetPort` only. For Cilium LB-IPAM, MetalLB, or cloud load balancers, use a separate manifest or your platform’s pattern so you can set annotations, `loadBalancerIP`, and session affinity; point that Service at the **reverseproxy** pods (`app.kubernetes.io/component: reverseproxy`).
 
@@ -848,7 +855,7 @@ helm upgrade --install certs-ui oci://cr.maks-it.com/charts/certs-ui `
 
 ### 5. Uninstall the Helm Chart
 
-PVCs for the server component use `helm.sh/resource-policy: keep` by default (`components.server.persistence.volumes[].pvc.keep: true`), so **`helm uninstall` does not delete them**—ACME/cache/data volumes remain until you remove the claims manually. Set `pvc.keep: false` on a volume if you want that claim deleted with the release.
+PVCs for the server component use `helm.sh/resource-policy: keep` by default (`components.server.persistence.volumes[].pvc.keep: true`), so **`helm uninstall` does not delete them**—ACME and data volumes remain until you remove the claims manually. Set `pvc.keep: false` on a volume if you want that claim deleted with the release.
 
 To uninstall the release (deployments, services, etc.) run:
 
@@ -863,6 +870,44 @@ helm uninstall certs-ui -n certs-ui
 ```powershell
 helm uninstall certs-ui -n certs-ui
 ```
+
+## Run E2E Against k3s Ingress (PowerShell)
+
+Use the API-key E2E tests from `MaksIT.CertsUI.Tests` to validate health, authorization, and multi-replica routing behavior through your ingress.
+
+### 1) Create a read-capable API key
+
+Create the API key in the WebUI (or API) and copy the plaintext key once. The E2E flow expects this key in `X-API-KEY`.
+
+### 2) Set E2E environment variables
+
+```powershell
+$env:CERTSUI_E2E_BASE_URL = "https://certs-ui.<your-domain>"
+$env:CERTSUI_E2E_API_KEY = "<paste-api-key>"
+$env:CERTSUI_E2E_EXPECT_MIN_DISTINCT_INSTANCES = "2"
+```
+
+Notes:
+- `CERTSUI_E2E_BASE_URL` must be the public ingress URL (no `/api` suffix).
+- `CERTSUI_E2E_EXPECT_MIN_DISTINCT_INSTANCES` defaults to `2` if omitted.
+- Ensure ingress session affinity is disabled (or not sticky) for the multi-replica assertion.
+
+### 3) Run only the API-key E2E suite
+
+```powershell
+dotnet test .\src\MaksIT.CertsUI.Tests\MaksIT.CertsUI.Tests.csproj --filter "FullyQualifiedName~CertsUiApiKeyE2ETests"
+```
+
+### 4) Optional: run only the replica-distribution assertion
+
+```powershell
+dotnet test .\src\MaksIT.CertsUI.Tests\MaksIT.CertsUI.Tests.csproj --filter "FullyQualifiedName~ApiKey_StickyLessRequests_RuntimeInstanceId_ObservesMultipleReplicas"
+```
+
+If this test reports fewer instances than expected, check:
+- `components.server.replicaCount` in Helm values;
+- ingress/load-balancer session affinity settings;
+- rollout completion (`kubectl -n certs-ui get pods -l app.kubernetes.io/component=server`).
 
 ---
 

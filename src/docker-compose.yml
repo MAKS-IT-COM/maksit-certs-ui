@@ -3,6 +3,7 @@
 name: maksit-certs-ui
 
 services:
+
   reverseproxy:
     container_name: maksit-certs-ui-reverseproxy
     image: ${DOCKER_REGISTRY-}maksit-certs-ui-reverseproxy
@@ -22,4 +23,12 @@ services:
     image: ${DOCKER_REGISTRY-}maksit-certs-ui-server
     build:
       context: .
-      dockerfile: MaksIT.Webapi/Dockerfile
+      dockerfile: MaksIT.CertsUI/Dockerfile
+
+  postgres:
+    container_name: maksit-certs-ui-postgres
+    image: postgres:16
+
+  pgadmin:
+    container_name: maksit-certs-ui-pgadmin
+    image: dpage/pgadmin4:9.7

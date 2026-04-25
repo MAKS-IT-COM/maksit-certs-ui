@@ -1,8 +1,8 @@
 {
 	"info": {
 		"_postman_id": "95186b61-1197-4a6e-a90f-d97223528d90",
-		"name": "LetsEncrypt Client (MaksIT.Webapi)",
-		"description": "Aligned with MaksIT.Webapi controllers: routes under /api (except /.well-known/acme-challenge). Use Identity Login first, then set collection variable accessToken from the response (tests on Login do this). JWT is required for all /api/* routes except identity login, refresh, and logout.",
+		"name": "LetsEncrypt Client (MaksIT.CertsUI)",
+		"description": "Aligned with MaksIT.CertsUI controllers: routes under /api (except /.well-known/acme-challenge). Use Identity Login first, then set collection variable accessToken from the response (tests on Login do this). JWT is required for all /api/* routes except identity login, refresh, and logout.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"auth": {

@@ -21,6 +21,7 @@
 {{- $hasSecret := or (ne ($sf.existingSecret | default "") "") (and $sf.key (hasKey $sf "content")) }}
 {{- $svc := default dict $comp.service }}
 {{- $tgt := default 8080 $svc.targetPort }}
+{{- $replicas := max 1 ($comp.replicaCount | default 1 | int) }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -31,7 +32,7 @@ metadata:
     {{- include "certs-ui.labels" $root | nindent 4 }}
     app.kubernetes.io/component: {{ $compName }}
 spec:
-  replicas: 1
+  replicas: {{ $replicas }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -65,7 +66,12 @@ spec:
           env:
             {{- range $comp.env }}
             - name: {{ .name }}
+              {{- if hasKey . "valueFrom" }}
+              valueFrom:
+{{- toYaml .valueFrom | nindent 16 }}
+              {{- else }}
               value: {{ .value | quote }}
+              {{- end }}
             {{- end }}
           {{- end }}
           {{- with $comp.livenessProbe }}

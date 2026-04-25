@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
-import { getData } from '../../axiosConfig'
-import { useAppDispatch } from '../../redux/hooks'
+import { useEffect, useMemo, useState } from 'react'
+import { getDataWithoutLoader } from '../../axiosConfig'
 import { formatISODateString } from '../../functions'
 
 interface NormalLabelProps {
@@ -17,44 +16,41 @@ interface RemoteLabelProps {
 }
 
 type LabelProps = NormalLabelProps | RemoteLabelProps
-  
-const DataTableLabel = <T extends { [key: string]: never }>(props: LabelProps) => {
-  const dispatch = useAppDispatch()
 
-  const [label, setLabel] = useState<string>('')
+const DataTableLabel = <T extends { [key: string]: never }>(props: LabelProps) => {
+  const [remoteLabel, setRemoteLabel] = useState<string>('')
+
+  const label = useMemo(() => {
+    if (props.type !== 'normal') {
+      return remoteLabel
+    }
+
+    const { value = '', dataType = 'string' } = props
+
+    switch (dataType) {
+    case 'date':
+      return formatISODateString(value)
+    case 'string':
+    default:
+      return value
+    }
+  }, [props, remoteLabel])
 
   useEffect(() => {
-    const { type } = props
-    
-    if (type === 'normal') {
-      const { value = '', dataType = 'string' } = props as NormalLabelProps
-
-      switch (dataType) {
-      case 'date':
-        setLabel(formatISODateString(value))
-        break
-      case 'string':
-      default:
-        setLabel(value)
-        break
-      }
+    if (props.type !== 'remote') {
+      return
     }
 
-    if (type === 'remote') {
-      const { route, accessorKey } = props as RemoteLabelProps
+    const { route, accessorKey } = props
 
-      getData<T>(route)
-        .then(response => {
-          if (!response) return
-          
-          setLabel(response[accessorKey])
-        }).finally(() => {
-          
-        })
-    }
-    
-  }, [props, dispatch])
-  
+    getDataWithoutLoader<T>(route)
+      .then(response => {
+        if (!response) return
+
+        setRemoteLabel(response[accessorKey])
+      }).finally(() => {})
+  }, [props])
+
   return <p>{label}</p>
 }
 

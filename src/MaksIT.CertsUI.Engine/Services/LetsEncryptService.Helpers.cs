@@ -2,16 +2,15 @@ using System.Net.Http.Headers;
 using Microsoft.Extensions.Logging;
 using MaksIT.Core.Extensions;
 using MaksIT.Core.Security.JWS;
-using MaksIT.LetsEncrypt.Entities;
-using MaksIT.LetsEncrypt.Entities.Jws;
-using MaksIT.LetsEncrypt.Entities.LetsEncrypt;
-using MaksIT.LetsEncrypt.Exceptions;
-using MaksIT.LetsEncrypt.Models.Interfaces;
-using MaksIT.LetsEncrypt.Models.Responses;
+using MaksIT.CertsUI.Engine.Domain.Certs;
+using MaksIT.CertsUI.Engine.Domain.LetsEncrypt;
+using MaksIT.CertsUI.Engine.Domain.LetsEncrypt.Jws;
+using MaksIT.CertsUI.Engine.Dto.LetsEncrypt.Interfaces;
+using MaksIT.CertsUI.Engine.Dto.LetsEncrypt.Responses;
 using MaksIT.Results;
 
 
-namespace MaksIT.LetsEncrypt.Services;
+namespace MaksIT.CertsUI.Engine.Services;
 
 public partial class LetsEncryptService {
 

@@ -4,16 +4,16 @@ This document describes how authentication (login), token refresh, and logout wo
 
 **Audience:** Backend (C# / ASP.NET) and Frontend (TypeScript / React) developers.
 
-**Related:** This repo’s WebUI identity layer is **aligned** with **MaksIT-Vault** [`LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md`](../../maksit-vault/assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md) when both projects sit side by side under the same parent folder; otherwise open that path in your Vault clone. Vault documents **2FA**, **API-key RBAC**, and a **database-backed** user store. **MaksIT.CertsUI** uses a **settings-backed** user list, **no 2FA** on the backend (optional `LoginRequest` fields exist for shared models but are ignored; the WebUI 2FA inputs are commented out), and **no Vault-style ACL product surface**—JWT may still carry role/ACL claims for shared **MaksIT.Core** JWT helpers, but Certs is not an ACL administration app.
+**Related:** This repo’s WebUI identity layer is **aligned** with **MaksIT-Vault** [`LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md`](../../maksit-vault/assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md) when both projects sit side by side under the same parent folder; otherwise open that path in your Vault clone. Vault documents **2FA**, **API-key RBAC**, and a **database-backed** user store. **MaksIT.CertsUI** persists users and refresh tokens in **PostgreSQL** via **`IUserStore`**, **no 2FA** on the backend (optional `LoginRequest` fields exist for shared models but are ignored; the WebUI 2FA inputs are commented out), and **no Vault-style ACL product surface**—JWT may still carry role/ACL claims for shared **MaksIT.Core** JWT helpers, but Certs is not an ACL administration app.
 
 ---
 
 ## 1. Overview
 
 - **Access token:** Short-lived JWT used in the `Authorization: Bearer <token>` header for API calls.
-- **Refresh token:** Opaque string stored with the user in settings; used to obtain a new access token (and optionally a new refresh token) when the access token expires.
+- **Refresh token:** Opaque string stored with the user in PostgreSQL; used to obtain a new access token (and optionally a new refresh token) when the access token expires.
 - **Login** returns both tokens; the client stores them and uses the access token until it expires, then calls **refresh** with the refresh token.
-- **Logout** revokes the current session (or all sessions) on the server and clears tokens on the client. On Certs, the logout HTTP endpoint does **not** require a `Authorization` header; it identifies the session via the **access token** in the JSON body (see §3.4).
+- **Logout** revokes the current session (or all sessions) on the server and clears tokens on the client. On Certs, **logout requires** `Authorization: Bearer` with the current access JWT; the server matches that token when removing the session (see §3.4).
 
 ---
 
@@ -21,7 +21,7 @@ This document describes how authentication (login), token refresh, and logout wo
 
 ### 2.1 Backend: `JwtToken` (domain)
 
-**Location:** `src/MaksIT.Webapi/Domain/JwtToken.cs`
+**Location:** `src/MaksIT.CertsUI/Domain/JwtToken.cs`
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -60,23 +60,22 @@ There is **no** `Username` field on this model; the WebUI derives display name f
 | Layer | Component | Responsibility |
 |-------|------------|----------------|
 | API | `IdentityController` | Login, refresh, logout, and authenticated `PATCH` user. |
-| Service | `IdentityService` | Loads/saves **settings**, validates credentials, issues JWTs via `JwtGenerator`, maps domain `JwtToken` to `LoginResponse`. |
+| Service | `IdentityService` | Validates credentials, issues JWTs via `JwtGenerator`, maps domain `JwtToken` to `LoginResponse`, persists users via `IUserStore`. |
 | Domain | `User` | Password validation, JWT token list (upsert/remove/revoke). |
-| Persistence | `ISettingsService` | Users and tokens persist in application settings (not a separate identity database). |
+| Persistence | `IUserStore` | Users and JWT rows persist in PostgreSQL. |
 
 ### 3.2 Login
 
 **Endpoint:** `POST /api/identity/login`  
 **Controller:** `IdentityController.Login` → `IdentityService.LoginAsync`
 
-1. **Load** settings via `ISettingsService.LoadAsync`.
-2. **Resolve user** by username (`GetUserByName`).
-3. **Validate password** (`User.ValidatePassword`) with configured **pepper**.
-4. **Optional 2FA fields** on `LoginRequest` are **not** validated by Certs—ignored if sent.
-5. **Generate** access JWT via `JwtGenerator.TryGenerateToken` (secret, issuer, audience, expiration from config).
-6. **Generate** opaque refresh token and build a domain `JwtToken` with access + refresh expiry (`RefreshExpiration` from config).
-7. **Upsert** token on user, **SetLastLogin**, persist settings.
-8. Return `LoginResponse` (no username field; client uses JWT claims).
+1. **Resolve user** by username (`IUserStore.GetByNameAsync`).
+2. **Validate password** (`User.ValidatePassword`) with configured **pepper**.
+3. **Optional 2FA fields** on `LoginRequest` are **not** validated by Certs—ignored if sent.
+4. **Generate** access JWT via `JwtGenerator.TryGenerateToken` (secret, issuer, audience, expiration from config).
+5. **Generate** opaque refresh token and build a domain `JwtToken` with access + refresh expiry (`RefreshExpiration` from config).
+6. **Upsert** token on user, **SetLastLogin**, **`IUserStore.UpsertUserAsync`**.
+7. Return `LoginResponse` (no username field; client uses JWT claims).
 
 **Request body (`LoginRequest`):** `username`, `password`, optional unused `twoFactorCode` / `twoFactorRecoveryCode` (shared model shape only).
 
@@ -87,29 +86,25 @@ There is **no** `Username` field on this model; the WebUI derives display name f
 
 **Request body (`RefreshTokenRequest`):** `refreshToken` only (`src/MaksIT.Models/LetsEncryptServer/Identity/Login/RefreshTokenRequest.cs`). The WebUI may send a `force` flag for parity with shared thunk code; the Certs API model does **not** include it (extra properties are typically ignored by the serializer).
 
-1. **Load** settings.
-2. **Resolve user** by refresh token (`GetByRefreshToken`).
-3. **Remove** revoked JWT rows (`RemoveRevokedJwtTokens`).
-4. **Find** the token where `RefreshToken` matches.
-5. **Unauthorized** if not found → e.g. “Invalid refresh token.”
-6. **If the access token is still valid** (`UtcNow <= token.ExpiresAt`): update last login, save settings, return the **same** `LoginResponse` (no new JWT). There is **no** server-side `force` refresh path like Vault.
-7. **If access expired** but refresh is still valid (`UtcNow <= RefreshTokenExpiresAt`): issue a **new** access JWT + new refresh token, upsert token, save, return new `LoginResponse`.
-8. **If refresh is expired**: remove that token record, return **401** “Refresh token has expired.”
+1. **Resolve user** by refresh token (`IUserStore.GetByRefreshTokenAsync`).
+2. **Remove** revoked JWT rows (`RemoveRevokedJwtTokens`).
+3. **Find** the token where `RefreshToken` matches.
+4. **Unauthorized** if not found → e.g. “Invalid refresh token.”
+5. **If the access token is still valid** (`UtcNow <= token.ExpiresAt`): update last login, **`UpsertUserAsync`**, return the **same** `LoginResponse` (no new JWT). There is **no** server-side `force` refresh path like Vault.
+6. **If access expired** but refresh is still valid (`UtcNow <= RefreshTokenExpiresAt`): issue a **new** access JWT + new refresh token, upsert token, save, return new `LoginResponse`.
+7. **If refresh is expired**: remove that token record, return **401** “Refresh token has expired.”
 
 ### 3.4 Logout
 
-**Endpoint:** `POST /api/identity/logout` (**no** `JwtAuthorizationFilter` on this action)  
+**Endpoint:** `POST /api/identity/logout` (**requires** `JwtAuthorizationFilter` — send `Authorization: Bearer`)  
 **Controller:** `IdentityController.Logout` → `IdentityService.Logout`
 
-1. **Load** settings.
-2. **Resolve user** by **access JWT string** in the body (`LogoutRequest.Token`) via `GetByJwtToken`.
-3. If found: **`LogoutFromAllDevices`** → `RevokeAllJwtTokens()`; else → `RemoveJwtToken(token)` for the current session.
-4. Persist settings if the user was updated.
-5. Return success (implementation may still return OK if the token was unknown—clients should clear local state regardless).
+1. **Resolve user** by **access JWT** from the validated Bearer token (`GetByAccessTokenAsync` / token string from JWT context).
+2. If found: **`LogoutFromAllDevices`** → `RevokeAllJwtTokens()`; else → `RemoveJwtToken(accessToken)` for the current session.
+3. **`UpsertUserAsync`** if the user was updated.
+4. Return success (implementation may still return OK if the token was unknown—clients should clear local state regardless).
 
-**Request body (`LogoutRequest`):** `token` (access JWT), `logoutFromAllDevices`.
-
-The WebUI sends the current access token from stored identity; it does not rely on a Bearer header for this route.
+**Request body (`LogoutRequest`):** `token` (access JWT, for shared model parity), `logoutFromAllDevices` — the server uses the **Bearer** access token for lookup; keep body aligned with Vault clients if needed.
 
 ---
 
@@ -167,7 +162,7 @@ The WebUI sends the current access token from stored identity; it does not rely 
 |--------|----------|-----------------|--------|
 | POST | `/api/identity/login` | No | Login; returns access + refresh token. |
 | POST | `/api/identity/refresh` | No | Exchange refresh token for same or new tokens. |
-| POST | `/api/identity/logout` | No | Revoke session(s) using access token **in body**. |
+| POST | `/api/identity/logout` | Yes | Revoke session(s); Bearer identifies the access token to remove. |
 
 Other identity routes (e.g. `PATCH /api/identity/user/{id}`) use `JwtAuthorizationFilter` and require a valid JWT.
 
@@ -177,7 +172,7 @@ Base route: `api/identity` (`IdentityController`, `AppMap`).
 
 ## 6. Sequence overview
 
-**Login:** User submits credentials → POST `/api/identity/login` → settings updated with new `JwtToken` → WebUI stores identity → redirect into app.
+**Login:** User submits credentials → POST `/api/identity/login` → user row updated with new `JwtToken` in PostgreSQL → WebUI stores identity → redirect into app.
 
 **Authenticated request (access token valid):** Interceptor adds `Authorization: Bearer` → API validates JWT.
 
@@ -185,7 +180,7 @@ Base route: `api/identity` (`IdentityController`, `AppMap`).
 
 **401 on protected request:** Response interceptor attempts refresh; if refresh returns 401, `clearIdentity()` and redirect to `/login`.
 
-**Logout:** POST `/api/identity/logout` with body `{ token, logoutFromAllDevices }` → server removes token(s) from settings → client clears storage.
+**Logout:** POST `/api/identity/logout` with `Authorization: Bearer` and body `{ token, logoutFromAllDevices }` → server removes token(s) from the user row → client clears storage.
 
 Replace illustrative “organizations” examples in Vault with Certs resources (e.g. **accounts**, **certificate flows**)—the **mechanism** is the same: no protected API should run after refresh has failed without clearing identity.
 
@@ -194,9 +189,9 @@ Replace illustrative “organizations” examples in Vault with Certs resources 
 ## 7. Security notes
 
 - **Passwords** use salt + server-side **pepper**; not stored in plain text.
-- **Refresh tokens** are stored per user in settings; expiry and invalidation are enforced in `IdentityService.RefreshTokenAsync`.
+- **Refresh tokens** are stored per user in PostgreSQL; expiry and invalidation are enforced in `IdentityService.RefreshTokenAsync`.
 - **2FA** is **not** implemented on the Certs WebAPI; do not enable the WebUI 2FA fields until backend support exists.
-- **Login/refresh** do not require Bearer; other protected controllers use `JwtAuthorizationFilter`.
+- **Login/refresh** do not require Bearer; **logout** and other protected identity routes use `JwtAuthorizationFilter`.
 - Frontend keeps **one** identity in localStorage; refresh is serialized to avoid duplicate refresh storms.
 
 ---
@@ -205,10 +200,10 @@ Replace illustrative “organizations” examples in Vault with Certs resources 
 
 | Area | File |
 |------|------|
-| Domain – User | `src/MaksIT.Webapi/Domain/User.cs` |
-| Domain – JwtToken | `src/MaksIT.Webapi/Domain/JwtToken.cs` |
-| API service | `src/MaksIT.Webapi/Services/IdentityService.cs` |
-| API controller | `src/MaksIT.Webapi/Controllers/IdentityController.cs` |
+| Domain – User | `src/MaksIT.CertsUI/Domain/User.cs` |
+| Domain – JwtToken | `src/MaksIT.CertsUI/Domain/JwtToken.cs` |
+| API service | `src/MaksIT.CertsUI/Services/IdentityService.cs` |
+| API controller | `src/MaksIT.CertsUI/Controllers/IdentityController.cs` |
 | API models | `src/MaksIT.Models/LetsEncryptServer/Identity/Login/`, `.../Logout/` |
 | Frontend – state | `src/MaksIT.WebUI/src/redux/slices/identitySlice.ts` |
 | Frontend – HTTP | `src/MaksIT.WebUI/src/axiosConfig.ts` |

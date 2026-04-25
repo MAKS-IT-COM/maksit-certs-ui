@@ -1,7 +1,7 @@
-using MaksIT.LetsEncrypt.Entities;
+using MaksIT.CertsUI.Engine.Domain.LetsEncrypt;
 using Xunit;
 
-namespace MaksIT.LetsEncrypt.Tests;
+namespace MaksIT.CertsUI.Engine.Tests;
 
 public class ContentTypeTests
 {

@@ -28,7 +28,11 @@ With **`IfNotPresent`** (default), **`rollme`** is omitted; the node may keep a 
 
 Pod annotation **certs-ui.io/image** is the resolved `registry/repository:tag` for debugging.
 
-Optional per workload under **`components.<name>`**: **`livenessProbe`**, **`readinessProbe`**, **`resources`** (standard Kubernetes container fields). Omit a key to leave it unset.
+Optional per workload under **`components.<name>`**: **`replicaCount`** (default **1**; stateless **client** / **reverseproxy** are safe to raise on an HA cluster), **`livenessProbe`**, **`readinessProbe`**, **`resources`** (standard Kubernetes container fields). Omit a key to leave it unset.
+
+When **`replicaCount` > 1**, the chart creates a **PodDisruptionBudget** (`minAvailable: 1`) for that component.
+
+**Server + RWO PVCs:** the default **acme** / **data** volumes use **ReadWriteOnce**. Kubernetes will not schedule a second server pod on the same volume; for multiple server replicas you need **ReadWriteMany** (or equivalent) and an application design that tolerates shared disk (see product HA roadmap).
 
 ------------------------------------------------------------
 ## Config

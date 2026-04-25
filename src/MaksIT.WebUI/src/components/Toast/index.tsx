@@ -16,9 +16,14 @@ const Toast: FC = () => {
     const handleAddToast = (event: CustomEvent<Toast>) => {
       const { message, type, duration } = event.detail
 
-      // Add the new toast
+      // Add the new toast, avoiding duplicates with same message & type
       const id = uuidv4()
-      setToasts((prev) => [...prev, { id, message, type, duration }])
+      setToasts(prev => {
+        const hasDuplicate = prev.some(t => t.message === message && t.type === type)
+        if (hasDuplicate) return prev
+
+        return [...prev, { id, message, type, duration }]
+      })
 
       // Auto-remove if a duration is specified
       if (duration) {

@@ -5,8 +5,8 @@
   "openReport": false,
   "paths": {
     "testProjects": [
-      "..\\..\\src\\LetsEncrypt.Tests",
-      "..\\..\\src\\MaksIT.Webapi.Tests"
+      "..\\..\\src\\MaksIT.CertsUI.Engine.Tests",
+      "..\\..\\src\\MaksIT.CertsUI.Tests"
     ],
     "badgesDir": "..\\..\\assets\\badges"
   },

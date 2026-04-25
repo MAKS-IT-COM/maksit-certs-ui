@@ -1,8 +1,8 @@
 using MaksIT.Core.Extensions;
-using MaksIT.LetsEncrypt.Entities;
+using MaksIT.CertsUI.Engine.Domain.Certs;
 using Xunit;
 
-namespace MaksIT.LetsEncrypt.Tests;
+namespace MaksIT.CertsUI.Engine.Tests;
 
 public class RegistrationCacheAcmeCooldownSerializationTests {
   [Fact]

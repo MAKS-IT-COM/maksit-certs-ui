@@ -2,6 +2,7 @@
 import { Routes } from 'react-router-dom'
 import { GetRoutes } from './AppMap'
 import { Loader } from './components/Loader'
+import { Toast } from './components/Toast'
 
 const App = () => {
 
@@ -10,6 +11,7 @@ const App = () => {
       {GetRoutes()}
     </Routes>
     <Loader />
+    <Toast />
   </>
 }
 

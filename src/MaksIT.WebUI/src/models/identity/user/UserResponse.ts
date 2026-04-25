@@ -1,20 +1,17 @@
 import { ResponseModelBase } from '../../ResponseModelBase'
-import { UserEntityScopeResponse } from './UserEntityScopeResponse'
 
-
+/** Certs API user payload (LetsEncryptServer UserResponse). */
 export interface UserResponse extends ResponseModelBase {
-  id: string
-  username: string
-  email: string
-  mobileNumber?: string
-  isActive: boolean
 
-  twoFactorEnabled: boolean
+  /** Master */
+  id: string
+  username?: string
+  isActive?: boolean
+  lastLogin?: string
+
+  /** Two-factor */
+  twoFactorEnabled?: boolean
   twoFactorRecoveryCodes?: string[]
-  twoFactorSharedKey?: string
   qrCodeUrl?: string
   recoveryCodesLeft?: number
-
-  isGlobalAdmin: boolean
-  entityScopes?: UserEntityScopeResponse[]
 }

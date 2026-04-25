@@ -18,7 +18,7 @@ const Utilities: FC = () => {
       .then((response) => {
         if (!response) return
 
-        addToast(response?.message, 'info')
+        addToast(response.message, 'info')
       })
   }
 
@@ -55,7 +55,6 @@ const Utilities: FC = () => {
       })
   }
 
-
   return <FormContainer>
     <FormHeader>Utilities</FormHeader>
     <FormContent>
@@ -84,7 +83,6 @@ const Utilities: FC = () => {
         />
 
         <span className={'col-span-3'}></span>
-
 
         <ButtonComponent
           colspan={3}

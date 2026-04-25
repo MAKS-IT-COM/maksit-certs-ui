@@ -1,9 +1,11 @@
-using MaksIT.LetsEncrypt.Entities.LetsEncrypt;
+using MaksIT.CertsUI.Engine.Domain.LetsEncrypt;
 using Microsoft.Extensions.Caching.Memory;
 
-namespace MaksIT.LetsEncrypt.Services;
+namespace MaksIT.CertsUI.Engine.Services;
 
-/// <summary>Caches per-session <see cref="State"/> for ACME flows (directory, account, current order, challenges).</summary>
+/// <summary>
+/// In-memory cache of per-session <see cref="State"/> for ACME flows (directory, account, current order, challenges).
+/// </summary>
 public sealed class AcmeSessionStore {
   private static readonly TimeSpan SessionTtl = TimeSpan.FromHours(1);
 
