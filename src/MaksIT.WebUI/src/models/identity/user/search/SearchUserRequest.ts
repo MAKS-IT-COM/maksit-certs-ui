@@ -1,6 +1,6 @@
 import { PagedRequest } from '../../../PagedRequest'
 
+/** Certs API — no org/app filters (see server SearchUserRequest). */
 export interface SearchUserRequest extends PagedRequest {
-    organizationFilters?: string
-    aplicattionFilters?: string
+  usernameFilter?: string
 }

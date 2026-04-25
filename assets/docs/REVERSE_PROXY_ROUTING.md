@@ -30,7 +30,7 @@ Controllers use the usual **`/api/...`** prefix (e.g. `api/identity`, account an
 
 ### HTTP-01 (Let’s Encrypt)
 
-Traffic for **`/.well-known/acme-challenge/*`** must reach **MaksIT.Webapi** so the HTTP-01 validator can fetch the token file. The dedicated route sends that path to the **`server`** service (same `webapiCluster` as `/api`).
+Traffic for **`/.well-known/acme-challenge/*`** must reach **MaksIT.CertsUI** so the HTTP-01 validator can fetch the token file. The dedicated route sends that path to the **`server`** service (same `webapiCluster` as `/api`).
 
 ### Kubernetes (Helm)
 
@@ -51,7 +51,7 @@ The chart can mount **`config.js`** from a ConfigMap (`certsClientRuntime.apiUrl
 | Scenario | Typical base URL for Certs HTTP API |
 |----------|-------------------------------------|
 | Docker Compose (this repo) | `http://localhost:8080` (through YARP) |
-| Run **MaksIT.Webapi** only (F5 / `dotnet run`) | See `launchSettings.json` (e.g. `http://localhost:5016`) — **no** YARP |
+| Run **MaksIT.CertsUI** only (F5 / `dotnet run`) | See `launchSettings.json` (e.g. `http://localhost:5016`) — **no** YARP |
 | Run **ReverseProxy** only (outside Compose) | `launchSettings`: e.g. `http://localhost:5276` — cluster addresses in `appsettings.json` must resolve (Compose service names only work **inside** the Compose network) |
 
 If authentication succeeds but API calls fail, confirm traffic reaches the **same** WebAPI instance and data volume you expect (not a different port or stale container).

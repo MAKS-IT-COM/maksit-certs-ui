@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { AutoSizer, MultiGrid, GridCellProps } from 'react-virtualized'
 
-import { PagedResponse } from '../../models/PagedResponse'
+import { PagedResponse } from '../../models/letsEncryptServer/common/PagedResponse'
+import { DataTablePageView, mapCertsPagedToDataTable } from '../../functions/dataTablePaged'
 import { Plus, Trash2, Edit } from 'lucide-react'
 import { debounce } from 'lodash'
 
@@ -28,7 +29,7 @@ export interface DataTableColumn<T, K extends keyof T = keyof T> {
 }
 
 interface DataTableProps<T> {
-  rawd?: PagedResponse<T>
+  rawd?: PagedResponse<T> | DataTablePageView<T>
   columns: DataTableColumn<T>[]
   maxRecordsPerPage?: number
 
@@ -36,9 +37,9 @@ interface DataTableProps<T> {
 
   allowAddRow?: () => boolean
   onAddRow?: () => void
-  allowEditRow?: (ids: Record<string, string>) =>boolean
+  allowEditRow?: (ids: Record<string, string>) => boolean
   onEditRow?: (ids: Record<string, string>) => void
-  allowDeleteRow?: (ids: Record<string, string>) =>boolean
+  allowDeleteRow?: (ids: Record<string, string>) => boolean
   onDeleteRow?: (ids: Record<string, string>) => void
 
   onFilterChange?: (filters: Record<string, string>) => void
@@ -54,28 +55,14 @@ const DEFAULT_COL_WIDTH = 150
 const HEADER_ROWS = 2
 const ROW_HEIGHT = 40
 
-/** Normalizes rawd to a valid PagedResponse; treats undefined or invalid data (e.g. error payloads) as empty. */
-function normalizePagedResponse<T>(rawd: PagedResponse<T> | undefined): PagedResponse<T> {
-  if (rawd != null && Array.isArray(rawd.items)) {
-    return {
-      items: rawd.items,
-      pageNumber: rawd.pageNumber ?? 0,
-      pageSize: rawd.pageSize ?? 0,
-      totalCount: rawd.totalCount ?? 0,
-      totalPages: rawd.totalPages ?? 0,
-      hasPreviousPage: rawd.hasPreviousPage ?? false,
-      hasNextPage: rawd.hasNextPage ?? false
-    }
+function toDataTableView<T>(rawd: PagedResponse<T> | DataTablePageView<T> | undefined): DataTablePageView<T> {
+  if (rawd != null && 'data' in rawd && Array.isArray(rawd.data)) {
+    return mapCertsPagedToDataTable(rawd as PagedResponse<T>)
   }
-  return {
-    items: [],
-    totalCount: 0,
-    pageNumber: 0,
-    pageSize: 0,
-    totalPages: 0,
-    hasPreviousPage: false,
-    hasNextPage: false
+  if (rawd != null && 'items' in rawd && Array.isArray(rawd.items)) {
+    return rawd as DataTablePageView<T>
   }
+  return mapCertsPagedToDataTable(undefined)
 }
 
 const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>) => {
@@ -106,7 +93,7 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
     totalPages,
     hasPreviousPage,
     hasNextPage,
-  } = normalizePagedResponse(rawd)
+  } = toDataTableView(rawd)
 
   const gridRef = useRef<MultiGrid>(null)
   const filterMeasureRef = useRef<HTMLDivElement>(null)
@@ -123,24 +110,18 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
         const stored = localStorage.getItem(storageKey)
         if (stored) {
           const parsed = JSON.parse(stored)
-          // Check if parsed is an array and matches the expected length
-          if (Array.isArray(parsed) && parsed.length === columns.length + 1) {  // +1 for action column
+          if (Array.isArray(parsed) && parsed.length === columns.length + 1) {
             return parsed
           }
-          else {
-            // Remove invalid storage and fall back to default
-            localStorage.removeItem(storageKey)
-            return defaultWidths
-          }
+          localStorage.removeItem(storageKey)
+          return defaultWidths
         }
       }
       catch {
-        // Ignore and fall back to default
         return defaultWidths
       }
     }
 
-    // If no storage key or no valid stored widths, return default
     return defaultWidths
   })
 
@@ -154,7 +135,6 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
     }
   }, [colWidths, storageKey])
 
-  // Measure filter row content in a hidden node, then set height so row can animate from 0
   useEffect(() => {
     const el = filterMeasureRef.current
     if (!el || columns.length === 0) return
@@ -191,7 +171,7 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
     filters: string
   ) => {
     const prev = filterValues.current
-    
+
     const newValues = {
       ...prev,
       [filterId]: {
@@ -223,7 +203,7 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
     const ids = Object.fromEntries(
       idFields.map((key) => [key, `${row[key]}`])
     )
-    
+
     return ids
   }
 
@@ -277,7 +257,6 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
     const isActionCol = columnIndex === 0
     const col = columns[columnIndex - 1]
 
-    // classi statiche; solo width/height via style
     const commonClasses = [
       'box-border',
       'flex',
@@ -294,7 +273,6 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
       rowIndex >= HEADER_ROWS && selectedRowIndex === rowIndex - HEADER_ROWS ? 'bg-sky-100' : '',
     ].filter(Boolean).join(' ')
 
-    // Header
     if (rowIndex === 0) {
       const allowAddRowResult = handleAllowAddRow()
 
@@ -313,7 +291,6 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
           </div>
         )
       }
-      // il div esterno mantiene style/className, Resizable solo sul contenuto
       return (
         <div
           key={key}
@@ -341,7 +318,6 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
       )
     }
 
-    // Filter row
     if (rowIndex === 1) {
       return isActionCol ? (
         <div
@@ -362,11 +338,10 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
       )
     }
 
-    // Data rows
     const dataIdx = rowIndex - HEADER_ROWS
     if (isActionCol) {
       const allowEditRowResult = handleAllowEditRow(dataIdx)
-      const allowDeleteRowResult  = handleAllowDeleteRow(dataIdx)
+      const allowDeleteRowResult = handleAllowDeleteRow(dataIdx)
 
       return (
         <div
@@ -400,7 +375,7 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
         </div>
       )
     }
-    
+
     const row = items[dataIdx]
 
     return (
@@ -419,7 +394,6 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
     )
   }
 
-  // Handler for MultiGrid scroll
   const handleGridScroll = ({
     scrollTop,
     clientHeight,
@@ -429,11 +403,9 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
     clientHeight: number
     scrollHeight: number
   }) => {
-    // At bottom
     if (scrollTop + clientHeight >= scrollHeight - 2 && hasNextPage) {
       handleNextPage()
     }
-    // At top
     if (scrollTop <= 2 && hasPreviousPage) {
       handlePreviousPage()
     }
@@ -441,7 +413,6 @@ const DataTable = <T extends Record<string, unknown>,>(props: DataTableProps<T>)
 
   return (
     <div className={`col-span-${colspan} flex flex-col h-full w-full relative`}>
-      {/* Off-screen node to measure filter row content height so row can start at 0 and animate */}
       {columns[0] && (
         <div
           ref={filterMeasureRef}

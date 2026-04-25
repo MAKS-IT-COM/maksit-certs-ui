@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react'
 import { debounce } from 'lodash'
-import { useAppDispatch } from '../../redux/hooks'
-import { postData } from '../../axiosConfig'
+import { postDataWithoutLoader } from '../../axiosConfig'
 import { PagedRequest } from '../../models/PagedRequest'
-import { PagedResponse } from '../../models/PagedResponse'
+import { PagedResponse } from '../../models/letsEncryptServer/common/PagedResponse'
 
 interface FilterPropsBase {
   filterId?: string
@@ -24,10 +23,14 @@ interface RemoteFilterProps extends FilterPropsBase {
 }
 
 type FilterProps = NormalFilterProps | RemoteFilterProps
-  
+
 interface FilterState {
   value: string,
   operator: string
+}
+
+function toPascalCase(s: string): string {
+  return s.length === 0 ? s : s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 const DataTableFilter = <T extends { [key: string]: string }>(props: FilterProps) => {
@@ -41,33 +44,31 @@ const DataTableFilter = <T extends { [key: string]: string }>(props: FilterProps
       operator: 'contains'
     },
     disabled = false,
-    onFilterChange 
+    onFilterChange
   } = props
-
-  const dispatch = useAppDispatch()
 
   const [filterState, setFilterState] = useState<FilterState>(value)
 
   const debounceOnFilterChange = useMemo(() => {
     if (!onFilterChange) return
-   
+
     return debounce((route: string, filters: string) => {
 
-      postData<PagedRequest, PagedResponse<T>>(route, {
+      postDataWithoutLoader<PagedRequest, PagedResponse<T>>(route, {
         pageSize: 100,
         filters
       }).then((response) => {
         if (!response) return
 
-        const linqQuery = response.items.map(item => `${columnId} == "${item['id']}"`).join(' || ')
+        const rows = response.data ?? []
+        const linqQuery = rows.map(item => `${columnId} == "${item['id']}"`).join(' || ')
         onFilterChange?.(filterId, columnId, linqQuery)
-         
+
       }).finally(() => {
-        
-      })  
+      })
     }, 500)
-   
-  }, [filterId, columnId, dispatch, onFilterChange])
+
+  }, [filterId, columnId, onFilterChange])
 
   const handleFilterChange = (value: string, operator: string) => {
     setFilterState({
@@ -82,36 +83,38 @@ const DataTableFilter = <T extends { [key: string]: string }>(props: FilterProps
 
     let linqQuery = ''
 
+    const propName = toPascalCase(accessorKey)
+
     switch (operator) {
     case 'contains':
-      linqQuery = `${accessorKey}.Contains("${value}")`
+      linqQuery = `${propName}.Contains("${value}")`
       break
     case 'startsWith':
-      linqQuery = `${accessorKey}.StartsWith("${value}")`
+      linqQuery = `${propName}.StartsWith("${value}")`
       break
     case 'endsWith':
-      linqQuery = `${accessorKey}.EndsWith("${value}")`
+      linqQuery = `${propName}.EndsWith("${value}")`
       break
     case '=':
-      linqQuery = `${accessorKey} == "${value}"`
+      linqQuery = `${propName} == "${value}"`
       break
     case '!=':
-      linqQuery = `${accessorKey} != "${value}"`
+      linqQuery = `${propName} != "${value}"`
       break
     case '>':
-      linqQuery = `${accessorKey} > "${value}"`
+      linqQuery = `${propName} > "${value}"`
       break
     case '<':
-      linqQuery = `${accessorKey} < "${value}"`
+      linqQuery = `${propName} < "${value}"`
       break
     case '>=':
-      linqQuery = `${accessorKey} >= "${value}"`
+      linqQuery = `${propName} >= "${value}"`
       break
     case '<=':
-      linqQuery = `${accessorKey} <= "${value}"`
+      linqQuery = `${propName} <= "${value}"`
       break
     default:
-      linqQuery = `${accessorKey}.Contains("${value}")` // Default case handles using 'contains' as the safe fallback
+      linqQuery = `${propName}.Contains("${value}")`
       break
     }
 
@@ -127,11 +130,11 @@ const DataTableFilter = <T extends { [key: string]: string }>(props: FilterProps
   }
 
   return (
-    <div className={'flex flex-col gap-2'}>
+    <div className={'flex w-full min-w-0 flex-col gap-1 overflow-hidden justify-center h-full'}>
       <input
         type={'text'}
         placeholder={'Filter...'}
-        className={'w-full border border-outline/20 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:bg-gray-100 disabled:opacity-60'}
+        className={'block w-full min-w-0 max-w-full border rounded h-8 py-1 px-2 text-sm text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500/30 border-gray-300 bg-white disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-default'}
         value={filterState.value}
         onChange={e => handleFilterChange(e.target.value, filterState.operator)}
         disabled={disabled}
@@ -140,7 +143,7 @@ const DataTableFilter = <T extends { [key: string]: string }>(props: FilterProps
         value={filterState.operator}
         onChange={e => handleFilterChange(filterState.value, e.target.value)}
         disabled={disabled}
-        className={'w-full border border-outline/20 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:bg-gray-100 disabled:opacity-60'}
+        className={'block w-full min-w-0 max-w-full border rounded h-8 py-1 px-2 text-sm text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500/30 border-gray-300 bg-white disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-default'}
       >
         <option value={'contains'}>Contains</option>
         <option value={'startsWith'}>Starts With</option>

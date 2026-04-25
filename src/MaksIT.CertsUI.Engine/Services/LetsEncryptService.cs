@@ -7,13 +7,12 @@ using MaksIT.Core.Extensions;
 using MaksIT.Core.Security;
 using MaksIT.Core.Security.JWK;
 using MaksIT.Core.Security.JWS;
-using MaksIT.LetsEncrypt.Entities;
-using MaksIT.LetsEncrypt.Entities.Jws;
-using MaksIT.LetsEncrypt.Entities.LetsEncrypt;
-using MaksIT.LetsEncrypt.Exceptions;
-using MaksIT.LetsEncrypt.Models.Interfaces;
-using MaksIT.LetsEncrypt.Models.Requests;
-using MaksIT.LetsEncrypt.Models.Responses;
+using MaksIT.CertsUI.Engine.Domain.Certs;
+using MaksIT.CertsUI.Engine.Domain.LetsEncrypt;
+using MaksIT.CertsUI.Engine.Domain.LetsEncrypt.Jws;
+using MaksIT.CertsUI.Engine.Dto.LetsEncrypt.Interfaces;
+using MaksIT.CertsUI.Engine.Dto.LetsEncrypt.Requests;
+using MaksIT.CertsUI.Engine.Dto.LetsEncrypt.Responses;
 using MaksIT.Results;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Headers;
@@ -22,7 +21,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
 
-namespace MaksIT.LetsEncrypt.Services;
+namespace MaksIT.CertsUI.Engine.Services;
 
 public interface ILetsEncryptService {
   Result<RegistrationCache?> GetRegistrationCache(Guid sessionId);
@@ -43,18 +42,18 @@ public partial class LetsEncryptService : ILetsEncryptService {
   private const string AccountKeyMissingMessage = "Account key is not loaded; complete Init before this operation.";
 
   private readonly ILogger<LetsEncryptService> _logger;
-  private readonly LetsEncryptConfiguration _appSettings;
+  private readonly ICertsEngineConfiguration _engineConfiguration;
   private readonly HttpClient _httpClient;
   private readonly AcmeSessionStore _sessions;
 
   public LetsEncryptService(
       ILogger<LetsEncryptService> logger,
-      LetsEncryptConfiguration appSettings,
+      ICertsEngineConfiguration engineConfiguration,
       HttpClient httpClient,
       AcmeSessionStore sessions
    ) {
     _logger = logger;
-    _appSettings = appSettings;
+    _engineConfiguration = engineConfiguration;
     _httpClient = httpClient;
     _sessions = sessions;
   }
@@ -75,7 +74,7 @@ public partial class LetsEncryptService : ILetsEncryptService {
 
       state.IsStaging = isStaging;
 
-      _httpClient.BaseAddress ??= new Uri(isStaging ? _appSettings.Staging : _appSettings.Production);
+      _httpClient.BaseAddress ??= new Uri(isStaging ? _engineConfiguration.LetsEncryptStaging : _engineConfiguration.LetsEncryptProduction);
 
       if (state.Directory == null) {
         var request = new HttpRequestMessage(HttpMethod.Get, new Uri(DirectoryEndpoint, UriKind.Relative));
@@ -200,7 +199,7 @@ public partial class LetsEncryptService : ILetsEncryptService {
           ChallengeType = ChalengeType.http.GetDisplayName(),
           Location = result.Result.Location,
           AccountKey = accountKey.ExportCspBlob(true),
-          Id = result.Result.Id ?? string.Empty,
+          AcmeAccountResourceId = result.Result.Id ?? string.Empty,
           Key = result.Result.Key
         };
       }

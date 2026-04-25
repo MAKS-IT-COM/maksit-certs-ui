@@ -1,8 +1,9 @@
 using System.Net.Http.Headers;
-using MaksIT.LetsEncrypt.Models.Responses;
+using MaksIT.CertsUI.Engine.Domain.LetsEncrypt;
+using MaksIT.CertsUI.Engine.Dto.LetsEncrypt.Responses;
 using Xunit;
 
-namespace MaksIT.LetsEncrypt.Tests;
+namespace MaksIT.CertsUI.Engine.Tests;
 
 public class AcmeRetryAfterParserTests {
   [Fact]

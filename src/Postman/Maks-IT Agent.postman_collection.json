@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "1e13f461-ccaa-436a-92e4-e14c05131b96",
 		"name": "Maks-IT Agent (direct)",
-		"description": "Calls the Maks-IT Agent HTTP API directly (not through MaksIT.Webapi). Set collection variables agentBaseUrl (e.g. http://agent-host:5000) and agentKey.",
+		"description": "Calls the Maks-IT Agent HTTP API directly (not through MaksIT.CertsUI). Set collection variables agentBaseUrl (e.g. http://agent-host:5000) and agentKey.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"variable": [

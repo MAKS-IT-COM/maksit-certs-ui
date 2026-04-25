@@ -1,4 +1,5 @@
 # See docker-compose.yml header for maksit-certs-ui-* container/image naming (no clash with maksit-vault-*).
+# Postgres + pgAdmin layout mirrors maksit-vault/src/docker-compose.override.yml (local dev).
 networks:
   maksit-certs-ui-network:
     driver: bridge
@@ -18,7 +19,7 @@ services:
 
   client:
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      VITE_APP_TITLE: MaksIT.CertsUI
     volumes:
       - ./MaksIT.WebUI:/app
     networks:
@@ -30,10 +31,40 @@ services:
       ASPNETCORE_HTTP_PORTS: "5000"
     volumes:
       - D:/Compose/MaksIT.CertsUI/acme:/acme
-      - D:/Compose/MaksIT.CertsUI/cache:/cache
       - D:/Compose/MaksIT.CertsUI/data:/data
-      - D:/Compose/MaksIT.CertsUI/tmp:/tmp
       - D:/Compose/MaksIT.CertsUI/configMap/appsettings.json:/configMap/appsettings.json:ro
       - D:/Compose/MaksIT.CertsUI/secrets/appsecrets.json:/secrets/appsecrets.json:ro
     networks:
       - maksit-certs-ui-network
+    depends_on:
+      - postgres
+
+  postgres:
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: maksit
+      POSTGRES_PASSWORD: maksit
+      POSTGRES_DB: maksit_certs
+    networks:
+      - maksit-certs-ui-network
+    volumes:
+      - D:/Compose/MaksIT.CertsUI/postgresql/data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  pgadmin:
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: adminpass
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+      PGADMIN_REPLACE_SERVERS_ON_STARTUP: "True"
+    ports:
+      - "8081:80"
+    networks:
+      - maksit-certs-ui-network
+    depends_on:
+      - postgres
+    volumes:
+      - D:/Compose/MaksIT.CertsUI/postgresql/pgadmin-data:/var/lib/pgadmin
+      - D:/Compose/MaksIT.CertsUI/postgresql/servers.json:/pgadmin4/servers.json:ro

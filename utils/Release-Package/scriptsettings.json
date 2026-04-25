@@ -8,7 +8,7 @@
       "stageLabel": "build",
       "enabled": true,
       "projectFiles": [
-        "..\\..\\src\\MaksIT.Webapi\\MaksIT.Webapi.csproj"
+        "..\\..\\src\\MaksIT.CertsUI\\MaksIT.CertsUI.csproj"
       ]
     },
     {
@@ -16,8 +16,8 @@
       "stageLabel": "test",
       "enabled": true,
       "projects": [
-        "..\\..\\src\\LetsEncrypt.Tests",
-        "..\\..\\src\\MaksIT.Webapi.Tests"
+        "..\\..\\src\\MaksIT.CertsUI.Engine.Tests",
+        "..\\..\\src\\MaksIT.CertsUI.Tests"
       ],
       "resultsDir": "..\\..\\testResults"
     },
@@ -54,7 +54,7 @@
       "images": [
         {
           "service": "server",
-          "dockerfile": "MaksIT.Webapi/Dockerfile"
+          "dockerfile": "MaksIT.CertsUI/Dockerfile"
         },
         {
           "service": "client",
@@ -90,7 +90,7 @@
       "registryUrl": "DockerPush: registry host without scheme.",
       "credentialsEnvVar": "DockerPush / HelmPush: env var with base64(username:password).",
       "projectName": "DockerPush: image path segment: registryUrl/projectName/service:tag.",
-      "contextPath": "DockerPush: directory containing MaksIT.Webapi and MaksIT.WebUI (repo src/).",
+      "contextPath": "DockerPush: directory containing MaksIT.CertsUI and MaksIT.WebUI (repo src/).",
       "images": "Dockerfile paths are relative to contextPath.",
       "chartPath": "HelmPush: directory containing Chart.yaml. Keep version/appVersion as placeholders in git (e.g. 0.0.0); HelmPush overwrites with bare semver from DotNetReleaseVersion (shared.version, e.g. 3.3.4, no v) before package/push; falls back to stripping v from shared.tag if version is missing.",
       "ociRepository": "HelmPush: OCI registry URL for helm push (e.g. oci://cr.maks-it.com/charts).",

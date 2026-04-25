@@ -13,10 +13,10 @@
   <Project Path="docker-compose.dcproj">
     <Build Solution="*|Any CPU" />
   </Project>
-  <Project Path="LetsEncrypt.Tests/LetsEncrypt.Tests.csproj" />
-  <Project Path="LetsEncrypt/LetsEncrypt.csproj" />
+  <Project Path="MaksIT.CertsUI.Engine.Tests/MaksIT.CertsUI.Engine.Tests.csproj" />
+  <Project Path="MaksIT.CertsUI.Engine/MaksIT.CertsUI.Engine.csproj" />
   <Project Path="MaksIT.Models/MaksIT.Models.csproj" />
-  <Project Path="MaksIT.Webapi.Tests/MaksIT.Webapi.Tests.csproj" />
-  <Project Path="MaksIT.Webapi/MaksIT.Webapi.csproj" />
+  <Project Path="MaksIT.CertsUI.Tests/MaksIT.CertsUI.Tests.csproj" />
+  <Project Path="MaksIT.CertsUI/MaksIT.CertsUI.csproj" />
   <Project Path="ReverseProxy/ReverseProxy.csproj" />
 </Solution>

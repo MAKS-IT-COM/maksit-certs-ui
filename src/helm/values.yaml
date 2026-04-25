@@ -19,34 +19,49 @@ certsServerConfig:
     default: Information
     microsoftAspNetCore: Warning
   configuration:
-    auth:
-      issuer: ""
-      audience: ""
-      expiration: 15
-      refreshExpiration: 180
-    agent:
-      agentHostname: ""
-      agentPort: 5000
-      serviceToReload: haproxy
-    production: "https://acme-v02.api.letsencrypt.org/directory"
-    staging: "https://acme-staging-v02.api.letsencrypt.org/directory"
-    acmeFolder: /acme
-    cacheFolder: /cache
-    dataFolder: /data
-    settingsFile: /data/settings.json
+    certsUIEngineConfiguration:
+      admin:
+        username: "admin"
+      jwt:
+        issuer: ""
+        audience: ""
+        expiresIn: 15
+        refreshTokenExpiresIn: 180
+      twoFactor:
+        label: "CertsUI"
+        issuer: "MaksIT.CertsUI"
+        algorithm: ""
+        digits: 6
+        period: 30
+        timeTolerance: 1
+      agent:
+        agentHostname: ""
+        agentPort: 5000
+        serviceToReload: haproxy
+      production: "https://acme-v02.api.letsencrypt.org/directory"
+      staging: "https://acme-staging-v02.api.letsencrypt.org/directory"
+      acmeFolder: /acme
+      dataFolder: /data
 
 # Server Secret (appsecrets.json); referenced from components.server.secretsFile when tpl: true
+# Configuration:CertsUIEngineConfiguration:ConnectionString — same structural role as MaksIT.Vault VaultEngineConfiguration:ConnectionString.
 certsServerSecrets:
   authSecret: changeme-generate-a-long-random-string
   authPepper: ""
   agentKey: ""
+  adminPassword: changeme-generate-a-strong-password
+  certsUIEngineConfiguration:
+    connectionString: ""
 
 # Client ConfigMap (config.js); referenced when tpl: true
 certsClientRuntime:
   apiUrl: "http://certs-ui.example.com/api"
 
 components:
+  # Per-component replica count (minimum 1). Server uses RWO PVCs by default — use 1 unless
+  # your StorageClass supports ReadWriteMany and the app can share the volume (see NOTES.txt).
   server:
+    replicaCount: 1
     image:
       registry: cr.maks-it.com
       repository: certs-ui/server
@@ -57,6 +72,10 @@ components:
         value: Production
       - name: ASPNETCORE_HTTP_PORTS
         value: "5000"
+      - name: POD_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.name
     service:
       enabled: true
       type: ClusterIP
@@ -67,14 +86,6 @@ components:
       volumes:
         - name: acme
           mountPath: /acme
-          type: pvc
-          pvc:
-            create: true
-            keep: true
-            size: 50Mi
-            accessModes: [ReadWriteOnce]
-        - name: cache
-          mountPath: /cache
           type: pvc
           pvc:
             create: true
@@ -98,12 +109,18 @@ components:
       content: |
         {
           "Configuration": {
-            "Auth": {
-              "Secret": {{ .Values.certsServerSecrets.authSecret | toJson }},
-              "Pepper": {{ .Values.certsServerSecrets.authPepper | toJson }}
-            },
-            "Agent": {
-              "AgentKey": {{ .Values.certsServerSecrets.agentKey | toJson }}
+            "CertsUIEngineConfiguration": {
+              "ConnectionString": {{ .Values.certsServerSecrets.certsUIEngineConfiguration.connectionString | toJson }},
+              "Admin": {
+                "Password": {{ .Values.certsServerSecrets.adminPassword | toJson }}
+              },
+              "JwtSettingsConfiguration": {
+                "JwtSecret": {{ .Values.certsServerSecrets.authSecret | toJson }},
+                "PasswordPepper": {{ .Values.certsServerSecrets.authPepper | toJson }}
+              },
+              "Agent": {
+                "AgentKey": {{ .Values.certsServerSecrets.agentKey | toJson }}
+              }
             }
           }
         }
@@ -123,27 +140,59 @@ components:
           },
           "AllowedHosts": {{ .Values.certsServerConfig.allowedHosts | toJson }},
           "Configuration": {
-            "Auth": {
-              "Issuer": {{ .Values.certsServerConfig.configuration.auth.issuer | toJson }},
-              "Audience": {{ .Values.certsServerConfig.configuration.auth.audience | toJson }},
-              "Expiration": {{ .Values.certsServerConfig.configuration.auth.expiration }},
-              "RefreshExpiration": {{ .Values.certsServerConfig.configuration.auth.refreshExpiration }}
-            },
-            "Agent": {
-              "AgentHostname": {{ .Values.certsServerConfig.configuration.agent.agentHostname | toJson }},
-              "AgentPort": {{ .Values.certsServerConfig.configuration.agent.agentPort }},
-              "ServiceToReload": {{ .Values.certsServerConfig.configuration.agent.serviceToReload | toJson }}
-            },
-            "Production": {{ .Values.certsServerConfig.configuration.production | toJson }},
-            "Staging": {{ .Values.certsServerConfig.configuration.staging | toJson }},
-            "CacheFolder": {{ .Values.certsServerConfig.configuration.cacheFolder | toJson }},
-            "AcmeFolder": {{ .Values.certsServerConfig.configuration.acmeFolder | toJson }},
-            "DataFolder": {{ .Values.certsServerConfig.configuration.dataFolder | toJson }},
-            "SettingsFile": {{ .Values.certsServerConfig.configuration.settingsFile | toJson }}
+            "CertsUIEngineConfiguration": {
+              "Admin": {
+                "Username": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.admin.username | toJson }},
+                "Password": ""
+              },
+              "JwtSettingsConfiguration": {
+                "JwtSecret": "",
+                "Issuer": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.jwt.issuer | toJson }},
+                "Audience": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.jwt.audience | toJson }},
+                "ExpiresIn": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.jwt.expiresIn }},
+                "RefreshTokenExpiresIn": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.jwt.refreshTokenExpiresIn }},
+                "PasswordPepper": ""
+              },
+              "TwoFactorSettingsConfiguration": {
+                "Label": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.twoFactor.label | toJson }},
+                "Issuer": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.twoFactor.issuer | toJson }},
+                "Algorithm": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.twoFactor.algorithm | toJson }},
+                "Digits": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.twoFactor.digits }},
+                "Period": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.twoFactor.period }},
+                "TimeTolerance": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.twoFactor.timeTolerance }}
+              },
+              "Agent": {
+                "AgentHostname": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.agent.agentHostname | toJson }},
+                "AgentPort": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.agent.agentPort }},
+                "AgentKey": "",
+                "ServiceToReload": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.agent.serviceToReload | toJson }}
+              },
+              "Production": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.production | toJson }},
+              "Staging": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.staging | toJson }},
+              "AcmeFolder": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.acmeFolder | toJson }},
+              "DataFolder": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.dataFolder | toJson }}
+            }
           }
         }
+    livenessProbe:
+      httpGet:
+        path: /health/live
+        port: http
+      initialDelaySeconds: 20
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    readinessProbe:
+      httpGet:
+        path: /health/ready
+        port: http
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      timeoutSeconds: 5
+      failureThreshold: 3
 
   client:
+    replicaCount: 1
     image:
       registry: cr.maks-it.com
       repository: certs-ui/client
@@ -177,6 +226,7 @@ components:
     resources: {}
 
   reverseproxy:
+    replicaCount: 1
     image:
       registry: cr.maks-it.com
       repository: certs-ui/reverseproxy

@@ -1,0 +1,22 @@
+{{- $root := . -}}
+{{- range $compName, $comp := .Values.components }}
+{{- $replicas := max 1 ($comp.replicaCount | default 1 | int) }}
+{{- if gt $replicas 1 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "certs-ui.fullname" $root }}-{{ $compName }}-pdb
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "certs-ui.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $compName }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $root.Release.Name }}
+      app.kubernetes.io/name: {{ include "certs-ui.name" $root }}
+      app.kubernetes.io/component: {{ $compName }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,90 @@
+using Microsoft.Extensions.Options;
+using MaksIT.CertsUI.Engine.DomainServices;
+using MaksIT.CertsUI.Engine.Extensions;
+using MaksIT.CertsUI.Engine.Infrastructure;
+using MaksIT.CertsUI.Engine.RuntimeCoordination;
+
+namespace MaksIT.CertsUI.HostedServices;
+
+/// <summary>
+/// Runs startup initialization (migrations + identity bootstrap) before the API starts serving requests.
+/// Uses a PostgreSQL lease so only one replica runs migrations at a time.
+/// </summary>
+public sealed class InitializationHostedService(
+  ILogger<InitializationHostedService> logger,
+  IServiceProvider serviceProvider,
+  IOptions<Configuration> appSettings,
+  IRuntimeLeaseService runtimeLease,
+  IRuntimeInstanceId runtimeInstance
+) : IHostedService {
+
+  private static readonly TimeSpan BootstrapLeaseTtl = TimeSpan.FromMinutes(8);
+
+  public async Task StartAsync(CancellationToken cancellationToken) {
+    const int delayMilliseconds = 2000;
+
+    while (!cancellationToken.IsCancellationRequested) {
+      try {
+        logger.LogInformation("Running startup initialization...");
+
+        var holder = runtimeInstance.InstanceId;
+        var acquired = await runtimeLease.TryAcquireAsync(RuntimeLeaseNames.Bootstrap, holder, BootstrapLeaseTtl, cancellationToken).ConfigureAwait(false);
+        if (!acquired.IsSuccess)
+          throw new InvalidOperationException(string.Join(", ", acquired.Messages ?? ["Lease acquire failed."]));
+        if (!acquired.Value) {
+          logger.LogInformation("Bootstrap lease held by another instance; waiting...");
+          await Task.Delay(delayMilliseconds, cancellationToken).ConfigureAwait(false);
+          continue;
+        }
+
+        try {
+          await serviceProvider.EnsureCertsEngineMigratedAsync().ConfigureAwait(false);
+
+          await using var scope = serviceProvider.CreateAsyncScope();
+          var identityDomainService = scope.ServiceProvider.GetRequiredService<IIdentityDomainService>();
+          await EnsureIdentityInitializedAsync(appSettings.Value, identityDomainService, cancellationToken).ConfigureAwait(false);
+        }
+        finally {
+          var released = await runtimeLease.ReleaseAsync(RuntimeLeaseNames.Bootstrap, holder, cancellationToken).ConfigureAwait(false);
+          if (!released.IsSuccess)
+            logger.LogWarning("Bootstrap lease release reported failure: {Messages}", string.Join("; ", released.Messages ?? []));
+        }
+
+        logger.LogInformation("Startup initialization completed.");
+        return;
+      }
+      catch (Exception ex) {
+        logger.LogError(ex, "Startup initialization failed. Retrying...");
+        await Task.Delay(delayMilliseconds, cancellationToken).ConfigureAwait(false);
+      }
+    }
+  }
+
+  public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+  private static async Task EnsureIdentityInitializedAsync(
+    Configuration appSettings,
+    IIdentityDomainService identityDomainService,
+    CancellationToken cancellationToken
+  ) {
+    var dataDir = appSettings.CertsUIEngineConfiguration.DataFolder;
+    if (!Directory.Exists(dataDir))
+      Directory.CreateDirectory(dataDir);
+
+    var initPath = Path.Combine(dataDir, "init");
+    if (File.Exists(initPath))
+      return;
+
+    var count = await identityDomainService.CountUsersAsync(cancellationToken).ConfigureAwait(false);
+    if (!count.IsSuccess)
+      throw new InvalidOperationException(string.Join(", ", count.Messages));
+
+    if (count.Value == 0) {
+      var bootstrap = await identityDomainService.EnsureDefaultAdminAsync(cancellationToken).ConfigureAwait(false);
+      if (!bootstrap.IsSuccess)
+        throw new InvalidOperationException(string.Join(", ", bootstrap.Messages));
+    }
+
+    await File.WriteAllTextAsync(initPath, string.Empty, cancellationToken).ConfigureAwait(false);
+  }
+}

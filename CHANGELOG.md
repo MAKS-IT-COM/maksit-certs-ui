@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.7] - 2026-04-25
+
+### Added
+
+- **HA runtime coordination:** Added DB-backed HTTP-01 challenge persistence and runtime lease infrastructure (`acme_http_challenges`, `app_runtime_leases`) plus coordinated startup/renewal execution.
+- **Kubernetes readiness model:** Added per-component Helm `replicaCount` + PodDisruptionBudget support and health endpoints (`/health/live`, `/health/ready`) for probes.
+- **New backend host:** Added `MaksIT.CertsUI` WebAPI host with controllers, authorization filters (JWT and JWT-or-API-key), hosted services, and mapping/configuration abstractions.
+- **Engine platform expansion:** Added a domain-oriented `MaksIT.CertsUI.Engine` structure (`Domain`, `Dto`, `DomainServices`, `Persistance`, `QueryServices`, `Infrastructure`, `FluentMigrations`) with linq2db mappings and migration services.
+- **Frontend identity/api-key UX:** Added Users/API Keys pages and forms (`CreateUser`, `EditUser`, `SearchUser`, `CreateApiKey`) with reusable list/filter/paging components.
+- **Test suite:** Added `MaksIT.CertsUI.Tests` with service and integration coverage plus shared Postgres/WebAPI fixtures.
+
+### Changed
+
+- **Namespace and solution layout:** Standardized around `MaksIT.CertsUI*` and moved responsibilities into clearer host/engine layers.
+- **Engine model organization:** Reorganized ACME and related contracts from legacy top-level `Entities`/`Models` into `Domain` and `Dto`.
+- **Helm/runtime behavior:** Updated deployment templates to support `env.valueFrom`, pod-name-based holder identity, and probe wiring for live/ready endpoints.
+- **Documentation:** Updated README architecture references and linked HA architecture guidance.
+- **WebUI contracts:** Aligned identity/API-key request/response and paged-search models with updated backend endpoints.
+
+### Removed
+
+- **Deprecated host:** Removed legacy `MaksIT.Webapi` project and its old controllers/services/background services.
+- **Legacy engine layout:** Removed obsolete top-level engine files (`Entities`, `Models`, previous ACME helper locations, old project `.vscode` files).
+- **Old test project:** Removed `MaksIT.Webapi.Tests` in favor of `MaksIT.CertsUI.Tests`.
+
 ## [3.3.6] - 2026-04-13
 
 ### Added

@@ -13,7 +13,7 @@ import { jwtDecode } from 'jwt-decode'
 import { Claims } from '../../models/identity/Claims'
 
 interface Identity extends LoginResponse {
-  userId?: string,
+  userId?: string
   username?: string
 }
 
@@ -43,15 +43,15 @@ const login = createAsyncThunk(
 
 const logout = createAsyncThunk(
   'auth/logout',
-  async (logOutFromAllDevices: boolean = false) => {
+  async (logoutFromAllDevices: boolean = false) => {
     const identity = readIdentity()
     if (!identity || new Date(identity.refreshTokenExpiresAt) < new Date())
       return
 
     const apiRoute = GetApiRoute(ApiRoutes.identityLogout)
     const response = await postData<LogoutRequest, LogoutResponse>(apiRoute.route, {
-      logOutFromAllDevices,
-      token: identity.token
+      logoutFromAllDevices,
+      token: identity.token,
     })
     return response
   }
@@ -67,7 +67,7 @@ const refreshJwt = createAsyncThunk(
     const apiRoute = GetApiRoute(ApiRoutes.identityRefresh)
     const response = await postData<RefreshTokenRequest, LoginResponse>(apiRoute.route, {
       refreshToken: identity.refreshToken,
-      force
+      force,
     })
 
     return response
@@ -106,7 +106,7 @@ const identitySlice = createSlice({
 
       if (identity) {
         state.identity = {
-          ...identity
+          ...identity,
         }
         enrichStateWithJwtContent(identity.token, state.identity)
       }
@@ -125,7 +125,7 @@ const identitySlice = createSlice({
       state.showUserOffcanvas = false
       state.status = 'idle'
       removeIdentity()
-    }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -139,7 +139,7 @@ const identitySlice = createSlice({
         const normalized = normalizeLoginResponse(action.payload)
         if (normalized) {
           state.identity = {
-            ...normalized
+            ...normalized,
           }
           writeIdentity(normalized)
 
@@ -175,7 +175,7 @@ const identitySlice = createSlice({
         const normalized = normalizeLoginResponse(action.payload)
         if (normalized) {
           state.identity = {
-            ...normalized
+            ...normalized,
           }
           writeIdentity(normalized)
 
