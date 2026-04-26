@@ -135,6 +135,9 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
+// FluentMigrator must complete before any IHostedService starts; bootstrap lease uses app_runtime_leases.
+await app.Services.EnsureCertsEngineMigratedAsync();
+
 app.UseMiddleware<ErrorHandlingMiddleware>();
 
 app.AddCertsEngineMigrations();
@@ -169,4 +172,4 @@ app.MapGet("/health/ready", async (CancellationToken ct) => {
   }
 });
 
-app.Run();
+await app.RunAsync();

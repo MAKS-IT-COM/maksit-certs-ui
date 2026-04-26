@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.9] - 2026-04-26
+
+### Fixed
+
+- **Startup / database:** FluentMigrator (`EnsureCertsEngineMigratedAsync`) now runs in `Program.cs` immediately after `WebApplication.Build()` and before `RunAsync`, so schema (including `app_runtime_leases`) exists before any `IHostedService` starts. `InitializationHostedService` only performs bootstrap lease + identity init.
+
 ## [3.3.8] - 2026-04-26
 
 ### Fixed

@@ -4,11 +4,11 @@ using Microsoft.Extensions.Hosting;
 namespace MaksIT.CertsUI.Engine.Extensions;
 
 /// <summary>
-/// DB migrations are handled by FluentMigrator and optional schema sync from InitializationHostedService.
-/// This method is a no-op for backward compatibility with host startup.
+/// DB migrations run in <c>Program.cs</c> via <see cref="ServiceCollectionExtensions.EnsureCertsEngineMigratedAsync"/> before <c>RunAsync</c>.
+/// This method is a no-op kept for backward compatibility with older host wiring.
 /// </summary>
 public static class ApplicationBuilderExtensions {
   public static void AddCertsEngineMigrations(this IHost host) {
-    // No-op: migrations and schema sync run from InitializationHostedService via IRunMigrationsService and ISchemaSyncService.
+    // No-op: see Program.cs (migrations) and InitializationHostedService (identity bootstrap under lease).
   }
 }

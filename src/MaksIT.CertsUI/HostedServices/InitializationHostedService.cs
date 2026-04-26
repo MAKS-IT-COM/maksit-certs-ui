@@ -1,15 +1,14 @@
 using Microsoft.Extensions.Options;
 using MaksIT.CertsUI.Engine.DomainServices;
-using MaksIT.CertsUI.Engine.Extensions;
 using MaksIT.CertsUI.Engine.Infrastructure;
 using MaksIT.CertsUI.Engine.RuntimeCoordination;
 
 namespace MaksIT.CertsUI.HostedServices;
 
 /// <summary>
-/// Runs startup initialization (migrations + identity bootstrap) before the API starts serving requests.
-/// FluentMigrator runs first on every instance (same pattern as Vault); the bootstrap lease then ensures
-/// only one replica performs identity bootstrap against shared <see cref="Configuration.CertsUIEngineConfiguration.DataFolder"/>.
+/// Runs identity bootstrap before the API starts serving requests. FluentMigrator already ran in <c>Program.cs</c>
+/// before the host starts. The bootstrap lease ensures only one replica writes against shared
+/// <see cref="Configuration.CertsUIEngineConfiguration.DataFolder"/>.
 /// </summary>
 public sealed class InitializationHostedService(
   ILogger<InitializationHostedService> logger,
@@ -23,17 +22,10 @@ public sealed class InitializationHostedService(
 
   public async Task StartAsync(CancellationToken cancellationToken) {
     const int delayMilliseconds = 2000;
-    var migrationsApplied = false;
 
     while (!cancellationToken.IsCancellationRequested) {
       try {
         logger.LogInformation("Running startup initialization...");
-
-        // Migrations must run before lease acquisition: app_runtime_leases is created by FluentMigrator.
-        if (!migrationsApplied) {
-          await serviceProvider.EnsureCertsEngineMigratedAsync().ConfigureAwait(false);
-          migrationsApplied = true;
-        }
 
         var holder = runtimeInstance.InstanceId;
         var acquired = await runtimeLease.TryAcquireAsync(RuntimeLeaseNames.Bootstrap, holder, BootstrapLeaseTtl, cancellationToken).ConfigureAwait(false);

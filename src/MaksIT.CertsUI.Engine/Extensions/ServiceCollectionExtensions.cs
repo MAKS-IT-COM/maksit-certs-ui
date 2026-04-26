@@ -67,7 +67,7 @@ public static class ServiceCollectionExtensions {
   #region Host initialization helpers
 
   /// <summary>
-  /// Runs FluentMigrator then optional add-only schema sync (when <see cref="ICertsEngineConfiguration.AutoSyncSchema"/> is true). Called from host startup (e.g. InitializationHostedService).
+  /// Runs FluentMigrator then optional add-only schema sync (when <see cref="ICertsEngineConfiguration.AutoSyncSchema"/> is true). Called from <c>Program.cs</c> before <c>RunAsync</c>.
   /// </summary>
   public static async Task EnsureCertsEngineMigratedAsync(this IServiceProvider serviceProvider) {
     await using var scope = serviceProvider.CreateAsyncScope();
