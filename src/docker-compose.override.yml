@@ -9,6 +9,9 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_HTTP_PORTS: "8080"
+      # Same YARP keys as Helm (Kubernetes uses <fullname>-server/client). Compose uses service names server / client.
+      ReverseProxy__Clusters__webapiCluster__Destinations__d1__Address: "http://server:5000/"
+      ReverseProxy__Clusters__webuiCluster__Destinations__d1__Address: "http://client:5173/"
     ports:
       - "8080:8080"
     networks:

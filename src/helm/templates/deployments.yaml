@@ -65,9 +65,18 @@ spec:
           ports:
             - name: http
               containerPort: {{ $tgt }}
-          {{- if $comp.env }}
+          {{- $rpK8sUpstream := true }}
+          {{- if eq $compName "reverseproxy" }}
+          {{- if hasKey $comp "kubernetesUpstreamHosts" }}
+          {{- $raw := index $comp "kubernetesUpstreamHosts" }}
+          {{- if or (eq $raw false) (eq ($raw | toString | lower) "false") (eq ($raw | toString) "0") }}
+          {{- $rpK8sUpstream = false }}
+          {{- end }}
+          {{- end }}
+          {{- end }}
+          {{- if or $comp.env (eq $compName "reverseproxy") }}
           env:
-            {{- range $comp.env }}
+            {{- range ($comp.env | default list) }}
             - name: {{ .name }}
               {{- if hasKey . "valueFrom" }}
               valueFrom:
@@ -75,6 +84,17 @@ spec:
               {{- else }}
               value: {{ .value | quote }}
               {{- end }}
+            {{- end }}
+            {{- if and (eq $compName "reverseproxy") $rpK8sUpstream }}
+            {{- $fn := include "certs-ui.fullname" $root }}
+            {{- $client := index $root.Values.components "client" | default dict }}
+            {{- $server := index $root.Values.components "server" | default dict }}
+            {{- $cport := ($client.service | default dict).port | default 5173 }}
+            {{- $sport := ($server.service | default dict).port | default 5000 }}
+            - name: ReverseProxy__Clusters__webapiCluster__Destinations__d1__Address
+              value: {{ printf "http://%s-server:%v/" $fn $sport | quote }}
+            - name: ReverseProxy__Clusters__webuiCluster__Destinations__d1__Address
+              value: {{ printf "http://%s-client:%v/" $fn $cport | quote }}
             {{- end }}
           {{- end }}
           {{- with $comp.livenessProbe }}

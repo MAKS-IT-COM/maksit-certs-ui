@@ -2,7 +2,7 @@ Thank you for installing **{{ .Chart.Name }}**.
 
 Release: {{ .Release.Name }} / namespace {{ .Release.Namespace }}
 
-Services use ClusterIP; expose via ingress, gateway, or kubectl port-forward.
+Services use ClusterIP; expose via ingress, gateway, or kubectl port-forward. **reverseproxy:** with **`components.reverseproxy.kubernetesUpstreamHosts: true`** (default), YARP destinations are set by env to **`http://<fullname>-server:<serverPort>/`** and **`http://<fullname>-client:<clientPort>/`** (same pattern for single-node and HA replica counts). Docker Compose uses **`docker-compose.override.yml`** env to **`http://server:…`** / **`http://client:…`** instead (no Helm).
 
 ------------------------------------------------------------
 ## Components

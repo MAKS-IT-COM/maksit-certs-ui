@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.18] - 2026-04-26
+
+### Changed
+
+- **Docker Compose:** **`docker-compose.override.yml`** sets the same **`ReverseProxy__Clusters__*__Destinations__d1__Address`** environment variables as Kubernetes (**`http://server:5000/`** / **`http://client:5173/`** on the Compose network), so YARP behavior does not depend only on baked-in **`appsettings.json`**.
+- **Helm:** Optional **`components.reverseproxy.kubernetesUpstreamHosts`** (default **`true`**) toggles injection of in-cluster upstream URLs; set **`false`** only for custom Service naming. Single-replica and HA clusters use the same DNS pattern.
+
+### Fixed
+
+- **Helm / reverseproxy:** YARP upstreams defaulted to Compose hostnames **`server`** / **`client`**, which do not resolve in Kubernetes. The chart sets **`ReverseProxy__Clusters__*__Destinations__d1__Address`** to **`http://<release-fullname>-server:<port>/`** and **`http://<release-fullname>-client:<port>/`** when **`kubernetesUpstreamHosts`** is enabled (ports from **`components.server.service.port`** and **`components.client.service.port`**).
+
 ## [3.3.17] - 2026-04-26
 
 ### Changed

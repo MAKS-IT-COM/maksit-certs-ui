@@ -240,6 +240,14 @@ components:
 
   reverseproxy:
     replicaCount: 1
+    # kubernetesUpstreamHosts: when true (default), Helm adds YARP destination env on the reverseproxy pod (see templates/deployments.yaml).
+    # Example: helm install acme ./chart → fullname acme-certs-ui, server port 5000 / client port 5173 (defaults below) yields:
+    #   ReverseProxy__Clusters__webapiCluster__Destinations__d1__Address=http://acme-certs-ui-server:5000/
+    #   ReverseProxy__Clusters__webuiCluster__Destinations__d1__Address=http://acme-certs-ui-client:5173/
+    # Ports mirror components.server.service.port and components.client.service.port. Docker Compose: set the same two env keys in
+    # docker-compose.override.yml to http://server:5000/ and http://client:5173/ (Compose service names), not Helm.
+    # false: Helm does not inject those env vars — supply addresses yourself (custom Service names, mesh, external hosts).
+    kubernetesUpstreamHosts: true
     image:
       registry: cr.maks-it.com
       repository: certs-ui/reverseproxy
