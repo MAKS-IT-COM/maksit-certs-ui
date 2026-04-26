@@ -32,6 +32,8 @@ Optional per workload under **`components.<name>`**: **`replicaCount`** (default
 
 When **`replicaCount` > 1**, the chart creates a **PodDisruptionBudget** (`minAvailable: 1`) for that component.
 
+**Primary replica + ACME:** With multiple **server** pods, exactly one holds the Postgres lease `certs-ui-primary` and runs ACME orchestration (`CertsFlowDomainService`, renewal). Others answer **`AcmeChallengeAsync`** from the database for HTTP-01. Interactive UI flows should hit the primary: the chart defaults **`ClientIP`** session affinity on the **server** Service, and clients should retry on **503** (see `Retry-After` / `ProblemDetails`). After unclean failover, the old lease row can linger until its TTL (~90s with defaults); renewals and clean shutdown avoid stuck primaries.
+
 **Server + RWO PVCs:** the default **acme** / **data** volumes use **ReadWriteOnce**. Kubernetes will not schedule a second server pod on the same volume; for multiple server replicas you need **ReadWriteMany** (or equivalent) and an application design that tolerates shared disk (see product HA roadmap).
 
 ------------------------------------------------------------

@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.17] - 2026-04-26
+
+### Changed
+
+- **HA / API:** Non-primary replicas return **`Result.ServiceUnavailable`** with stable marker `urn:maksit:certs-ui:primary-replica-required` for ACME orchestration; the host maps that to **HTTP 503**, **`Retry-After`**, and **RFC 7807 `ProblemDetails`** (replacing ad-hoc 429-style overload semantics for this case).
+- **Helm:** Default **`components.server.service.sessionAffinity`** (`ClientIP`, configurable timeout), **`terminationGracePeriodSeconds`**, and a short **`preStop` sleep** so rolling updates drain connections before the primary lease TTL window. Disable or tune under **`components.server`** if your ingress already pins API traffic.
+
+## [3.3.16] - 2026-04-26
+
+### Changed
+
+- **HA / primary replica:** A single elected instance holds Postgres lease `certs-ui-primary` (`RuntimeLeaseNames.PrimaryReplica`), renews it periodically, and is the only instance with `IPrimaryReplicaWorkload.IsPrimary` after startup. It runs coordination DDL, identity bootstrap, **all ACME domain flows** (`CertsFlowDomainService`), and **`AutoRenewal`**. Other replicas serve HTTP (identity, health, etc.) and **`AcmeChallengeAsync`** (HTTP-01 token materialization for ingress). Followers reject ACME orchestration at the domain layer until they become primary after failover.
+- **Startup:** Removed separate `certs-ui-bootstrap` lease; primary lease serializes first-time admin creation. `PrimaryReplicaShutdownHostedService` (registered last) releases the primary lease on shutdown.
+
+## [3.3.15] - 2026-04-26
+
+### Fixed
+
+- **Startup / HA:** `InitializationHostedService` no longer takes the bootstrap lease when PostgreSQL already has users. Only the empty-database path waits on the lease (single-writer default admin). Extra replicas used to block on the lease until Kubernetes canceled `StartAsync`, surfacing as `TaskCanceledException` at startup while the first replica held the lease.
+- **Startup:** Retry backoff treats `OperationCanceledException` when the host is stopping as shutdown (no misleading “initialization failed” loop); cooperative cancel still ends startup.
+
 ## [3.3.14] - 2026-04-26
 
 ### Fixed

@@ -83,6 +83,16 @@ components:
       type: ClusterIP
       port: 5000
       targetPort: 5000
+      # ClientIP affinity helps browsers hit the same server pod for multi-step ACME (primary holds orchestration).
+      sessionAffinity:
+        enabled: true
+        clientIPTimeoutSeconds: 10800
+    # Give kube-proxy / ingress time to stop sending new connections before SIGKILL (pairs with preStop).
+    terminationGracePeriodSeconds: 90
+    lifecycle:
+      preStop:
+        exec:
+          command: ["/bin/sh", "-c", "sleep 5"]
     persistence:
       storageClass: local-path
       volumes:

@@ -67,9 +67,14 @@ builder.Services.AddOptions<JsonOptions>().Configure(o =>
 builder.Services.AddScoped<JwtAuthorizationFilter>();
 builder.Services.AddScoped<JwtOrApiKeyAuthorizationFilter>();
 
+// Primary replica: one elected instance (Postgres lease) runs ACME + renewal; register shutdown last so StopAsync releases the lease first.
+builder.Services.AddSingleton<PrimaryReplicaGate>();
+builder.Services.AddSingleton<IPrimaryReplicaWorkload>(sp => sp.GetRequiredService<PrimaryReplicaGate>());
+
 // Hosted services: initialization first, then autorenewal loop.
 builder.Services.AddHostedService<InitializationHostedService>();
 builder.Services.AddHostedService<AutoRenewal>();
+builder.Services.AddHostedService<PrimaryReplicaShutdownHostedService>();
 
 // PostgreSQL: prefer Configuration:CertsUIEngineConfiguration:ConnectionString in appsecrets.json; fallback ConnectionStrings:Certs for older files.
 var certsConnectionString = appSettings.CertsUIEngineConfiguration.ConnectionString

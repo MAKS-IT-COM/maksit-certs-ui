@@ -13,6 +13,13 @@ metadata:
     app.kubernetes.io/component: {{ $compName }}
 spec:
   type: {{ default "ClusterIP" $svc.type }}
+  {{- $sa := default dict $svc.sessionAffinity }}
+  {{- if $sa.enabled }}
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: {{ default 10800 $sa.clientIPTimeoutSeconds }}
+  {{- end }}
   ports:
     - port: {{ default 80 $svc.port }}
       targetPort: http

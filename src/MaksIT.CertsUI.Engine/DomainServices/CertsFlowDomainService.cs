@@ -57,6 +57,7 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
   private readonly IAcmeHttpChallengePersistenceService _httpChallenges;
   private readonly IRuntimeLeaseService _runtimeLease;
   private readonly IRuntimeInstanceId _runtimeInstance;
+  private readonly IPrimaryReplicaWorkload _primaryReplica;
   private readonly string _acmePath;
 
   public CertsFlowDomainService(
@@ -68,7 +69,8 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
     ICertsFlowEngineConfiguration config,
     IAcmeHttpChallengePersistenceService httpChallenges,
     IRuntimeLeaseService runtimeLease,
-    IRuntimeInstanceId runtimeInstance) {
+    IRuntimeInstanceId runtimeInstance,
+    IPrimaryReplicaWorkload primaryReplica) {
     _logger = logger;
     _httpClient = httpClient;
     _letsEncryptService = letsEncryptService;
@@ -78,12 +80,16 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
     _httpChallenges = httpChallenges;
     _runtimeLease = runtimeLease;
     _runtimeInstance = runtimeInstance;
+    _primaryReplica = primaryReplica;
     _acmePath = config.AcmeFolder;
   }
 
   #region Terms of service
 
   public Result<string?> GetTermsOfService(Guid sessionId) {
+    if (!_primaryReplica.IsPrimary)
+      return Result<string?>.ServiceUnavailable(null, CertsFlowPrimaryReplica.ServiceUnavailableMessages);
+
     var result = _letsEncryptService.GetTermsOfServiceUri(sessionId);
     if (!result.IsSuccess || result.Value == null)
       return result;
@@ -122,10 +128,15 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
 
   #region Session, orders, and certificates
 
-  public async Task<Result> CompleteChallengesAsync(Guid sessionId) =>
-    await _letsEncryptService.CompleteChallenges(sessionId);
+  public async Task<Result> CompleteChallengesAsync(Guid sessionId) {
+    if (!_primaryReplica.IsPrimary)
+      return Result.ServiceUnavailable(CertsFlowPrimaryReplica.ServiceUnavailableMessages);
+    return await _letsEncryptService.CompleteChallenges(sessionId);
+  }
 
   public async Task<Result<Guid?>> ConfigureClientAsync(bool isStaging) {
+    if (!_primaryReplica.IsPrimary)
+      return Result<Guid?>.ServiceUnavailable(null, CertsFlowPrimaryReplica.ServiceUnavailableMessages);
     var sessionId = Guid.NewGuid();
     var result = await _letsEncryptService.ConfigureClient(sessionId, isStaging);
     if (!result.IsSuccess)
@@ -134,6 +145,8 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
   }
 
   public async Task<Result<Guid?>> InitAsync(Guid sessionId, Guid? accountId, string description, string[] contacts) {
+    if (!_primaryReplica.IsPrimary)
+      return Result<Guid?>.ServiceUnavailable(null, CertsFlowPrimaryReplica.ServiceUnavailableMessages);
     RegistrationCache? cache = null;
     if (accountId == null) {
       accountId = Guid.NewGuid();
@@ -154,6 +167,8 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
   }
 
   public async Task<Result<List<string>?>> NewOrderAsync(Guid sessionId, string[] hostnames, string challengeType) {
+    if (!_primaryReplica.IsPrimary)
+      return Result<List<string>?>.ServiceUnavailable(null, CertsFlowPrimaryReplica.ServiceUnavailableMessages);
     var holder = _runtimeInstance.InstanceId;
     var acquired = await _runtimeLease.TryAcquireAsync(RuntimeLeaseNames.AcmeWriter, holder, AcmeWriterLeaseTtl, CancellationToken.None);
     if (!acquired.IsSuccess)
@@ -189,6 +204,8 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
   }
 
   public async Task<Result> GetCertificatesAsync(Guid sessionId, string[] hostnames) {
+    if (!_primaryReplica.IsPrimary)
+      return Result.ServiceUnavailable(CertsFlowPrimaryReplica.ServiceUnavailableMessages);
     foreach (var subject in hostnames) {
       var result = await _letsEncryptService.GetCertificate(sessionId, subject);
       if (!result.IsSuccess)
@@ -204,14 +221,19 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
     return Result.Ok();
   }
 
-  public async Task<Result> GetOrderAsync(Guid sessionId, string[] hostnames) =>
-    await _letsEncryptService.GetOrder(sessionId, hostnames);
+  public async Task<Result> GetOrderAsync(Guid sessionId, string[] hostnames) {
+    if (!_primaryReplica.IsPrimary)
+      return Result.ServiceUnavailable(CertsFlowPrimaryReplica.ServiceUnavailableMessages);
+    return await _letsEncryptService.GetOrder(sessionId, hostnames);
+  }
 
   #endregion
 
   #region Deploy and revoke
 
   public async Task<Result<Dictionary<string, string>?>> ApplyCertificatesAsync(Guid accountId) {
+    if (!_primaryReplica.IsPrimary)
+      return Result<Dictionary<string, string>?>.ServiceUnavailable(null, CertsFlowPrimaryReplica.ServiceUnavailableMessages);
     var cacheResult = await _registrationCache.LoadAsync(accountId);
     if (!cacheResult.IsSuccess || cacheResult.Value?.CachedCerts == null)
       return cacheResult.ToResultOfType<Dictionary<string, string>?>(_ => null);
@@ -231,6 +253,8 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
   }
 
   public async Task<Result> RevokeCertificatesAsync(Guid sessionId, string[] hostnames) {
+    if (!_primaryReplica.IsPrimary)
+      return Result.ServiceUnavailable(CertsFlowPrimaryReplica.ServiceUnavailableMessages);
     foreach (var hostname in hostnames) {
       var result = await _letsEncryptService.RevokeCertificate(sessionId, hostname, RevokeReason.Unspecified);
       if (!result.IsSuccess)

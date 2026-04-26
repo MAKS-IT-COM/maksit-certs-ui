@@ -1,5 +1,6 @@
 using MaksIT.CertsUI.Engine.Domain.Certs;
 using MaksIT.CertsUI.Engine.Persistance.Services;
+using MaksIT.CertsUI.Engine.RuntimeCoordination;
 using MaksIT.Results;
 using MaksIT.CertsUI.Services;
 using Microsoft.Extensions.Options;
@@ -11,22 +12,30 @@ namespace MaksIT.CertsUI.HostedServices {
     private readonly IOptions<Configuration> _appSettings;
     private readonly ILogger<AutoRenewal> _logger;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IPrimaryReplicaWorkload _primaryReplica;
 
     private static readonly Random _random = new();
 
     public AutoRenewal(
         IOptions<Configuration> appSettings,
         ILogger<AutoRenewal> logger,
-        IServiceScopeFactory scopeFactory
+        IServiceScopeFactory scopeFactory,
+        IPrimaryReplicaWorkload primaryReplica
     ) {
       _appSettings = appSettings;
       _logger = logger;
       _scopeFactory = scopeFactory;
+      _primaryReplica = primaryReplica;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
       while (!stoppingToken.IsCancellationRequested) {
-        _logger.LogInformation("Background service is running.");
+        if (!_primaryReplica.IsPrimary) {
+          await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken).ConfigureAwait(false);
+          continue;
+        }
+
+        _logger.LogInformation("Background service is running (primary replica).");
 
         using var scope = _scopeFactory.CreateScope();
         var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();

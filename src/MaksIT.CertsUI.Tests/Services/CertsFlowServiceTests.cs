@@ -29,7 +29,8 @@ public sealed class CertsFlowServiceTests
         Mock<IAcmeHttpChallengePersistenceService>? httpChallenges = null,
         Mock<IRuntimeLeaseService>? runtimeLease = null,
         Mock<IRuntimeInstanceId>? runtimeInstance = null,
-        HttpMessageHandler? httpHandler = null)
+        HttpMessageHandler? httpHandler = null,
+        Mock<IPrimaryReplicaWorkload>? primaryReplica = null)
     {
         registrationCache ??= new Mock<IRegistrationCachePersistanceService>();
         agent ??= new Mock<IAgentDeploymentService>();
@@ -55,6 +56,9 @@ public sealed class CertsFlowServiceTests
         runtimeInstance ??= new Mock<IRuntimeInstanceId>();
         if (!runtimeInstanceProvided)
             runtimeInstance.Setup(i => i.InstanceId).Returns("test-instance");
+        var primaryWorkload = primaryReplica ?? new Mock<IPrimaryReplicaWorkload>();
+        if (primaryReplica is null)
+            primaryWorkload.Setup(p => p.IsPrimary).Returns(true);
         var handler = httpHandler ?? new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([0x25, 0x50, 0x44, 0x46]) });
         var httpClient = new HttpClient(handler, disposeHandler: true);
         return new CertsFlowDomainService(
@@ -66,7 +70,8 @@ public sealed class CertsFlowServiceTests
             new TestCertsFlowEngineConfiguration(fx),
             httpChallenges.Object,
             runtimeLease.Object,
-            runtimeInstance.Object);
+            runtimeInstance.Object,
+            primaryWorkload.Object);
     }
 
     [Fact]
@@ -83,6 +88,45 @@ public sealed class CertsFlowServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
+    }
+
+    [Fact]
+    public async Task ConfigureClientAsync_WhenNotPrimary_ReturnsServiceUnavailableWithMarker()
+    {
+        using var fx = new WebApiTestFixture();
+        var le = new Mock<ILetsEncryptService>();
+        var primary = new Mock<IPrimaryReplicaWorkload>();
+        primary.Setup(p => p.IsPrimary).Returns(false);
+        var sut = CreateSut(fx, le, primaryReplica: primary);
+
+        var result = await sut.ConfigureClientAsync(isStaging: false);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains(CertsFlowPrimaryReplica.DiagnosticMarker, result.Messages ?? []);
+        le.Verify(x => x.ConfigureClient(It.IsAny<Guid>(), It.IsAny<bool>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AcmeChallenge_WhenNotPrimary_StillSucceedsFromDatabase()
+    {
+        using var fx = new WebApiTestFixture();
+        var name = "challenge-token";
+        var le = new Mock<ILetsEncryptService>();
+        var primary = new Mock<IPrimaryReplicaWorkload>();
+        primary.Setup(p => p.IsPrimary).Returns(false);
+        var challenges = new Mock<IAcmeHttpChallengePersistenceService>();
+        challenges.Setup(c => c.GetTokenValueAsync(name, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<string?>.Ok("body"));
+        challenges.Setup(c => c.UpsertAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Ok());
+        challenges.Setup(c => c.DeleteOlderThanAsync(It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<int>.Ok(0));
+        var sut = CreateSut(fx, le, httpChallenges: challenges, primaryReplica: primary);
+
+        var result = await sut.AcmeChallengeAsync(name, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("body", result.Value);
     }
 
     [Fact]
