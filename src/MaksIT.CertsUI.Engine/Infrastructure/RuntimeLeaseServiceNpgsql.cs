@@ -29,15 +29,15 @@ public sealed class RuntimeLeaseServiceNpgsql(
 
       await using var cmd = new NpgsqlCommand(
         """
-        INSERT INTO app_runtime_leases (lease_name, holder_id, version, acquired_at_utc, expires_at_utc)
+        INSERT INTO public.app_runtime_leases (lease_name, holder_id, version, acquired_at_utc, expires_at_utc)
         VALUES (@name, @holder, 1, @acquired, @expires)
         ON CONFLICT (lease_name) DO UPDATE
         SET holder_id = EXCLUDED.holder_id,
-            version = app_runtime_leases.version + 1,
+            version = public.app_runtime_leases.version + 1,
             acquired_at_utc = EXCLUDED.acquired_at_utc,
             expires_at_utc = EXCLUDED.expires_at_utc
-        WHERE app_runtime_leases.expires_at_utc < EXCLUDED.acquired_at_utc
-           OR app_runtime_leases.holder_id = EXCLUDED.holder_id
+        WHERE public.app_runtime_leases.expires_at_utc < EXCLUDED.acquired_at_utc
+           OR public.app_runtime_leases.holder_id = EXCLUDED.holder_id
         RETURNING holder_id;
         """,
         conn);
@@ -72,7 +72,7 @@ public sealed class RuntimeLeaseServiceNpgsql(
 
       await using var cmd = new NpgsqlCommand(
         """
-        DELETE FROM app_runtime_leases
+        DELETE FROM public.app_runtime_leases
         WHERE lease_name = @name AND holder_id = @holder;
         """,
         conn);

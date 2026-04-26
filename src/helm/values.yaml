@@ -1,8 +1,8 @@
 global:
   imagePullSecrets: []
   image:
-    # Uncomment to override every component (global wins when set). Otherwise use each components.*.image.
-    # No Chart.appVersion.
+    # When non-empty, overrides every components.*.image.tag (see _helpers.tpl). Production/staging: pin to released
+    # semver (e.g. 3.3.13) and use pullPolicy Always or bump tag each release — do not rely on :latest + IfNotPresent alone.
     # tag: "latest"
     # pullPolicy: IfNotPresent
   # Optional rollout tuning (see NOTES): pin a fixed pod annotation or add a nonce for frozen/git-rendered manifests.

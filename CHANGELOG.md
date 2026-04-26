@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.13] - 2026-04-26
+
+### Fixed
+
+- **HA lease / `42P01`:** Added `CoordinationTableProvisioner` with explicit `public.*` DDL; `InitializationHostedService` calls it immediately before bootstrap lease acquire (idempotent, same as post-migrate repair). `RuntimeLeaseServiceNpgsql` now uses `public.app_runtime_leases` in SQL so a non-default `search_path` cannot miss the table. Post-migrate verification requires `public.app_runtime_leases` plus `users` or `"VersionInfo"`.
+
+### Upgrade notes (Kubernetes / Helm)
+
+- **Pin container tags to the app semver** (e.g. `3.3.13` for server, client, reverseproxy) via `global.image.tag` and/or `components.*.image.tag`. The chart resolves the effective tag with `global.image.tag` when set (see `src/helm/templates/_helpers.tpl`).
+- **Do not rely on `latest` + `imagePullPolicy: IfNotPresent` alone** — nodes keep the first pulled digest, so you can run an old server binary while the OCI chart is already `3.3.13`. Use an explicit semver tag and/or `pullPolicy: Always` (or bump `global.rolloutNonce` / `global.rollme` per chart NOTES) when upgrading.
+- **Push all three images** for the tag you pin (`certs-ui/server`, `certs-ui/client`, `certs-ui/reverseproxy`) so every deployment can pull successfully.
+
 ## [3.3.12] - 2026-04-26
 
 ### Fixed

@@ -38,7 +38,7 @@ public sealed class RunMigrationsService(
     await EnsureDatabaseExistsAsync(cancellationToken).ConfigureAwait(false);
     await BaselineExistingEfDatabaseAsync(cancellationToken).ConfigureAwait(false);
     await Task.Run(() => migrationRunner.MigrateUp(), cancellationToken).ConfigureAwait(false);
-    await EnsureCoordinationTablesAsync(cancellationToken).ConfigureAwait(false);
+    await CoordinationTableProvisioner.EnsureAsync(config.ConnectionString, cancellationToken).ConfigureAwait(false);
     await VerifyCoreSchemaAsync(cancellationToken).ConfigureAwait(false);
     logger.LogInformation("Certs database migrations completed.");
   }
@@ -50,12 +50,12 @@ public sealed class RunMigrationsService(
 
     await using var cmd = new NpgsqlCommand(
       """
-      SELECT EXISTS (
-        SELECT 1 FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'users')
-      OR EXISTS (
-        SELECT 1 FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'VersionInfo');
+      SELECT
+        EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'app_runtime_leases')
+        AND (
+          EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users')
+          OR EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'VersionInfo')
+        );
       """,
       conn);
 
@@ -64,37 +64,8 @@ public sealed class RunMigrationsService(
       return;
 
     throw new InvalidOperationException(
-      "After FluentMigrator MigrateUp(), the target database still has no \"users\" or \"VersionInfo\" table in schema \"public\". " +
-      "Confirm the connection string Database= value, that the role can CREATE TABLE, and that FluentMigrator is not in preview/connectionless mode (non-empty connection string).");
-  }
-
-  /// <summary>
-  /// Idempotent DDL for HA tables from <see cref="AcmeChallengesAndRuntimeLeases"/>.
-  /// When <c>VersionInfo</c> already lists that migration but the tables are missing (restore drift, partial apply),
-  /// FluentMigrator will not re-run <c>Up()</c>; this repair keeps lease and HTTP-01 persistence working.
-  /// </summary>
-  private async Task EnsureCoordinationTablesAsync(CancellationToken cancellationToken) {
-    await using var conn = new NpgsqlConnection(config.ConnectionString);
-    await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
-
-    await using var cmd = new NpgsqlCommand(
-      """
-      CREATE TABLE IF NOT EXISTS acme_http_challenges (
-        file_name text NOT NULL PRIMARY KEY,
-        token_value text NOT NULL,
-        created_at_utc timestamp with time zone NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS "IX_acme_http_challenges_created_at_utc" ON acme_http_challenges (created_at_utc);
-      CREATE TABLE IF NOT EXISTS app_runtime_leases (
-        lease_name text NOT NULL PRIMARY KEY,
-        holder_id text NOT NULL,
-        version bigint NOT NULL DEFAULT 1,
-        acquired_at_utc timestamp with time zone NOT NULL,
-        expires_at_utc timestamp with time zone NOT NULL
-      );
-      """,
-      conn);
-    await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+      "After migrations and coordination DDL, schema \"public\" is missing \"app_runtime_leases\" and/or core tables (\"users\" / \"VersionInfo\"). " +
+      "Confirm Database= in the connection string, role CREATE privileges, and that FluentMigrator committed (non-empty connection string).");
   }
 
   private async Task EnsureDatabaseExistsAsync(CancellationToken cancellationToken) {
