@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.8] - 2026-04-26
+
+### Fixed
+
+- **Startup / database:** `InitializationHostedService` now runs FluentMigrator (`EnsureCertsEngineMigratedAsync`) before acquiring the bootstrap PostgreSQL lease, so `app_runtime_leases` exists on an empty database (same ordering idea as Vault: migrate first, then coordination).
+- **Startup:** While waiting for the bootstrap lease, migrations are not re-run on every poll interval (`migrationsApplied` guard).
+
+### Changed
+
+- **Container image:** `MaksIT.CertsUI` Dockerfile installs `libgssapi-krb5-2` so Npgsql can load GSS/Kerberos support without missing-library warnings on slim `aspnet` images.
+
 ## [3.3.7] - 2026-04-25
 
 ### Added
