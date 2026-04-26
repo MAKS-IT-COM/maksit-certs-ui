@@ -1,4 +1,5 @@
 using FluentMigrator.Runner;
+using FluentMigrator.Runner.Initialization;
 using Microsoft.Extensions.DependencyInjection;
 using MaksIT.CertsUI.Engine.DomainServices;
 using MaksIT.CertsUI.Engine.FluentMigrations;
@@ -25,15 +26,21 @@ public static class ServiceCollectionExtensions {
     if (string.IsNullOrWhiteSpace(certsEngineConfiguration.ConnectionString))
       throw new ArgumentException("Certs engine connection string is required for FluentMigrator (empty string uses connectionless/preview mode and will not create tables).", nameof(certsEngineConfiguration));
 
-    // FluentMigrator: IRunMigrationsService invoked from Program.cs before RunAsync. Use .For.All() so version metadata
-    // and migration discovery match in-process runner expectations (see FluentMigrator docs / #1062).
+    // FluentMigrator: IRunMigrationsService invoked from Program.cs before RunAsync. Use .For.All() so migration discovery
+    // matches in-process runner expectations (see FluentMigrator docs / #1062).
+    // Version table: AddFluentMigratorCore registers a default IVersionTableMetaDataAccessor; replace it so public.version_info
+    // is always used (ConfigureRunner's WithVersionTable alone can lose to that default depending on DI resolution order).
     services.AddFluentMigratorCore()
       .ConfigureRunner(rb => rb
         .AddPostgres()
         .WithGlobalConnectionString(certsEngineConfiguration.ConnectionString)
-        .WithVersionTable(new CertsFluentMigratorVersionTableMetaData())
         .ScanIn(typeof(BaselineCertsSchema).Assembly).For.All())
       .AddLogging(lb => lb.AddFluentMigratorConsole());
+
+    foreach (var d in services.Where(x => x.ServiceType == typeof(IVersionTableMetaDataAccessor)).ToList())
+      services.Remove(d);
+    services.AddSingleton<IVersionTableMetaDataAccessor>(
+      new PassThroughVersionTableMetaDataAccessor(new CertsFluentMigratorVersionTableMetaData()));
     services.AddScoped<IRunMigrationsService, RunMigrationsService>();
     services.AddScoped<ISchemaSyncService, SchemaSyncService>();
 

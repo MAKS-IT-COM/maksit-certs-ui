@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.20] - 2026-04-26
+
+### Fixed
+
+- **FluentMigrator DI:** **`AddFluentMigratorCore`** registers a default **`IVersionTableMetaDataAccessor`**; **`WithVersionTable`** on **`ConfigureRunner`** could still leave **`VersionInfo`** in use. Engine registration now removes any prior **`IVersionTableMetaDataAccessor`** descriptors and registers **`PassThroughVersionTableMetaDataAccessor`** for **`CertsFluentMigratorVersionTableMetaData`** so **`MigrateUp`** always targets **`version_info`**.
+
 ## [3.3.19] - 2026-04-26
 
 ### Changed
