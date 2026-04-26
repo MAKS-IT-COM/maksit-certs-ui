@@ -25,7 +25,6 @@ public class BaselineCertsSchema : Migration {
       .WithColumn("Name").AsCustom("text").NotNullable()
       .WithColumn("Salt").AsCustom("text").NotNullable()
       .WithColumn("Hash").AsCustom("text").NotNullable()
-      .WithColumn("JwtTokensJson").AsCustom("text").NotNullable()
       .WithColumn("LastLoginUtc").AsDateTimeOffset().NotNullable();
 
     Create.Index("IX_users_Name").OnTable("users").OnColumn("Name").Unique();

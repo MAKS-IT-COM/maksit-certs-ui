@@ -3,15 +3,13 @@ using FluentMigrator;
 namespace MaksIT.CertsUI.Engine.FluentMigrations;
 
 /// <summary>
-/// Databases that already applied <see cref="JwtTokensTableMigrateFromJson"/> when it still dropped <c>JwtTokensJson</c>
-/// get the column back (empty default). Expand-only: we never remove renamed/legacy columns in <c>Up()</c>.
+/// Previously re-added <c>users.JwtTokensJson</c> when a prior migration had dropped that JSON column.
+/// <see cref="DropUsersJwtTokensJson"/> removes the column; persisted sessions use <c>jwt_tokens</c> only (same role as Vault’s <c>JwtToken</c> rows).
 /// </summary>
 [Migration(20260426120000)]
 public class RestoreUsersJwtTokensJsonIfDropped : Migration {
   public override void Up() {
-    Execute.Sql("""
-      ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "JwtTokensJson" text NOT NULL DEFAULT '';
-      """);
+    // No-op: revision kept so databases that already applied the old DDL remain valid; see DropUsersJwtTokensJson.
   }
 
   public override void Down() =>

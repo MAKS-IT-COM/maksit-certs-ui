@@ -83,7 +83,6 @@ public class SchemaSyncService(ICertsEngineConfiguration config, ILogger<SchemaS
         ("Name", "text"),
         ("Salt", "text"),
         ("Hash", "text"),
-        ("JwtTokensJson", "text"),
         ("LastLoginUtc", "timestamp with time zone"),
         ("IsActive", "boolean"),
         ("TwoFactorSharedKey", "text"),
@@ -168,7 +167,6 @@ public class SchemaSyncService(ICertsEngineConfiguration config, ILogger<SchemaS
 
     if (table.Equals("users", StringComparison.OrdinalIgnoreCase)) {
       if (column.Equals("TwoFactorSharedKey", StringComparison.OrdinalIgnoreCase)) return false;
-      if (column.Equals("JwtTokensJson", StringComparison.OrdinalIgnoreCase)) return false;
     }
 
     return true;

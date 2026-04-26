@@ -4,8 +4,8 @@ using FluentMigrator;
 namespace MaksIT.CertsUI.Engine.FluentMigrations;
 
 /// <summary>
-/// Normalizes JWT refresh/access tokens into <c>jwt_tokens</c> (one row per token). Legacy <c>users.JwtTokensJson</c> is retained
-/// (expand-only policy); the app reads <c>jwt_tokens</c> only.
+/// Normalizes JWT refresh/access tokens into <c>jwt_tokens</c> (one row per token).
+/// If <c>users.JwtTokensJson</c> exists (older databases), rows are copied from that JSON; otherwise this step only creates <c>jwt_tokens</c>.
 /// </summary>
 [Migration(20260418100000)]
 public class JwtTokensTableMigrateFromJson : Migration {
@@ -29,24 +29,26 @@ public class JwtTokensTableMigrateFromJson : Migration {
     Create.Index("IX_jwt_tokens_Token").OnTable("jwt_tokens").OnColumn("Token");
     Create.Index("IX_jwt_tokens_RefreshToken").OnTable("jwt_tokens").OnColumn("RefreshToken");
 
-    Execute.Sql("""
-      INSERT INTO "jwt_tokens" ("Id", "UserId", "Token", "RefreshToken", "IssuedAt", "ExpiresAt", "RefreshTokenExpiresAt", "IsRevoked")
-      SELECT
-        (elem->>'Id')::uuid,
-        u."Id",
-        COALESCE(elem->>'Token', ''),
-        COALESCE(elem->>'RefreshToken', ''),
-        (elem->>'IssuedAt')::timestamptz,
-        (elem->>'ExpiresAt')::timestamptz,
-        (elem->>'RefreshTokenExpiresAt')::timestamptz,
-        COALESCE((elem->>'IsRevoked')::boolean, false)
-      FROM "users" u
-      CROSS JOIN LATERAL json_array_elements(
-        CASE WHEN u."JwtTokensJson" IS NULL OR btrim(u."JwtTokensJson"::text) = '' THEN '[]'::json
-             ELSE u."JwtTokensJson"::json END
-      ) AS elem
-      WHERE (elem->>'Id') IS NOT NULL
-      """);
+    if (Schema.Table("users").Column("JwtTokensJson").Exists()) {
+      Execute.Sql("""
+        INSERT INTO "jwt_tokens" ("Id", "UserId", "Token", "RefreshToken", "IssuedAt", "ExpiresAt", "RefreshTokenExpiresAt", "IsRevoked")
+        SELECT
+          (elem->>'Id')::uuid,
+          u."Id",
+          COALESCE(elem->>'Token', ''),
+          COALESCE(elem->>'RefreshToken', ''),
+          (elem->>'IssuedAt')::timestamptz,
+          (elem->>'ExpiresAt')::timestamptz,
+          (elem->>'RefreshTokenExpiresAt')::timestamptz,
+          COALESCE((elem->>'IsRevoked')::boolean, false)
+        FROM "users" u
+        CROSS JOIN LATERAL json_array_elements(
+          CASE WHEN u."JwtTokensJson" IS NULL OR btrim(u."JwtTokensJson"::text) = '' THEN '[]'::json
+               ELSE u."JwtTokensJson"::json END
+        ) AS elem
+        WHERE (elem->>'Id') IS NOT NULL
+        """);
+    }
   }
 
   public override void Down() =>

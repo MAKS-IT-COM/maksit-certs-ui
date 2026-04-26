@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.14] - 2026-04-26
+
+### Fixed
+
+- **Identity / PostgreSQL:** Removed redundant `users.JwtTokensJson` (historical JSON blob of sessions on the user row). **Server-side session allowlist semantics are unchanged:** issued sessions remain rows in `jwt_tokens` and are validated the same way as in Vault’s persisted `JwtToken` model—only the duplicate JSON encoding was dropped. New `users` inserts no longer hit `23502` on that column. FluentMigrator `DropUsersJwtTokensJson` (`20260426140000`) drops the column when present; the baseline no longer creates it; `JwtTokensTableMigrateFromJson` copies from JSON only if that column still exists (upgrades from older DBs).
+
+### Changed
+
+- **FluentMigrator:** `RestoreUsersJwtTokensJsonIfDropped` (`20260426120000`) is now a no-op (revision kept for databases that already applied it). Session material is stored only in `jwt_tokens`, not duplicated as JSON on `users`.
+
 ## [3.3.13] - 2026-04-26
 
 ### Fixed
@@ -29,13 +39,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- **Database:** FluentMigrator `RestoreUsersJwtTokensJsonIfDropped` (`20260426120000`) restores `users.JwtTokensJson` with `ADD COLUMN IF NOT EXISTS` when an older database had it removed by a prior `JwtTokensTableMigrateFromJson` revision.
+- **Database:** FluentMigrator `RestoreUsersJwtTokensJsonIfDropped` (`20260426120000`) initially re-added `users.JwtTokensJson` with `ADD COLUMN IF NOT EXISTS` for databases that had dropped it under an older `JwtTokensTableMigrateFromJson` revision. **Superseded in 3.3.14:** that revision is a no-op and `DropUsersJwtTokensJson` drops the column; tokens stay in `jwt_tokens` only.
 - **Helm / config:** `certsServerConfig.configuration.certsUIEngineConfiguration.autoSyncSchema` (default `true`) is rendered into server `appsettings.json` so add-only schema sync runs on every startup unless explicitly disabled.
 
 ### Changed
 
-- **Startup schema policy:** Documented expand-only expectations — FluentMigrator `Up()` should add tables/columns; avoid dropping renamed or legacy columns in `Up()`. `JwtTokensTableMigrateFromJson` no longer drops `JwtTokensJson` (tokens remain in `jwt_tokens`; legacy JSON column may remain for audit).
-- **Schema sync:** `AutoSyncSchema` defaults to **true** in repo `appsettings.json`; `SchemaSyncService` desired map includes `users.IsActive`, `TwoFactorSharedKey`, and optional `JwtTokensJson` for additive repair. Still **ADD COLUMN IF NOT EXISTS** only (no DROP).
+- **Startup schema policy:** Documented expand-only expectations — FluentMigrator `Up()` should add tables/columns; avoid dropping renamed columns in routine `Up()` without an explicit follow-up plan. `JwtTokensTableMigrateFromJson` no longer drops `JwtTokensJson` in that revision’s `Up()` (tokens are normalized into `jwt_tokens`). **3.3.14** removes `JwtTokensJson` from the live schema via `DropUsersJwtTokensJson`.
+- **Schema sync:** `AutoSyncSchema` defaults to **true** in repo `appsettings.json`; `SchemaSyncService` desired map includes `users.IsActive` and `TwoFactorSharedKey`. **3.3.14** stops treating `JwtTokensJson` as a desired column. Still **ADD COLUMN IF NOT EXISTS** only (no DROP in sync).
 - **ICertsEngineConfiguration / ISchemaSyncService:** Clarified that add-only sync is recommended and describes the no-DROP guarantee.
 
 ## [3.3.10] - 2026-04-26
