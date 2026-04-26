@@ -4,25 +4,35 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.22] - 2026-04-27
+
+### Changed
+
+- **Release tooling / frontend image versioning:** `DockerPush` now supports per-image `versionEnvFiles` and temporarily rewrites `VITE_APP_VERSION` in `src/MaksIT.WebUI/.env` and `src/MaksIT.WebUI/.env.prod` to the release semver from `<Version>` (for example `3.3.22`) during docker build/push, then restores original files so placeholders remain unchanged in git.
+- **HA / Terms of Service PDF cache:** Replaced pod-filesystem Terms of Service PDF caching with shared PostgreSQL cache table `terms_of_service_cache` (`url`, `url_hash_hex`, `etag`, `last_modified_utc`, `content_type`, `content_bytes`, `fetched_at_utc`, `expires_at_utc`). ToS retrieval now uses cache TTL/HTTP validators and no longer relies on local files.
+- **Terms of Service API:** Uses only session-based endpoint `GET /api/certs/{sessionId}/terms-of-service` for interactive ACME flows (stateless `isStaging` variant removed).
+
+## [3.3.21] - 2026-04-26
+
+### Changed
+
+- **FluentMigrator:** Restored FluentMigrator defaults for the migration history table (**`VersionInfo`**, columns **`Version`**, **`AppliedOn`**, **`Description`**). Removed **`CertsFluentMigratorVersionTableMetaData`**, custom **`IVersionTableMetaDataAccessor`** registration, and post-migrate verification against **`version_info`**.
+
 ## [3.3.20] - 2026-04-26
 
 ### Fixed
 
-- **FluentMigrator DI:** **`AddFluentMigratorCore`** registers a default **`IVersionTableMetaDataAccessor`**; **`WithVersionTable`** on **`ConfigureRunner`** could still leave **`VersionInfo`** in use. Engine registration now removes any prior **`IVersionTableMetaDataAccessor`** descriptors and registers **`PassThroughVersionTableMetaDataAccessor`** for **`CertsFluentMigratorVersionTableMetaData`** so **`MigrateUp`** always targets **`version_info`**.
+- **FluentMigrator DI:** Attempted to force **`version_info`** by replacing **`IVersionTableMetaDataAccessor`** registrations. **Superseded in 3.3.21:** reverted to default **`VersionInfo`** table and standard column names (see **3.3.21**).
 
 ## [3.3.19] - 2026-04-26
 
-### Changed
-
-- **FluentMigrator / PostgreSQL:** Version metadata table is **`public.version_info`** with snake_case columns **`version`**, **`applied_on`**, **`description`** and unique index **`uc_version`**, configured via **`CertsFluentMigratorVersionTableMetaData`** and **`WithVersionTable`** on the runner (aligned with the rest of the schema naming).
-
 ### Removed
 
-- **Startup migrations:** Removed legacy compatibility paths: **`VersionInfo` → `version_info` rename**, PascalCase → snake_case column repair on the version table, and the **EF-era baseline** that created or seeded **`version_info`** when **`users`** already existed (and **`RunMigrationsService.BaselineVersion`**).
+- **Startup migrations:** Removed legacy compatibility paths (EF-era baseline that seeded the version table when **`users`** already existed, **`VersionInfo` → `version_info` rename**, PascalCase → snake_case column repair, and **`RunMigrationsService.BaselineVersion`**).
 
 ### Upgrade notes
 
-- **Breaking:** **Recreate the Certs engine database** (or use a new empty database). The app no longer upgrades in place from **`VersionInfo`**, mixed column casing, or pre–FluentMigrator-baseline layouts; **`MigrateUp`** expects a clean or fully FluentMigrator-managed schema.
+- **Breaking:** **Recreate the Certs engine database** (or use a new empty database) if you still relied on those removed startup paths; **`MigrateUp`** expects a schema managed only by FluentMigrator migrations in-process.
 
 ## [3.3.18] - 2026-04-26
 

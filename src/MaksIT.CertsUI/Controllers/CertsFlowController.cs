@@ -25,8 +25,8 @@ namespace MaksIT.CertsUI.Controllers {
     }
 
     [HttpGet("{sessionId}/terms-of-service")]
-    public IActionResult TermsOfService(Guid sessionId) {
-      var result = _certsFlowService.GetTermsOfService(sessionId);
+    public async Task<IActionResult> TermsOfService(Guid sessionId) {
+      var result = await _certsFlowService.GetTermsOfServiceAsync(sessionId);
       return result.ToCertsFlowActionResult();
     }
 

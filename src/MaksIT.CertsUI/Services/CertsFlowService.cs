@@ -4,7 +4,7 @@ using MaksIT.Results;
 namespace MaksIT.CertsUI.Services;
 
 public interface ICertsFlowService {
-  Result<string?> GetTermsOfService(Guid sessionId);
+  Task<Result<string?>> GetTermsOfServiceAsync(Guid sessionId);
   Task<Result> CompleteChallengesAsync(Guid sessionId);
   Task<Result<Guid?>> ConfigureClientAsync(bool isStaging);
   Task<Result<Guid?>> InitAsync(Guid sessionId, Guid? accountId, string description, string[] contacts);
@@ -23,8 +23,8 @@ public sealed class CertsFlowService(
   ICertsFlowDomainService domain
 ) : ICertsFlowService {
 
-  public Result<string?> GetTermsOfService(Guid sessionId) =>
-    domain.GetTermsOfService(sessionId);
+  public Task<Result<string?>> GetTermsOfServiceAsync(Guid sessionId) =>
+    domain.GetTermsOfServiceAsync(sessionId);
 
   public Task<Result> CompleteChallengesAsync(Guid sessionId) =>
     domain.CompleteChallengesAsync(sessionId);
