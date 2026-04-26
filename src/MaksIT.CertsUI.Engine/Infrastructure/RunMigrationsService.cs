@@ -8,7 +8,7 @@ using Npgsql;
 namespace MaksIT.CertsUI.Engine.Infrastructure;
 
 /// <summary>
-/// FluentMigrator runner for the Certs database: optionally creates the database, baselines legacy EF-created schemas, migrates up,
+/// FluentMigrator runner for the Certs database: optionally creates the database, migrates up,
 /// then idempotent coordination-table repair. Forward <c>Up()</c> migrations should be additive (new tables/columns); avoid dropping
 /// renamed or legacy columns in <c>Up()</c> — use expand/contract and ops-driven cleanup.
 /// </summary>
@@ -17,8 +17,6 @@ public sealed class RunMigrationsService(
   ILogger<RunMigrationsService> logger,
   ICertsEngineConfiguration config
 ) : IRunMigrationsService {
-
-  public static long BaselineVersion => BaselineCertsSchema.Version;
 
   public async Task RunAsync(CancellationToken cancellationToken = default) {
     if (string.IsNullOrWhiteSpace(config.ConnectionString))
@@ -36,7 +34,6 @@ public sealed class RunMigrationsService(
     logger.LogInformation("FluentMigrator discovered {MigrationCount} migration type(s) in {Assembly}.", migrationTypeCount, typeof(BaselineCertsSchema).Assembly.GetName().Name);
 
     await EnsureDatabaseExistsAsync(cancellationToken).ConfigureAwait(false);
-    await BaselineExistingEfDatabaseAsync(cancellationToken).ConfigureAwait(false);
     await Task.Run(() => migrationRunner.MigrateUp(), cancellationToken).ConfigureAwait(false);
     await CoordinationTableProvisioner.EnsureAsync(config.ConnectionString, cancellationToken).ConfigureAwait(false);
     await VerifyCoreSchemaAsync(cancellationToken).ConfigureAwait(false);
@@ -54,7 +51,7 @@ public sealed class RunMigrationsService(
         EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'app_runtime_leases')
         AND (
           EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users')
-          OR EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'VersionInfo')
+          OR EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'version_info')
         );
       """,
       conn);
@@ -64,7 +61,7 @@ public sealed class RunMigrationsService(
       return;
 
     throw new InvalidOperationException(
-      "After migrations and coordination DDL, schema \"public\" is missing \"app_runtime_leases\" and/or core tables (\"users\" / \"VersionInfo\"). " +
+      "After migrations and coordination DDL, schema \"public\" is missing \"app_runtime_leases\" and/or core tables (\"users\" / \"version_info\"). " +
       "Confirm Database= in the connection string, role CREATE privileges, and that FluentMigrator committed (non-empty connection string).");
   }
 
@@ -101,44 +98,6 @@ public sealed class RunMigrationsService(
         "Could not use maintenance connection to database \"postgres\" for auto-create of \"{TargetDatabase}\". " +
         "If the target database already exists, migrations will continue; otherwise create the database manually.",
         database);
-    }
-  }
-
-  /// <summary>
-  /// If the database already has Certs tables from legacy EF Core migrations, mark the FluentMigrator baseline as applied.
-  /// </summary>
-  private async Task BaselineExistingEfDatabaseAsync(CancellationToken cancellationToken) {
-    await using var conn = new NpgsqlConnection(config.ConnectionString);
-    await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
-
-    await using (var cmd = new NpgsqlCommand(
-      "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users' LIMIT 1",
-      conn)) {
-      await using var reader = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-      if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-        return;
-    }
-
-    logger.LogInformation("Existing Certs schema detected; baselining FluentMigrator VersionInfo if needed.");
-
-    await using (var cmd = new NpgsqlCommand(@"
-      CREATE TABLE IF NOT EXISTS ""VersionInfo"" (
-        ""Version"" bigint NOT NULL PRIMARY KEY,
-        ""AppliedOn"" timestamp NULL,
-        ""Description"" varchar(1024) NULL
-      )", conn)) {
-      await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-    }
-
-    await using (var cmd = new NpgsqlCommand(
-      @"INSERT INTO ""VersionInfo"" (""Version"", ""AppliedOn"", ""Description"")
-        VALUES (@v, @appliedOn, @desc)
-        ON CONFLICT (""Version"") DO NOTHING",
-      conn)) {
-      cmd.Parameters.AddWithValue("v", BaselineCertsSchema.Version);
-      cmd.Parameters.AddWithValue("appliedOn", DBNull.Value);
-      cmd.Parameters.AddWithValue("desc", "BaselineCertsSchema (existing DB from EF Core)");
-      await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
   }
 }

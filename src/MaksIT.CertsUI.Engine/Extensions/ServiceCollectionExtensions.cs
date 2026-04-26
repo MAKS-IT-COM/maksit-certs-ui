@@ -31,6 +31,7 @@ public static class ServiceCollectionExtensions {
       .ConfigureRunner(rb => rb
         .AddPostgres()
         .WithGlobalConnectionString(certsEngineConfiguration.ConnectionString)
+        .WithVersionTable(new CertsFluentMigratorVersionTableMetaData())
         .ScanIn(typeof(BaselineCertsSchema).Assembly).For.All())
       .AddLogging(lb => lb.AddFluentMigratorConsole());
     services.AddScoped<IRunMigrationsService, RunMigrationsService>();

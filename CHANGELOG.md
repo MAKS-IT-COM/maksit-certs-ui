@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.19] - 2026-04-26
+
+### Changed
+
+- **FluentMigrator / PostgreSQL:** Version metadata table is **`public.version_info`** with snake_case columns **`version`**, **`applied_on`**, **`description`** and unique index **`uc_version`**, configured via **`CertsFluentMigratorVersionTableMetaData`** and **`WithVersionTable`** on the runner (aligned with the rest of the schema naming).
+
+### Removed
+
+- **Startup migrations:** Removed legacy compatibility paths: **`VersionInfo` → `version_info` rename**, PascalCase → snake_case column repair on the version table, and the **EF-era baseline** that created or seeded **`version_info`** when **`users`** already existed (and **`RunMigrationsService.BaselineVersion`**).
+
+### Upgrade notes
+
+- **Breaking:** **Recreate the Certs engine database** (or use a new empty database). The app no longer upgrades in place from **`VersionInfo`**, mixed column casing, or pre–FluentMigrator-baseline layouts; **`MigrateUp`** expects a clean or fully FluentMigrator-managed schema.
+
 ## [3.3.18] - 2026-04-26
 
 ### Changed
