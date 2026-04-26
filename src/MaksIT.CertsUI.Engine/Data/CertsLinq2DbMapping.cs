@@ -73,6 +73,17 @@ public static class CertsLinq2DbMapping {
       .Property(x => x.TokenValue).HasColumnName("token_value")
       .Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc");
 
+    builder.Entity<TermsOfServiceCacheDto>()
+      .HasTableName(Table.TermsOfServiceCache.Name)
+      .Property(x => x.Url).HasColumnName("url").IsPrimaryKey()
+      .Property(x => x.UrlHashHex).HasColumnName("url_hash_hex")
+      .Property(x => x.ETag).HasColumnName("etag")
+      .Property(x => x.LastModifiedUtc).HasColumnName("last_modified_utc")
+      .Property(x => x.ContentType).HasColumnName("content_type")
+      .Property(x => x.ContentBytes).HasColumnName("content_bytes")
+      .Property(x => x.FetchedAtUtc).HasColumnName("fetched_at_utc")
+      .Property(x => x.ExpiresAtUtc).HasColumnName("expires_at_utc");
+
     builder.Build();
     return schema;
   }

@@ -29,7 +29,7 @@ Configure this plugin **immediately before** `DockerPush`, `HelmPush`, `GitHub`,
 
 ## Helm charts in git
 
-Commit `Chart.yaml` with placeholder `version` and `appVersion` (for example `0.0.0`) so `helm lint` stays valid. `HelmPush` temporarily replaces both with the release semver (same as the git tag / `DotNetReleaseVersion`) before packaging, then restores the file. Image tags for `DockerPush` come from the engine context, not from the chart file in the repo.
+Commit `Chart.yaml` with placeholder `version` and `appVersion` (for example `0.0.0`) so `helm lint` stays valid. `HelmPush` temporarily replaces both with the release semver (same as the git tag / `DotNetReleaseVersion`) before packaging, then restores the file. `DockerPush` image tags come from the engine context (not from chart files), and you can optionally set per-image `versionEnvFiles` to temporarily write `VITE_APP_VERSION={shared.version}` into frontend `.env` files during build, with automatic restore after push.
 
 This repository uses `src/helm/`. For a minimal scaffold chart, see **maksit-repoutils** `charts/my-service/`.
 

@@ -1,10 +1,15 @@
 using MaksIT.CertsUI.Engine.Domain.Certs;
+using MaksIT.CertsUI.Engine.Dto.Certs;
 using MaksIT.CertsUI.Engine.Infrastructure;
 using MaksIT.CertsUI.Engine.Persistance.Services;
 using MaksIT.CertsUI.Engine.RuntimeCoordination;
 using MaksIT.CertsUI.Engine.Services;
 using MaksIT.Results;
 using Microsoft.Extensions.Logging;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace MaksIT.CertsUI.Engine.DomainServices;
 
@@ -14,7 +19,7 @@ namespace MaksIT.CertsUI.Engine.DomainServices;
 public interface ICertsFlowDomainService {
 
   #region Terms of service
-  Result<string?> GetTermsOfService(Guid sessionId);
+  Task<Result<string?>> GetTermsOfServiceAsync(Guid sessionId);
   #endregion
 
   #region Session, orders, and certificates
@@ -54,6 +59,7 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
   private readonly IRegistrationCachePersistanceService _registrationCache;
   private readonly IAgentDeploymentService _agentDeployment;
   private readonly ICertsFlowEngineConfiguration _config;
+  private readonly ITermsOfServiceCachePersistenceService _termsOfServiceCache;
   private readonly IAcmeHttpChallengePersistenceService _httpChallenges;
   private readonly IRuntimeLeaseService _runtimeLease;
   private readonly IRuntimeInstanceId _runtimeInstance;
@@ -67,6 +73,7 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
     IRegistrationCachePersistanceService registrationCache,
     IAgentDeploymentService agentDeployment,
     ICertsFlowEngineConfiguration config,
+    ITermsOfServiceCachePersistenceService termsOfServiceCache,
     IAcmeHttpChallengePersistenceService httpChallenges,
     IRuntimeLeaseService runtimeLease,
     IRuntimeInstanceId runtimeInstance,
@@ -77,6 +84,7 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
     _registrationCache = registrationCache;
     _agentDeployment = agentDeployment;
     _config = config;
+    _termsOfServiceCache = termsOfServiceCache;
     _httpChallenges = httpChallenges;
     _runtimeLease = runtimeLease;
     _runtimeInstance = runtimeInstance;
@@ -86,42 +94,83 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
 
   #region Terms of service
 
-  public Result<string?> GetTermsOfService(Guid sessionId) {
-    if (!_primaryReplica.IsPrimary)
-      return Result<string?>.ServiceUnavailable(null, CertsFlowPrimaryReplica.ServiceUnavailableMessages);
+  public async Task<Result<string?>> GetTermsOfServiceAsync(Guid sessionId) {
+    var termsUriResult = _letsEncryptService.GetTermsOfServiceUri(sessionId);
+    if (!termsUriResult.IsSuccess || termsUriResult.Value == null)
+      return termsUriResult;
 
-    var result = _letsEncryptService.GetTermsOfServiceUri(sessionId);
-    if (!result.IsSuccess || result.Value == null)
-      return result;
+    return await GetOrFetchTermsOfServicePdfBase64Async(termsUriResult.Value);
+  }
 
-    var termsOfServiceUrl = result.Value;
-
+  private async Task<Result<string?>> GetOrFetchTermsOfServicePdfBase64Async(string termsOfServiceUrl) {
     try {
-      var fileName = Path.GetFileName(new Uri(termsOfServiceUrl).LocalPath);
-      var termsOfServicePdfPath = Path.Combine(_config.DataFolder, fileName);
-      foreach (var file in Directory.GetFiles(_config.DataFolder, "*.pdf")) {
-        if (!string.Equals(Path.GetFileName(file), fileName, StringComparison.OrdinalIgnoreCase)) {
-          try {
-            File.Delete(file);
-          }
-          catch { /* ignore */ }
-        }
+      var cachedResult = await _termsOfServiceCache.GetByUrlAsync(termsOfServiceUrl);
+      if (cachedResult.IsSuccess && cachedResult.Value != null && cachedResult.Value.ExpiresAtUtc > DateTimeOffset.UtcNow)
+        return Result<string?>.Ok(Convert.ToBase64String(cachedResult.Value.ContentBytes));
+
+      using var request = new HttpRequestMessage(HttpMethod.Get, termsOfServiceUrl);
+      if (cachedResult.IsSuccess && cachedResult.Value != null) {
+        if (!string.IsNullOrWhiteSpace(cachedResult.Value.ETag))
+          request.Headers.TryAddWithoutValidation("If-None-Match", cachedResult.Value.ETag);
+        if (cachedResult.Value.LastModifiedUtc.HasValue)
+          request.Headers.IfModifiedSince = cachedResult.Value.LastModifiedUtc.Value;
       }
-      byte[] pdfBytes;
-      if (File.Exists(termsOfServicePdfPath)) {
-        pdfBytes = File.ReadAllBytes(termsOfServicePdfPath);
+
+      var response = await _httpClient.SendAsync(request);
+      if (response.StatusCode == HttpStatusCode.NotModified && cachedResult.IsSuccess && cachedResult.Value != null) {
+        var now = DateTimeOffset.UtcNow;
+        var notModifiedEntry = cachedResult.Value;
+        notModifiedEntry.FetchedAtUtc = now;
+        notModifiedEntry.ExpiresAtUtc = GetExpiry(now, response.Headers.CacheControl, response.Content.Headers.Expires);
+        var refreshResult = await _termsOfServiceCache.UpsertAsync(notModifiedEntry);
+        if (!refreshResult.IsSuccess)
+          return refreshResult.ToResultOfType<string?>(null);
+        return Result<string?>.Ok(Convert.ToBase64String(notModifiedEntry.ContentBytes));
       }
-      else {
-        pdfBytes = _httpClient.GetByteArrayAsync(termsOfServiceUrl).GetAwaiter().GetResult();
-        File.WriteAllBytes(termsOfServicePdfPath, pdfBytes);
-      }
-      var base64 = Convert.ToBase64String(pdfBytes);
-      return Result<string?>.Ok(base64);
+
+      if (!response.IsSuccessStatusCode)
+        return Result<string?>.InternalServerError(null, $"Failed to download Terms of Service PDF. Status: {(int)response.StatusCode} {response.ReasonPhrase}");
+
+      var bytes = await response.Content.ReadAsByteArrayAsync();
+      if (bytes.Length == 0)
+        return Result<string?>.InternalServerError(null, "Downloaded Terms of Service PDF is empty.");
+
+      var fetchedAt = DateTimeOffset.UtcNow;
+      var cacheEntry = new TermsOfServiceCacheDto {
+        Url = termsOfServiceUrl,
+        UrlHashHex = ComputeSha256Hex(termsOfServiceUrl),
+        ETag = response.Headers.ETag?.Tag,
+        LastModifiedUtc = response.Content.Headers.LastModified,
+        ContentType = response.Content.Headers.ContentType?.MediaType ?? "application/pdf",
+        ContentBytes = bytes,
+        FetchedAtUtc = fetchedAt,
+        ExpiresAtUtc = GetExpiry(fetchedAt, response.Headers.CacheControl, response.Content.Headers.Expires)
+      };
+
+      var upsertResult = await _termsOfServiceCache.UpsertAsync(cacheEntry);
+      if (!upsertResult.IsSuccess)
+        return upsertResult.ToResultOfType<string?>(null);
+
+      return Result<string?>.Ok(Convert.ToBase64String(bytes));
     }
     catch (Exception ex) {
-      _logger.LogError(ex, "Failed to download, cache, or convert Terms of Service PDF");
-      return Result<string?>.InternalServerError(null, $"Failed to download, cache, or convert Terms of Service PDF: {ex.Message}");
+      _logger.LogError(ex, "Failed to fetch or cache Terms of Service PDF");
+      return Result<string?>.InternalServerError(null, $"Failed to fetch or cache Terms of Service PDF: {ex.Message}");
     }
+  }
+
+  private static string ComputeSha256Hex(string text) {
+    var bytes = Encoding.UTF8.GetBytes(text);
+    var hash = SHA256.HashData(bytes);
+    return Convert.ToHexString(hash).ToLowerInvariant();
+  }
+
+  private static DateTimeOffset GetExpiry(DateTimeOffset now, CacheControlHeaderValue? cacheControl, DateTimeOffset? expiresHeader) {
+    if (cacheControl?.MaxAge is TimeSpan maxAge && maxAge > TimeSpan.Zero)
+      return now.Add(maxAge);
+    if (expiresHeader.HasValue && expiresHeader.Value > now)
+      return expiresHeader.Value;
+    return now.AddHours(24);
   }
 
   #endregion

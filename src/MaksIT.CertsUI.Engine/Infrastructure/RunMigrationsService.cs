@@ -51,7 +51,7 @@ public sealed class RunMigrationsService(
         EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'app_runtime_leases')
         AND (
           EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users')
-          OR EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'version_info')
+          OR EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'VersionInfo')
         );
       """,
       conn);
@@ -61,7 +61,7 @@ public sealed class RunMigrationsService(
       return;
 
     throw new InvalidOperationException(
-      "After migrations and coordination DDL, schema \"public\" is missing \"app_runtime_leases\" and/or core tables (\"users\" / \"version_info\"). " +
+      "After migrations and coordination DDL, schema \"public\" is missing \"app_runtime_leases\" and/or core tables (\"users\" / \"VersionInfo\"). " +
       "Confirm Database= in the connection string, role CREATE privileges, and that FluentMigrator committed (non-empty connection string).");
   }
 

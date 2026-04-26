@@ -16,5 +16,6 @@ public class Table(int id, string name) : Enumeration(id, name) {
 
   #region Certs
   public static readonly Table RegistrationCaches = new(2, "registration_caches");
+  public static readonly Table TermsOfServiceCache = new(5, "terms_of_service_cache");
   #endregion
 }

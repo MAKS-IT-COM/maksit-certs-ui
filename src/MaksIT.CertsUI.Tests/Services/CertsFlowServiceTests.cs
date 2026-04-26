@@ -1,6 +1,7 @@
 using System.Net;
 using MaksIT.CertsUI.Engine.Domain.Certs;
 using MaksIT.CertsUI.Engine.DomainServices;
+using MaksIT.CertsUI.Engine.Dto.Certs;
 using MaksIT.CertsUI.Engine.Infrastructure;
 using MaksIT.CertsUI.Engine.Persistance.Services;
 using MaksIT.CertsUI.Engine.RuntimeCoordination;
@@ -26,6 +27,7 @@ public sealed class CertsFlowServiceTests
         Mock<ILetsEncryptService> le,
         Mock<IRegistrationCachePersistanceService>? registrationCache = null,
         Mock<IAgentDeploymentService>? agent = null,
+        Mock<ITermsOfServiceCachePersistenceService>? termsOfServiceCache = null,
         Mock<IAcmeHttpChallengePersistenceService>? httpChallenges = null,
         Mock<IRuntimeLeaseService>? runtimeLease = null,
         Mock<IRuntimeInstanceId>? runtimeInstance = null,
@@ -34,6 +36,14 @@ public sealed class CertsFlowServiceTests
     {
         registrationCache ??= new Mock<IRegistrationCachePersistanceService>();
         agent ??= new Mock<IAgentDeploymentService>();
+        var tosCacheProvided = termsOfServiceCache is not null;
+        termsOfServiceCache ??= new Mock<ITermsOfServiceCachePersistenceService>();
+        if (!tosCacheProvided) {
+            termsOfServiceCache.Setup(c => c.GetByUrlAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Result<TermsOfServiceCacheDto?>.NotFound(null, "missing"));
+            termsOfServiceCache.Setup(c => c.UpsertAsync(It.IsAny<TermsOfServiceCacheDto>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Result.Ok());
+        }
         var httpChallengesProvided = httpChallenges is not null;
         httpChallenges ??= new Mock<IAcmeHttpChallengePersistenceService>();
         if (!httpChallengesProvided) {
@@ -68,6 +78,7 @@ public sealed class CertsFlowServiceTests
             registrationCache.Object,
             agent.Object,
             new TestCertsFlowEngineConfiguration(fx),
+            termsOfServiceCache.Object,
             httpChallenges.Object,
             runtimeLease.Object,
             runtimeInstance.Object,
@@ -308,40 +319,52 @@ public sealed class CertsFlowServiceTests
     }
 
     [Fact]
-    public void GetTermsOfService_WhenLetsEncryptFails_Propagates()
+    public async Task GetTermsOfServiceAsync_WhenLetsEncryptFails_Propagates()
     {
         using var fx = new WebApiTestFixture();
+        var sessionId = Guid.NewGuid();
         var le = new Mock<ILetsEncryptService>();
-        le.Setup(x => x.GetTermsOfServiceUri(It.IsAny<Guid>()))
+        le.Setup(x => x.GetTermsOfServiceUri(sessionId))
             .Returns(Result<string?>.InternalServerError(null, "no uri"));
 
         var sut = CreateSut(fx, le);
 
-        var result = sut.GetTermsOfService(Guid.NewGuid());
+        var result = await sut.GetTermsOfServiceAsync(sessionId);
 
         Assert.False(result.IsSuccess);
     }
 
     [Fact]
-    public void GetTermsOfService_WhenPdfAlreadyOnDisk_ReturnsBase64WithoutHttp()
+    public async Task GetTermsOfServiceAsync_WhenCachedAndNotExpired_ReturnsBase64WithoutHttp()
     {
         using var fx = new WebApiTestFixture();
-        var fileName = "cached-tos.pdf";
-        var dataPath = Path.Combine(fx.AppOptions.Value.CertsUIEngineConfiguration.DataFolder, fileName);
-        File.WriteAllBytes(dataPath, [7, 7, 7]);
-
+        var sessionId = Guid.NewGuid();
+        var url = "https://acme.test/sub/cached-tos.pdf";
         var le = new Mock<ILetsEncryptService>();
-        le.Setup(x => x.GetTermsOfServiceUri(It.IsAny<Guid>()))
-            .Returns(Result<string?>.Ok($"https://acme.test/sub/{fileName}"));
+        le.Setup(x => x.GetTermsOfServiceUri(sessionId))
+            .Returns(Result<string?>.Ok(url));
+
+        var tosCache = new Mock<ITermsOfServiceCachePersistenceService>();
+        tosCache.Setup(c => c.GetByUrlAsync(url, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<TermsOfServiceCacheDto?>.Ok(new TermsOfServiceCacheDto {
+                Url = url,
+                UrlHashHex = "abc",
+                ContentType = "application/pdf",
+                ContentBytes = [7, 7, 7],
+                FetchedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
+                ExpiresAtUtc = DateTimeOffset.UtcNow.AddHours(1)
+            }));
+        tosCache.Setup(c => c.UpsertAsync(It.IsAny<TermsOfServiceCacheDto>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Ok());
 
         var httpHit = false;
-        var sut = CreateSut(fx, le, httpHandler: new StubHttpMessageHandler(_ =>
+        var sut = CreateSut(fx, le, termsOfServiceCache: tosCache, httpHandler: new StubHttpMessageHandler(_ =>
         {
             httpHit = true;
-            return new HttpResponseMessage(HttpStatusCode.OK);
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([1, 2, 3]) };
         }));
 
-        var result = sut.GetTermsOfService(Guid.NewGuid());
+        var result = await sut.GetTermsOfServiceAsync(sessionId);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(Convert.ToBase64String([7, 7, 7]), result.Value);

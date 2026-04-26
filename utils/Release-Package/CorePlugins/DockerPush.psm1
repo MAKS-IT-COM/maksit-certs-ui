@@ -47,6 +47,27 @@ function Get-RegistryCredentialsFromEnv {
     return @{ User = $parts[0]; Password = $parts[1] }
 }
 
+function Set-EnvVersionValue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Version
+    )
+
+    $content = Get-Content -LiteralPath $FilePath -Raw
+    if ($content -match '(?m)^\s*VITE_APP_VERSION\s*=') {
+        $content = $content -replace '(?m)^\s*VITE_APP_VERSION\s*=.*$', "VITE_APP_VERSION=$Version"
+    }
+    else {
+        $separator = if ($content -match "(\r?\n)$") { '' } else { [Environment]::NewLine }
+        $content = "$content${separator}VITE_APP_VERSION=$Version"
+    }
+
+    Set-Content -LiteralPath $FilePath -Value $content -NoNewline
+}
+
 function Invoke-Plugin {
     param(
         [Parameter(Mandatory = $true)]
@@ -137,29 +158,69 @@ function Invoke-Plugin {
             $service = [string]$img.service
             $baseName = "$registryUrl/$($pluginSettings.projectName)/$service"
 
-            $primaryRef = "${baseName}:$($imageTags[0])"
-            Write-Log -Level "STEP" -Message "Building $primaryRef ..."
-            docker build -t $primaryRef -f $dockerfilePath $contextPath
-            if ($LASTEXITCODE -ne 0) {
-                throw "Docker build failed for $primaryRef"
-            }
+            $versionEnvFiles = @()
+            if ($img.PSObject.Properties.Name -contains 'versionEnvFiles' -and $null -ne $img.versionEnvFiles) {
+                foreach ($relativeEnvFile in @($img.versionEnvFiles)) {
+                    if ([string]::IsNullOrWhiteSpace([string]$relativeEnvFile)) {
+                        continue
+                    }
 
-            Write-Log -Level "STEP" -Message "Pushing $primaryRef ..."
-            docker push $primaryRef
-            if ($LASTEXITCODE -ne 0) {
-                throw "Docker push failed for $primaryRef"
-            }
+                    $envFilePath = [System.IO.Path]::GetFullPath((Join-Path $contextPath ([string]$relativeEnvFile)))
+                    if (-not (Test-Path -LiteralPath $envFilePath -PathType Leaf)) {
+                        throw "Configured versionEnvFiles entry not found: $envFilePath"
+                    }
 
-            for ($ti = 1; $ti -lt $imageTags.Count; $ti++) {
-                $aliasRef = "${baseName}:$($imageTags[$ti])"
-                Write-Log -Level "STEP" -Message "Tagging and pushing $aliasRef ..."
-                docker tag $primaryRef $aliasRef
-                if ($LASTEXITCODE -ne 0) {
-                    throw "Docker tag failed: $primaryRef -> $aliasRef"
+                    $backupPath = "$envFilePath.repoutils.bak"
+                    Copy-Item -LiteralPath $envFilePath -Destination $backupPath -Force
+                    $versionEnvFiles += [pscustomobject]@{
+                        FilePath = $envFilePath
+                        BackupPath = $backupPath
+                    }
                 }
-                docker push $aliasRef
+            }
+
+            try {
+                foreach ($envFile in $versionEnvFiles) {
+                    Write-Log -Level "INFO" -Message "Temporarily setting VITE_APP_VERSION=$bareVersion in $($envFile.FilePath)"
+                    Set-EnvVersionValue -FilePath $envFile.FilePath -Version $bareVersion
+                }
+
+                $primaryRef = "${baseName}:$($imageTags[0])"
+                Write-Log -Level "STEP" -Message "Building $primaryRef ..."
+                docker build -t $primaryRef -f $dockerfilePath $contextPath
                 if ($LASTEXITCODE -ne 0) {
-                    throw "Docker push failed for $aliasRef"
+                    throw "Docker build failed for $primaryRef"
+                }
+
+                Write-Log -Level "STEP" -Message "Pushing $primaryRef ..."
+                docker push $primaryRef
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Docker push failed for $primaryRef"
+                }
+
+                for ($ti = 1; $ti -lt $imageTags.Count; $ti++) {
+                    $aliasRef = "${baseName}:$($imageTags[$ti])"
+                    Write-Log -Level "STEP" -Message "Tagging and pushing $aliasRef ..."
+                    docker tag $primaryRef $aliasRef
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "Docker tag failed: $primaryRef -> $aliasRef"
+                    }
+                    docker push $aliasRef
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "Docker push failed for $aliasRef"
+                    }
+                }
+            }
+            finally {
+                foreach ($envFile in $versionEnvFiles) {
+                    if (Test-Path -LiteralPath $envFile.BackupPath -PathType Leaf) {
+                        Move-Item -LiteralPath $envFile.BackupPath -Destination $envFile.FilePath -Force
+                    }
+                }
+                foreach ($envFile in $versionEnvFiles) {
+                    if (Test-Path -LiteralPath $envFile.BackupPath -PathType Leaf) {
+                        Remove-Item -LiteralPath $envFile.BackupPath -Force -ErrorAction SilentlyContinue
+                    }
                 }
             }
         }

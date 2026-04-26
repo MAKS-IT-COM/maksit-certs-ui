@@ -58,7 +58,11 @@
         },
         {
           "service": "client",
-          "dockerfile": "MaksIT.WebUI/Dockerfile.prod"
+          "dockerfile": "MaksIT.WebUI/Dockerfile.prod",
+          "versionEnvFiles": [
+            "MaksIT.WebUI/.env",
+            "MaksIT.WebUI/.env.prod"
+          ]
         },
         {
           "service": "reverseproxy",
@@ -92,6 +96,7 @@
       "projectName": "DockerPush: image path segment: registryUrl/projectName/service:tag.",
       "contextPath": "DockerPush: directory containing MaksIT.CertsUI and MaksIT.WebUI (repo src/).",
       "images": "Dockerfile paths are relative to contextPath.",
+      "versionEnvFiles": "DockerPush image option: array of files (relative to contextPath) where VITE_APP_VERSION is temporarily set to shared.version before docker build, then restored after build/push.",
       "chartPath": "HelmPush: directory containing Chart.yaml. Keep version/appVersion as placeholders in git (e.g. 0.0.0); HelmPush overwrites with bare semver from DotNetReleaseVersion (shared.version, e.g. 3.3.4, no v) before package/push; falls back to stripping v from shared.tag if version is missing.",
       "ociRepository": "HelmPush: OCI registry URL for helm push (e.g. oci://cr.maks-it.com/charts).",
       "pushLatest": "Docker: also push :latest (images also get bare :3.3.4 and :v3.3.4 from DotNetReleaseVersion). Helm: oras copy chart to :latest (requires oras on PATH).",
