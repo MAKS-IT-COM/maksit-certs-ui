@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.12] - 2026-04-26
+
+### Fixed
+
+- **FluentMigrator:** Use `.ScanIn(…).For.All()` instead of `.For.Migrations()` so in-process discovery matches FluentMigrator guidance (avoids “no migrations” / incomplete runner behavior in some versions).
+- **FluentMigrator:** Throw if the engine connection string is empty when registering the runner — a null/empty `WithGlobalConnectionString` puts the processor in **connectionless/preview** mode (SQL logged, **nothing committed**), which matches reports of empty databases with no errors.
+- **Migrations:** Log host/database (no password) and count of `[Migration]` types before `MigrateUp`; after coordination DDL, verify `public.users` or `public."VersionInfo"` exists or fail with an actionable error (wrong `Database=`, permissions, or preview mode).
+- **Database bootstrap:** If the role cannot open a maintenance connection to database `postgres` (common for locked-down app users), log a warning and skip automatic `CREATE DATABASE` instead of failing the whole migration step.
+
+## [3.3.11] - 2026-04-26
+
+### Added
+
+- **Database:** FluentMigrator `RestoreUsersJwtTokensJsonIfDropped` (`20260426120000`) restores `users.JwtTokensJson` with `ADD COLUMN IF NOT EXISTS` when an older database had it removed by a prior `JwtTokensTableMigrateFromJson` revision.
+- **Helm / config:** `certsServerConfig.configuration.certsUIEngineConfiguration.autoSyncSchema` (default `true`) is rendered into server `appsettings.json` so add-only schema sync runs on every startup unless explicitly disabled.
+
+### Changed
+
+- **Startup schema policy:** Documented expand-only expectations — FluentMigrator `Up()` should add tables/columns; avoid dropping renamed or legacy columns in `Up()`. `JwtTokensTableMigrateFromJson` no longer drops `JwtTokensJson` (tokens remain in `jwt_tokens`; legacy JSON column may remain for audit).
+- **Schema sync:** `AutoSyncSchema` defaults to **true** in repo `appsettings.json`; `SchemaSyncService` desired map includes `users.IsActive`, `TwoFactorSharedKey`, and optional `JwtTokensJson` for additive repair. Still **ADD COLUMN IF NOT EXISTS** only (no DROP).
+- **ICertsEngineConfiguration / ISchemaSyncService:** Clarified that add-only sync is recommended and describes the no-DROP guarantee.
+
+## [3.3.10] - 2026-04-26
+
+### Fixed
+
+- **Database:** After FluentMigrator `MigrateUp`, `RunMigrationsService` applies idempotent `CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS` for `acme_http_challenges` and `app_runtime_leases`. If `VersionInfo` already records the migration but tables are missing (restore drift, partial apply, manual DB edits), FluentMigrator would skip `Up()` and the bootstrap lease would fail with `42P01`; this repair aligns schema with runtime needs.
+
 ## [3.3.9] - 2026-04-26
 
 ### Fixed

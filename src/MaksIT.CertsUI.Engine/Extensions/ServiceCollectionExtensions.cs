@@ -22,12 +22,16 @@ public static class ServiceCollectionExtensions {
 
     services.AddSingleton(certsEngineConfiguration);
 
-    // FluentMigrator: run migrations at startup via IRunMigrationsService (called from InitializationHostedService)
+    if (string.IsNullOrWhiteSpace(certsEngineConfiguration.ConnectionString))
+      throw new ArgumentException("Certs engine connection string is required for FluentMigrator (empty string uses connectionless/preview mode and will not create tables).", nameof(certsEngineConfiguration));
+
+    // FluentMigrator: IRunMigrationsService invoked from Program.cs before RunAsync. Use .For.All() so version metadata
+    // and migration discovery match in-process runner expectations (see FluentMigrator docs / #1062).
     services.AddFluentMigratorCore()
       .ConfigureRunner(rb => rb
         .AddPostgres()
         .WithGlobalConnectionString(certsEngineConfiguration.ConnectionString)
-        .ScanIn(typeof(BaselineCertsSchema).Assembly).For.Migrations())
+        .ScanIn(typeof(BaselineCertsSchema).Assembly).For.All())
       .AddLogging(lb => lb.AddFluentMigratorConsole());
     services.AddScoped<IRunMigrationsService, RunMigrationsService>();
     services.AddScoped<ISchemaSyncService, SchemaSyncService>();
@@ -67,7 +71,8 @@ public static class ServiceCollectionExtensions {
   #region Host initialization helpers
 
   /// <summary>
-  /// Runs FluentMigrator then optional add-only schema sync (when <see cref="ICertsEngineConfiguration.AutoSyncSchema"/> is true). Called from <c>Program.cs</c> before <c>RunAsync</c>.
+  /// Runs FluentMigrator (versioned <c>Up()</c> migrations, expand-only policy: no dropping legacy columns) then add-only
+  /// <see cref="ISchemaSyncService"/> when <see cref="ICertsEngineConfiguration.AutoSyncSchema"/> is true. Called from <c>Program.cs</c> before <c>RunAsync</c>.
   /// </summary>
   public static async Task EnsureCertsEngineMigratedAsync(this IServiceProvider serviceProvider) {
     await using var scope = serviceProvider.CreateAsyncScope();

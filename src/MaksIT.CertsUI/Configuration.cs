@@ -71,7 +71,7 @@ public class CertsUIEngineConfiguration : ICertsFlowEngineConfiguration {
   /// <summary>Npgsql connection string; optional when using legacy <c>ConnectionStrings:Certs</c>.</summary>
   public string? ConnectionString { get; set; }
 
-  /// <summary>When true, add-only schema sync after FluentMigrator. Default false.</summary>
+  /// <summary>When true, add-only schema sync after FluentMigrator (ADD COLUMN only, never DROP legacy/renamed columns). Set explicitly in appsettings/Helm (deserialization defaults missing bools to false).</summary>
   public bool AutoSyncSchema { get; set; }
 
   public required AdminUser Admin { get; set; }

@@ -4,7 +4,8 @@ using FluentMigrator;
 namespace MaksIT.CertsUI.Engine.FluentMigrations;
 
 /// <summary>
-/// Normalizes JWT refresh/access tokens into <c>jwt_tokens</c> (one row per token) and drops legacy <c>users.JwtTokensJson</c>.
+/// Normalizes JWT refresh/access tokens into <c>jwt_tokens</c> (one row per token). Legacy <c>users.JwtTokensJson</c> is retained
+/// (expand-only policy); the app reads <c>jwt_tokens</c> only.
 /// </summary>
 [Migration(20260418100000)]
 public class JwtTokensTableMigrateFromJson : Migration {
@@ -46,8 +47,6 @@ public class JwtTokensTableMigrateFromJson : Migration {
       ) AS elem
       WHERE (elem->>'Id') IS NOT NULL
       """);
-
-    Delete.Column("JwtTokensJson").FromTable("users");
   }
 
   public override void Down() =>

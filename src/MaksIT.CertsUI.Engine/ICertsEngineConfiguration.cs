@@ -6,7 +6,10 @@ namespace MaksIT.CertsUI.Engine;
 public interface ICertsEngineConfiguration {
   string ConnectionString { get; }
 
-  /// <summary>When true, run add-only schema sync at startup after migrations. Default false in production.</summary>
+  /// <summary>
+  /// When true (recommended), run add-only schema sync after FluentMigrator on each startup: <c>ALTER TABLE … ADD COLUMN IF NOT EXISTS</c> only,
+  /// never DROP. Disable only if you manage DDL exclusively elsewhere.
+  /// </summary>
   bool AutoSyncSchema { get; }
 
   /// <summary>Let's Encrypt production ACME directory URL (RFC 8555).</summary>

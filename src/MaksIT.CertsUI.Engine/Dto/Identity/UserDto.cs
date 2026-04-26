@@ -4,6 +4,7 @@ namespace MaksIT.CertsUI.Engine.Dto.Identity;
 
 /// <summary>
 /// PostgreSQL <c>users</c> row (Linq2DB). JWT sessions live in <c>jwt_tokens</c>; <see cref="JwtTokens"/> is not a mapped column.
+/// A legacy <c>JwtTokensJson</c> column may still exist on the table for expand-only migrations; it is not mapped here.
 /// </summary>
 public class UserDto : DtoDocumentBase<Guid> {
   public required string Name { get; set; }

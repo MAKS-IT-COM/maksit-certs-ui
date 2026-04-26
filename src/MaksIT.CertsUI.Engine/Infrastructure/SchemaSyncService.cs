@@ -4,7 +4,8 @@ using Npgsql;
 namespace MaksIT.CertsUI.Engine.Infrastructure;
 
 /// <summary>
-/// Add-only schema sync: adds missing columns to match DTOs (no DROP). Runs after FluentMigrator; table creation stays in migrations.
+/// Add-only schema sync on startup (after FluentMigrator): missing columns from the configured desired-schema map get
+/// <c>ALTER TABLE … ADD COLUMN IF NOT EXISTS</c>. No DROP, TRUNCATE, or column rename destructive DDL — legacy columns stay until you clean them as an ops task.
 /// </summary>
 public class SchemaSyncService(ICertsEngineConfiguration config, ILogger<SchemaSyncService> logger) : ISchemaSyncService {
   private readonly ICertsEngineConfiguration _config = config;
@@ -82,7 +83,10 @@ public class SchemaSyncService(ICertsEngineConfiguration config, ILogger<SchemaS
         ("Name", "text"),
         ("Salt", "text"),
         ("Hash", "text"),
+        ("JwtTokensJson", "text"),
         ("LastLoginUtc", "timestamp with time zone"),
+        ("IsActive", "boolean"),
+        ("TwoFactorSharedKey", "text"),
       ],
       ["jwt_tokens"] = [
         ("Id", "uuid"),
@@ -160,6 +164,11 @@ public class SchemaSyncService(ICertsEngineConfiguration config, ILogger<SchemaS
       if (column.Equals("Description", StringComparison.OrdinalIgnoreCase)) return false;
       if (column.Equals("RevokedAtUtc", StringComparison.OrdinalIgnoreCase)) return false;
       if (column.Equals("ExpiresAtUtc", StringComparison.OrdinalIgnoreCase)) return false;
+    }
+
+    if (table.Equals("users", StringComparison.OrdinalIgnoreCase)) {
+      if (column.Equals("TwoFactorSharedKey", StringComparison.OrdinalIgnoreCase)) return false;
+      if (column.Equals("JwtTokensJson", StringComparison.OrdinalIgnoreCase)) return false;
     }
 
     return true;

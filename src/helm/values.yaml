@@ -20,6 +20,8 @@ certsServerConfig:
     microsoftAspNetCore: Warning
   configuration:
     certsUIEngineConfiguration:
+      # Add-only column sync after FluentMigrator (ALTER ADD IF NOT EXISTS; never DROP). Set false to disable.
+      autoSyncSchema: true
       admin:
         username: "admin"
       jwt:
@@ -141,6 +143,7 @@ components:
           "AllowedHosts": {{ .Values.certsServerConfig.allowedHosts | toJson }},
           "Configuration": {
             "CertsUIEngineConfiguration": {
+              "AutoSyncSchema": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.autoSyncSchema }},
               "Admin": {
                 "Username": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.admin.username | toJson }},
                 "Password": ""
