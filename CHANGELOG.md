@@ -4,6 +4,38 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.0] - 2026-04-27
+
+### Breaking
+
+- **HA / interactive ACME:** `CertsFlowDomainService` no longer checks `IPrimaryReplicaWorkload.IsPrimary`. All replicas may run configure-client, init, orders, challenge completion, certificate download, apply, and revoke. The API no longer returns **HTTP 503** with `ProblemDetails.type` **`urn:maksit:certs-ui:primary-replica-required`** for those flows. Clients that retried on that signal (for example the SPA) should treat normal error semantics only.
+- **HTTP-01 challenge:** `AcmeChallengeAsync` no longer writes tokens under **`AcmeFolder`** or reads a legacy on-disk file. Challenge text is served from PostgreSQL only; ingress must reach **`GET /.well-known/acme-challenge/{token}`** on this app (or equivalent) rather than a shared volume of token files.
+- **Startup:** Removed the shared **`init`** marker file under **`DataFolder`**. Followers wait until the database reports at least one user (same readiness signal, without filesystem coupling).
+- **HA / process model:** Removed **`IPrimaryReplicaWorkload`**, **`PrimaryReplicaGate`**, and **`PrimaryReplicaShutdownHostedService`**. There is no long-lived “primary replica” or lease renewal loop in the API process.
+
+### Changed
+
+- **ACME sessions:** Let's Encrypt client **`State`** is persisted in PostgreSQL table **`acme_sessions`** (`session_id`, payload JSON, timestamps) so any replica can continue the same ACME session after load balancing.
+- **LetsEncrypt / `HttpClient`:** `ConfigureClient` fetches the ACME directory using an absolute URL derived from staging/production configuration instead of assigning **`BaseAddress`** on the shared **`HttpClient`**.
+- **`InitializationHostedService`:** Dropped unused **`IOptions<Configuration>`** from the constructor (DI callers unchanged except the removed parameter).
+- **Bootstrap:** **`InitializationHostedService`** acquires **`certs-ui-bootstrap`** (`RuntimeLeaseNames.BootstrapCoordinator`), runs **`CoordinationTableProvisioner`** + optional default admin, **releases** the lease, and exits. Other pods wait until **`users`** exist.
+- **Renewal:** **`AutoRenewal`** acquires **`certs-ui-renewal-sweep`** (`RuntimeLeaseNames.RenewalSweep`) for each sweep, runs work, **releases**, then sleeps. Any pod may win the next sweep.
+- **Lease names:** Replaced **`certs-ui-primary`** with **`BootstrapCoordinator`** and **`RenewalSweep`** constants (see **`RuntimeLeaseNames`**).
+- **Helm (cloud-native defaults):** **`components.server.service.sessionAffinity.enabled`** defaults to **`false`** so the server `Service` uses stateless load balancing (no **`ClientIP`** stickiness). Enable explicitly only when needed.
+- **Helm:** **`certsClientRuntime.apiUrl`** default is **`/api`** so the Web UI calls the API on the same browser origin (typical single-ingress / reverse-proxy setup). Override with a full URL when UI and API are on different hosts.
+
+### Removed
+
+- **`CertsFlowPrimaryReplica`**, **`PrimaryReplicaRequiredObjectResult`**, and **`CertsFlowResultExtensions`** / **`ToCertsFlowActionResult`**; **`CertsFlowController`** uses **`ToActionResult()`** like other API controllers.
+- **Web UI:** Primary-replica **503** auto-retry logic in **`axiosConfig.ts`**.
+- **Configuration / Helm:** **`AcmeFolder`** and **`DataFolder`** settings and the default **server** **acme**/**data** PVC mounts (cloud-native: no app-local disk for ACME or bootstrap markers). **`AddMemoryCache()`** host registration removed (unused).
+
+### Upgrade notes
+
+- **Migrations:** Apply FluentMigrator through **`3.4.0`** (includes **`acme_sessions`** and related coordination entries) before relying on cross-replica ACME sessions.
+- **Compose / secrets:** Remove **`acme`** and **`data`** bind mounts from **`docker-compose.override.yml`** if you still have them; they are no longer read by the application.
+- **Operations:** If you alert or filter on lease name **`certs-ui-primary`**, retarget to **`certs-ui-bootstrap`** and **`certs-ui-renewal-sweep`**.
+
 ## [3.3.22] - 2026-04-27
 
 ### Changed

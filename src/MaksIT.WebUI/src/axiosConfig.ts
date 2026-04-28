@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- axios config bags use dynamic fields (skipLoader) */
+/* eslint-disable @typescript-eslint/no-explicit-any -- axios config bags use dynamic fields (e.g. skipLoader) */
 import axios from 'axios'
 import { readIdentity } from './localStorage/identity'
 import { ApiRoutes, GetApiRoute } from './AppMap'

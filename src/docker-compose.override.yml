@@ -33,8 +33,6 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_HTTP_PORTS: "5000"
     volumes:
-      - D:/Compose/MaksIT.CertsUI/acme:/acme
-      - D:/Compose/MaksIT.CertsUI/data:/data
       - D:/Compose/MaksIT.CertsUI/configMap/appsettings.json:/configMap/appsettings.json:ro
       - D:/Compose/MaksIT.CertsUI/secrets/appsecrets.json:/secrets/appsecrets.json:ro
     networks:
@@ -44,10 +42,11 @@ services:
 
   postgres:
     restart: unless-stopped
+    # Aligns with Helm-style local defaults: user/db/password certsui (set the same in secrets appsecrets.json ConnectionString).
     environment:
-      POSTGRES_USER: maksit
-      POSTGRES_PASSWORD: maksit
-      POSTGRES_DB: maksit_certs
+      POSTGRES_USER: certsui
+      POSTGRES_PASSWORD: certsui
+      POSTGRES_DB: certsui
     networks:
       - maksit-certs-ui-network
     volumes:
@@ -55,6 +54,7 @@ services:
     ports:
       - "5432:5432"
 
+  # pgAdmin: mount servers.json (see repo src/postgresql/servers.json.example). Store password for user certsui in pgAdmin or use PassFile.
   pgadmin:
     restart: unless-stopped
     environment:

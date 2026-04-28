@@ -1,138 +1,134 @@
 using MaksIT.CertsUI.Engine.Domain.Certs;
+using MaksIT.CertsUI.Engine.Infrastructure;
 using MaksIT.CertsUI.Engine.Persistance.Services;
 using MaksIT.CertsUI.Engine.RuntimeCoordination;
-using MaksIT.Results;
 using MaksIT.CertsUI.Services;
-using Microsoft.Extensions.Options;
-using System;
 
-namespace MaksIT.CertsUI.HostedServices {
-  public class AutoRenewal : BackgroundService {
+namespace MaksIT.CertsUI.HostedServices;
 
-    private readonly IOptions<Configuration> _appSettings;
-    private readonly ILogger<AutoRenewal> _logger;
-    private readonly IServiceScopeFactory _scopeFactory;
-    private readonly IPrimaryReplicaWorkload _primaryReplica;
+/// <summary>Certificate renewal: each sweep acquires <see cref="RuntimeLeaseNames.RenewalSweep"/> so only one pod runs ACME renewal at a time (symmetric replicas, no elected primary).</summary>
+public sealed class AutoRenewal(
+  ILogger<AutoRenewal> logger,
+  IServiceScopeFactory scopeFactory,
+  IRuntimeLeaseService leaseService,
+  IRuntimeInstanceId runtimeInstance
+) : BackgroundService {
 
-    private static readonly Random _random = new();
+  private static readonly TimeSpan RenewalLeaseTtl = TimeSpan.FromMinutes(12);
+  private static readonly Random Random = new();
 
-    public AutoRenewal(
-        IOptions<Configuration> appSettings,
-        ILogger<AutoRenewal> logger,
-        IServiceScopeFactory scopeFactory,
-        IPrimaryReplicaWorkload primaryReplica
-    ) {
-      _appSettings = appSettings;
-      _logger = logger;
-      _scopeFactory = scopeFactory;
-      _primaryReplica = primaryReplica;
-    }
+  protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
+    while (!stoppingToken.IsCancellationRequested) {
+      var holder = runtimeInstance.InstanceId;
+      var acquired = await leaseService.TryAcquireAsync(RuntimeLeaseNames.RenewalSweep, holder, RenewalLeaseTtl, stoppingToken).ConfigureAwait(false);
+      if (!acquired.IsSuccess) {
+        if (logger.IsEnabled(LogLevel.Warning))
+          logger.LogWarning("Renewal sweep lease check failed: {Messages}", string.Join("; ", acquired.Messages ?? []));
+        await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken).ConfigureAwait(false);
+        continue;
+      }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
-      while (!stoppingToken.IsCancellationRequested) {
-        if (!_primaryReplica.IsPrimary) {
-          await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken).ConfigureAwait(false);
-          continue;
-        }
+      if (!acquired.Value) {
+        await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken).ConfigureAwait(false);
+        continue;
+      }
 
-        _logger.LogInformation("Background service is running (primary replica).");
+      try {
+        if (logger.IsEnabled(LogLevel.Information))
+          logger.LogInformation("Running certificate renewal sweep (lease holder {Holder}).", holder);
 
-        using var scope = _scopeFactory.CreateScope();
+        using var scope = scopeFactory.CreateScope();
         var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
         var certsFlowService = scope.ServiceProvider.GetRequiredService<ICertsFlowService>();
         var httpChallenges = scope.ServiceProvider.GetRequiredService<IAcmeHttpChallengePersistenceService>();
 
-        var purge = await httpChallenges.DeleteOlderThanAsync(TimeSpan.FromDays(10), stoppingToken);
+        var purge = await httpChallenges.DeleteOlderThanAsync(TimeSpan.FromDays(10), stoppingToken).ConfigureAwait(false);
         if (purge.IsSuccess && purge.Value > 0)
-          _logger.LogInformation("Purged {Count} HTTP-01 challenge row(s) older than 10 days.", purge.Value);
+          logger.LogInformation("Purged {Count} HTTP-01 challenge row(s) older than 10 days.", purge.Value);
 
-        var loadAccountsFromCacheResult = await cacheService.LoadAccountsFromCacheAsync();
+        var loadAccountsFromCacheResult = await cacheService.LoadAccountsFromCacheAsync().ConfigureAwait(false);
         if (!loadAccountsFromCacheResult.IsSuccess || loadAccountsFromCacheResult.Value == null) {
-          LogErrors(loadAccountsFromCacheResult.Messages);
-          await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
+          LogErrorMessages(loadAccountsFromCacheResult.Messages);
+          await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken).ConfigureAwait(false);
           continue;
         }
 
         var accountsResponse = loadAccountsFromCacheResult.Value;
+        foreach (var account in accountsResponse.Where(x => !x.IsDisabled))
+          await ProcessAccountAsync(certsFlowService, account).ConfigureAwait(false);
+      }
+      finally {
+        var released = await leaseService.ReleaseAsync(RuntimeLeaseNames.RenewalSweep, holder, CancellationToken.None).ConfigureAwait(false);
+        if (!released.IsSuccess && logger.IsEnabled(LogLevel.Warning))
+          logger.LogWarning("Renewal sweep lease release: {Messages}", string.Join("; ", released.Messages ?? []));
+      }
 
-        foreach (var account in accountsResponse.Where(x => !x.IsDisabled)) {
-          await ProcessAccountAsync(certsFlowService, account);
-        }
+      await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken).ConfigureAwait(false);
+    }
+  }
 
-        await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+  private async Task ProcessAccountAsync(ICertsFlowService certsFlowService, RegistrationCache cache) {
+    var hosts = cache.GetHosts();
+    var toRenew = new List<string>();
+
+    foreach (var host in hosts) {
+      if (host.IsDisabled)
+        continue;
+
+      if ((host.Expires - DateTime.UtcNow).TotalDays < 30) {
+        int randomDays = Random.Next(1, 6);
+        var renewalTime = host.Expires.AddDays(-randomDays);
+        if (DateTime.UtcNow >= renewalTime)
+          toRenew.Add(host.Hostname);
       }
     }
 
-    private async Task<Result> ProcessAccountAsync(ICertsFlowService certsFlowService, RegistrationCache cache) {
-
-      var hosts = cache.GetHosts();
-      var toRenew = new List<string>();
-
-      foreach (var host in hosts) {
-        if (host.IsDisabled)
-          continue;
-
-        // Only consider certs expiring within 30 days
-        if ((host.Expires - DateTime.UtcNow).TotalDays < 30) {
-          // Randomize renewal between 1 and 5 days before expiry
-          int randomDays = _random.Next(1, 6);
-          var renewalTime = host.Expires.AddDays(-randomDays);
-          if (DateTime.UtcNow >= renewalTime) {
-            toRenew.Add(host.Hostname);
-          }
-        }
-      }
-
-      if (!toRenew.Any()) {
-        _logger.LogInformation("No certificates are due for randomized renewal at this time.");
-        return Result.Ok();
-      }
-
-      var cooldownSkipped = new List<(string Hostname, DateTimeOffset NotBeforeUtc)>();
-      var eligible = new List<string>();
-      foreach (var hostname in toRenew) {
-        if (cache.IsHostnameInAcmeCooldown(hostname, out var notBefore)) {
-          cooldownSkipped.Add((hostname, notBefore));
-          continue;
-        }
-        eligible.Add(hostname);
-      }
-
-      if (cooldownSkipped.Count > 0) {
-        var sample = cooldownSkipped[0];
-        _logger.LogInformation(
-          "Skipping {SkippedCount} hostname(s) in ACME cooldown for account {AccountId} (e.g. {ExampleHost} until {NotBeforeUtc:u} UTC).",
-          cooldownSkipped.Count, cache.AccountId, sample.Hostname, sample.NotBeforeUtc);
-      }
-
-      if (!eligible.Any()) {
-        _logger.LogInformation("All due certificates for account {AccountId} are in ACME cooldown; no renewal attempted.", cache.AccountId);
-        return Result.Ok();
-      }
-
-      var fullFlowResult = await certsFlowService.FullFlow(
-          cache.IsStaging, cache.AccountId, cache.Description, cache.Contacts, cache.ChallengeType, eligible.ToArray()
-      );
-
-      if (!fullFlowResult.IsSuccess)
-        return fullFlowResult;
-
-      _logger.LogInformation("Certificates renewed for account {AccountId}: {Hostnames}", cache.AccountId, string.Join(", ", eligible));
-
-      return Result.Ok();
+    if (!toRenew.Any()) {
+      logger.LogInformation("No certificates are due for randomized renewal at this time for account {AccountId}.", cache.AccountId);
+      return;
     }
 
-    
-
-    private void LogErrors(IEnumerable<string> errors) {
-      foreach (var error in errors) {
-        _logger.LogError(error);
+    var cooldownSkipped = new List<(string Hostname, DateTimeOffset NotBeforeUtc)>();
+    var eligible = new List<string>();
+    foreach (var hostname in toRenew) {
+      if (cache.IsHostnameInAcmeCooldown(hostname, out var notBefore)) {
+        cooldownSkipped.Add((hostname, notBefore));
+        continue;
       }
+      eligible.Add(hostname);
     }
 
-    public override Task StopAsync(CancellationToken stoppingToken) {
-      _logger.LogInformation("Background service is stopping.");
-      return base.StopAsync(stoppingToken);
+    if (cooldownSkipped.Count > 0) {
+      var sample = cooldownSkipped[0];
+      logger.LogInformation(
+        "Skipping {SkippedCount} hostname(s) in ACME cooldown for account {AccountId} (e.g. {ExampleHost} until {NotBeforeUtc:u} UTC).",
+        cooldownSkipped.Count, cache.AccountId, sample.Hostname, sample.NotBeforeUtc);
     }
+
+    if (!eligible.Any()) {
+      logger.LogInformation("All due certificates for account {AccountId} are in ACME cooldown; no renewal attempted.", cache.AccountId);
+      return;
+    }
+
+    var fullFlowResult = await certsFlowService.FullFlow(
+      cache.IsStaging, cache.AccountId, cache.Description, cache.Contacts, cache.ChallengeType, eligible.ToArray()
+    ).ConfigureAwait(false);
+
+    if (!fullFlowResult.IsSuccess)
+      LogErrorMessages(fullFlowResult.Messages);
+    else
+      logger.LogInformation("Certificates renewed for account {AccountId}: {Hostnames}", cache.AccountId, string.Join(", ", eligible));
+  }
+
+  private void LogErrorMessages(IEnumerable<string>? errors) {
+    if (errors == null)
+      return;
+    foreach (var error in errors)
+      logger.LogError("{Error}", error);
+  }
+
+  public override Task StopAsync(CancellationToken stoppingToken) {
+    logger.LogInformation("Background service is stopping.");
+    return base.StopAsync(stoppingToken);
   }
 }

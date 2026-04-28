@@ -86,14 +86,5 @@ public class CertsUIEngineConfiguration : ICertsFlowEngineConfiguration {
 
   public required string Staging { get; set; }
 
-  public required string AcmeFolder { get; set; }
-
-  /// <summary>Writable directory for ACME subscriber agreement PDFs and <c>init</c> marker.</summary>
-  public required string DataFolder { get; set; }
-
-  string ICertsFlowEngineConfiguration.AcmeFolder => AcmeFolder;
-
-  string ICertsFlowEngineConfiguration.DataFolder => DataFolder;
-
   string ICertsFlowEngineConfiguration.AgentServiceToReload => Agent.ServiceToReload;
 }

@@ -4,5 +4,5 @@
 namespace MaksIT.Models.Agent.Requests;
 
 public class CertsUploadRequest : RequestModelBase {
-  public Dictionary<string, string> Certs { get; set; }
+  public required Dictionary<string, string> Certs { get; set; }
 }

@@ -11,12 +11,6 @@ builder.Services.AddReverseProxy()
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-app.UseRouting();
-
-// Use YARP reverse proxy
-app.UseEndpoints(endpoints => {
-  endpoints.MapReverseProxy();
-});
+app.MapReverseProxy();
 
 app.Run();

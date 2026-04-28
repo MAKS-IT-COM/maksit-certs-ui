@@ -4,6 +4,9 @@ namespace MaksIT.CertsUI.Engine.RuntimeCoordination;
 public static class RuntimeLeaseNames {
   public const string AcmeWriter = "certs-ui-acme-writer";
 
-  /// <summary>Single elected instance: identity bootstrap, ACME orchestration, and background renewal.</summary>
-  public const string PrimaryReplica = "certs-ui-primary";
+  /// <summary>Held only for coordination DDL + optional default-admin bootstrap; released when done (no renewal loop).</summary>
+  public const string BootstrapCoordinator = "certs-ui-bootstrap";
+
+  /// <summary>Held for one renewal sweep (purge + account passes); released after each sweep so any pod may run the next.</summary>
+  public const string RenewalSweep = "certs-ui-renewal-sweep";
 }

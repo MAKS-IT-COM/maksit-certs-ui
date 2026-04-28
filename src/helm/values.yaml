@@ -42,8 +42,6 @@ certsServerConfig:
         serviceToReload: haproxy
       production: "https://acme-v02.api.letsencrypt.org/directory"
       staging: "https://acme-staging-v02.api.letsencrypt.org/directory"
-      acmeFolder: /acme
-      dataFolder: /data
 
 # Server Secret (appsecrets.json); referenced from components.server.secretsFile when tpl: true
 # Configuration:CertsUIEngineConfiguration:ConnectionString — same structural role as MaksIT.Vault VaultEngineConfiguration:ConnectionString.
@@ -55,13 +53,12 @@ certsServerSecrets:
   certsUIEngineConfiguration:
     connectionString: ""
 
-# Client ConfigMap (config.js); referenced when tpl: true
+# Client ConfigMap (config.js); referenced when tpl: true. Prefer a relative URL (/api) when UI and API share one ingress origin.
 certsClientRuntime:
-  apiUrl: "http://certs-ui.example.com/api"
+  apiUrl: "/api"
 
 components:
-  # Per-component replica count (minimum 1). Server uses RWO PVCs by default — use 1 unless
-  # your StorageClass supports ReadWriteMany and the app can share the volume (see NOTES.txt).
+  # Per-component replica count (minimum 1). Server is stateless for app data (PostgreSQL); scale freely.
   server:
     replicaCount: 1
     image:
@@ -83,9 +80,9 @@ components:
       type: ClusterIP
       port: 5000
       targetPort: 5000
-      # ClientIP affinity helps browsers hit the same server pod for multi-step ACME (primary holds orchestration).
+      # Stateless default (no ClientIP). Set enabled: true only if you want sticky sessions at the Service layer.
       sessionAffinity:
-        enabled: true
+        enabled: false
         clientIPTimeoutSeconds: 10800
     # Give kube-proxy / ingress time to stop sending new connections before SIGKILL (pairs with preStop).
     terminationGracePeriodSeconds: 90
@@ -95,23 +92,8 @@ components:
           command: ["/bin/sh", "-c", "sleep 5"]
     persistence:
       storageClass: local-path
-      volumes:
-        - name: acme
-          mountPath: /acme
-          type: pvc
-          pvc:
-            create: true
-            keep: true
-            size: 50Mi
-            accessModes: [ReadWriteOnce]
-        - name: data
-          mountPath: /data
-          type: pvc
-          pvc:
-            create: true
-            keep: true
-            size: 50Mi
-            accessModes: [ReadWriteOnce]
+      # Optional extra mounts (e.g. emptyDir scratch). ACME sessions and HTTP-01 tokens use PostgreSQL, not /acme.
+      volumes: []
     secretsFile:
       key: appsecrets.json
       mountPath: /secrets/appsecrets.json
@@ -181,9 +163,7 @@ components:
                 "ServiceToReload": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.agent.serviceToReload | toJson }}
               },
               "Production": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.production | toJson }},
-              "Staging": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.staging | toJson }},
-              "AcmeFolder": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.acmeFolder | toJson }},
-              "DataFolder": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.dataFolder | toJson }}
+              "Staging": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.staging | toJson }}
             }
           }
         }

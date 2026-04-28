@@ -39,22 +39,27 @@ public sealed class TermsOfServiceCachePersistenceServiceLinq2Db(
 
     try {
       using var db = connectionFactory.Create();
-      var existing = db.GetTable<TermsOfServiceCacheDto>().FirstOrDefault(x => x.Url == cacheEntry.Url);
-      if (existing == null) {
-        db.Insert(cacheEntry);
-      }
-      else {
-        db.GetTable<TermsOfServiceCacheDto>()
-          .Where(x => x.Url == cacheEntry.Url)
-          .Set(x => x.UrlHashHex, cacheEntry.UrlHashHex)
-          .Set(x => x.ETag, cacheEntry.ETag)
-          .Set(x => x.LastModifiedUtc, cacheEntry.LastModifiedUtc)
-          .Set(x => x.ContentType, cacheEntry.ContentType)
-          .Set(x => x.ContentBytes, cacheEntry.ContentBytes)
-          .Set(x => x.FetchedAtUtc, cacheEntry.FetchedAtUtc)
-          .Set(x => x.ExpiresAtUtc, cacheEntry.ExpiresAtUtc)
-          .Update();
-      }
+      db.GetTable<TermsOfServiceCacheDto>().InsertOrUpdate(
+        () => new TermsOfServiceCacheDto {
+          Url = cacheEntry.Url,
+          UrlHashHex = cacheEntry.UrlHashHex,
+          ETag = cacheEntry.ETag,
+          LastModifiedUtc = cacheEntry.LastModifiedUtc,
+          ContentType = cacheEntry.ContentType,
+          ContentBytes = cacheEntry.ContentBytes,
+          FetchedAtUtc = cacheEntry.FetchedAtUtc,
+          ExpiresAtUtc = cacheEntry.ExpiresAtUtc
+        },
+        old => new TermsOfServiceCacheDto {
+          Url = old.Url,
+          UrlHashHex = cacheEntry.UrlHashHex,
+          ETag = cacheEntry.ETag,
+          LastModifiedUtc = cacheEntry.LastModifiedUtc,
+          ContentType = cacheEntry.ContentType,
+          ContentBytes = cacheEntry.ContentBytes,
+          FetchedAtUtc = cacheEntry.FetchedAtUtc,
+          ExpiresAtUtc = cacheEntry.ExpiresAtUtc
+        });
 
       return Task.FromResult(Result.Ok());
     }

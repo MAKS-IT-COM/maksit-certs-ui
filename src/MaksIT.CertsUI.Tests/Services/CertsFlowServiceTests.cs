@@ -17,8 +17,6 @@ namespace MaksIT.CertsUI.Tests.Services;
 public sealed class CertsFlowServiceTests
 {
     private sealed class TestCertsFlowEngineConfiguration(WebApiTestFixture fx) : ICertsFlowEngineConfiguration {
-        public string AcmeFolder => fx.AppOptions.Value.CertsUIEngineConfiguration.AcmeFolder;
-        public string DataFolder => fx.AppOptions.Value.CertsUIEngineConfiguration.DataFolder;
         public string AgentServiceToReload => fx.AppOptions.Value.CertsUIEngineConfiguration.Agent.ServiceToReload;
     }
 
@@ -31,8 +29,7 @@ public sealed class CertsFlowServiceTests
         Mock<IAcmeHttpChallengePersistenceService>? httpChallenges = null,
         Mock<IRuntimeLeaseService>? runtimeLease = null,
         Mock<IRuntimeInstanceId>? runtimeInstance = null,
-        HttpMessageHandler? httpHandler = null,
-        Mock<IPrimaryReplicaWorkload>? primaryReplica = null)
+        HttpMessageHandler? httpHandler = null)
     {
         registrationCache ??= new Mock<IRegistrationCachePersistanceService>();
         agent ??= new Mock<IAgentDeploymentService>();
@@ -66,9 +63,6 @@ public sealed class CertsFlowServiceTests
         runtimeInstance ??= new Mock<IRuntimeInstanceId>();
         if (!runtimeInstanceProvided)
             runtimeInstance.Setup(i => i.InstanceId).Returns("test-instance");
-        var primaryWorkload = primaryReplica ?? new Mock<IPrimaryReplicaWorkload>();
-        if (primaryReplica is null)
-            primaryWorkload.Setup(p => p.IsPrimary).Returns(true);
         var handler = httpHandler ?? new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([0x25, 0x50, 0x44, 0x46]) });
         var httpClient = new HttpClient(handler, disposeHandler: true);
         return new CertsFlowDomainService(
@@ -81,8 +75,7 @@ public sealed class CertsFlowServiceTests
             termsOfServiceCache.Object,
             httpChallenges.Object,
             runtimeLease.Object,
-            runtimeInstance.Object,
-            primaryWorkload.Object);
+            runtimeInstance.Object);
     }
 
     [Fact]
@@ -90,7 +83,7 @@ public sealed class CertsFlowServiceTests
     {
         using var fx = new WebApiTestFixture();
         var le = new Mock<ILetsEncryptService>();
-        le.Setup(x => x.ConfigureClient(It.IsAny<Guid>(), false))
+        le.Setup(x => x.ConfigureClient(It.IsAny<Guid>(), false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Ok());
 
         var sut = CreateSut(fx, le);
@@ -102,50 +95,11 @@ public sealed class CertsFlowServiceTests
     }
 
     [Fact]
-    public async Task ConfigureClientAsync_WhenNotPrimary_ReturnsServiceUnavailableWithMarker()
-    {
-        using var fx = new WebApiTestFixture();
-        var le = new Mock<ILetsEncryptService>();
-        var primary = new Mock<IPrimaryReplicaWorkload>();
-        primary.Setup(p => p.IsPrimary).Returns(false);
-        var sut = CreateSut(fx, le, primaryReplica: primary);
-
-        var result = await sut.ConfigureClientAsync(isStaging: false);
-
-        Assert.False(result.IsSuccess);
-        Assert.Contains(CertsFlowPrimaryReplica.DiagnosticMarker, result.Messages ?? []);
-        le.Verify(x => x.ConfigureClient(It.IsAny<Guid>(), It.IsAny<bool>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task AcmeChallenge_WhenNotPrimary_StillSucceedsFromDatabase()
-    {
-        using var fx = new WebApiTestFixture();
-        var name = "challenge-token";
-        var le = new Mock<ILetsEncryptService>();
-        var primary = new Mock<IPrimaryReplicaWorkload>();
-        primary.Setup(p => p.IsPrimary).Returns(false);
-        var challenges = new Mock<IAcmeHttpChallengePersistenceService>();
-        challenges.Setup(c => c.GetTokenValueAsync(name, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<string?>.Ok("body"));
-        challenges.Setup(c => c.UpsertAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Ok());
-        challenges.Setup(c => c.DeleteOlderThanAsync(It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<int>.Ok(0));
-        var sut = CreateSut(fx, le, httpChallenges: challenges, primaryReplica: primary);
-
-        var result = await sut.AcmeChallengeAsync(name, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal("body", result.Value);
-    }
-
-    [Fact]
     public async Task ConfigureClientAsync_WhenConfigureFails_PropagatesFailure()
     {
         using var fx = new WebApiTestFixture();
         var le = new Mock<ILetsEncryptService>();
-        le.Setup(x => x.ConfigureClient(It.IsAny<Guid>(), It.IsAny<bool>()))
+        le.Setup(x => x.ConfigureClient(It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.InternalServerError(["configure failed"]));
 
         var sut = CreateSut(fx, le);
@@ -161,7 +115,7 @@ public sealed class CertsFlowServiceTests
         using var fx = new WebApiTestFixture();
         var sessionId = Guid.NewGuid();
         var le = new Mock<ILetsEncryptService>();
-        le.Setup(x => x.Init(sessionId, It.IsAny<Guid>(), "d", It.Is<string[]>(c => c.Length == 1 && c[0] == "mailto:a@b"), null))
+        le.Setup(x => x.Init(sessionId, It.IsAny<Guid>(), "d", It.Is<string[]>(c => c.Length == 1 && c[0] == "mailto:a@b"), null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Ok());
 
         var sut = CreateSut(fx, le);
@@ -170,7 +124,7 @@ public sealed class CertsFlowServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
-        le.Verify(x => x.Init(sessionId, It.IsAny<Guid>(), "d", It.IsAny<string[]>(), null), Times.Once);
+        le.Verify(x => x.Init(sessionId, It.IsAny<Guid>(), "d", It.IsAny<string[]>(), null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -184,7 +138,7 @@ public sealed class CertsFlowServiceTests
             .ReturnsAsync(Result<RegistrationCache?>.InternalServerError(null, "missing"));
 
         var le = new Mock<ILetsEncryptService>();
-        le.Setup(x => x.Init(sessionId, It.IsAny<Guid>(), "d", It.IsAny<string[]>(), null))
+        le.Setup(x => x.Init(sessionId, It.IsAny<Guid>(), "d", It.IsAny<string[]>(), null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Ok());
 
         var sut = CreateSut(fx, le, cache);
@@ -214,7 +168,7 @@ public sealed class CertsFlowServiceTests
             .ReturnsAsync(Result<RegistrationCache?>.Ok(reg));
 
         var le = new Mock<ILetsEncryptService>();
-        le.Setup(x => x.Init(sessionId, accountId, "d", It.IsAny<string[]>(), reg))
+        le.Setup(x => x.Init(sessionId, accountId, "d", It.IsAny<string[]>(), reg, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Ok());
 
         var sut = CreateSut(fx, le, cache);
@@ -231,7 +185,7 @@ public sealed class CertsFlowServiceTests
         using var fx = new WebApiTestFixture();
         var sessionId = Guid.NewGuid();
         var le = new Mock<ILetsEncryptService>();
-        le.Setup(x => x.NewOrder(sessionId, It.IsAny<string[]>(), "http-01"))
+        le.Setup(x => x.NewOrder(sessionId, It.IsAny<string[]>(), "http-01", It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<Dictionary<string, string>?>.Ok(new Dictionary<string, string>
             {
                 ["example.com"] = "tokenPart.rest.of.token"
@@ -271,7 +225,7 @@ public sealed class CertsFlowServiceTests
         var result = await sut.NewOrderAsync(sessionId, ["example.com"], "http-01");
 
         Assert.False(result.IsSuccess);
-        le.Verify(x => x.NewOrder(It.IsAny<Guid>(), It.IsAny<string[]>(), It.IsAny<string>()), Times.Never);
+        le.Verify(x => x.NewOrder(It.IsAny<Guid>(), It.IsAny<string[]>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         runtimeLease.Verify(l => l.ReleaseAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -292,7 +246,7 @@ public sealed class CertsFlowServiceTests
         var result = await sut.NewOrderAsync(sessionId, ["example.com"], "http-01");
 
         Assert.False(result.IsSuccess);
-        le.Verify(x => x.NewOrder(It.IsAny<Guid>(), It.IsAny<string[]>(), It.IsAny<string>()), Times.Never);
+        le.Verify(x => x.NewOrder(It.IsAny<Guid>(), It.IsAny<string[]>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         runtimeLease.Verify(l => l.ReleaseAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -302,7 +256,7 @@ public sealed class CertsFlowServiceTests
         using var fx = new WebApiTestFixture();
         var sessionId = Guid.NewGuid();
         var le = new Mock<ILetsEncryptService>();
-        le.Setup(x => x.NewOrder(sessionId, It.IsAny<string[]>(), "http-01"))
+        le.Setup(x => x.NewOrder(sessionId, It.IsAny<string[]>(), "http-01", It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<Dictionary<string, string>?>.InternalServerError(null, "acme failed"));
         var runtimeLease = new Mock<IRuntimeLeaseService>();
         runtimeLease.Setup(l => l.TryAcquireAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
@@ -324,8 +278,8 @@ public sealed class CertsFlowServiceTests
         using var fx = new WebApiTestFixture();
         var sessionId = Guid.NewGuid();
         var le = new Mock<ILetsEncryptService>();
-        le.Setup(x => x.GetTermsOfServiceUri(sessionId))
-            .Returns(Result<string?>.InternalServerError(null, "no uri"));
+        le.Setup(x => x.GetTermsOfServiceUriAsync(sessionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<string?>.InternalServerError(null, "no uri"));
 
         var sut = CreateSut(fx, le);
 
@@ -341,8 +295,8 @@ public sealed class CertsFlowServiceTests
         var sessionId = Guid.NewGuid();
         var url = "https://acme.test/sub/cached-tos.pdf";
         var le = new Mock<ILetsEncryptService>();
-        le.Setup(x => x.GetTermsOfServiceUri(sessionId))
-            .Returns(Result<string?>.Ok(url));
+        le.Setup(x => x.GetTermsOfServiceUriAsync(sessionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<string?>.Ok(url));
 
         var tosCache = new Mock<ITermsOfServiceCachePersistenceService>();
         tosCache.Setup(c => c.GetByUrlAsync(url, It.IsAny<CancellationToken>()))
@@ -384,7 +338,7 @@ public sealed class CertsFlowServiceTests
     }
 
     [Fact]
-    public async Task AcmeChallenge_WhenDbRowExists_MaterializesFileAndReturnsContent()
+    public async Task AcmeChallenge_WhenDbRowExists_ReturnsContent()
     {
         using var fx = new WebApiTestFixture();
         var name = "challenge-token";
@@ -402,9 +356,6 @@ public sealed class CertsFlowServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal("challenge-body", result.Value);
-        var path = Path.Combine(fx.AppOptions.Value.CertsUIEngineConfiguration.AcmeFolder, name);
-        Assert.True(File.Exists(path));
-        Assert.Equal("challenge-body", await File.ReadAllTextAsync(path));
     }
 
     [Fact]
@@ -508,14 +459,14 @@ public sealed class CertsFlowServiceTests
         using var fx = new WebApiTestFixture();
         var sessionId = Guid.NewGuid();
         var le = new Mock<ILetsEncryptService>();
-        le.Setup(x => x.CompleteChallenges(sessionId))
+        le.Setup(x => x.CompleteChallenges(sessionId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Ok());
         var sut = CreateSut(fx, le);
 
         var result = await sut.CompleteChallengesAsync(sessionId);
 
         Assert.True(result.IsSuccess);
-        le.Verify(x => x.CompleteChallenges(sessionId), Times.Once);
+        le.Verify(x => x.CompleteChallenges(sessionId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -524,7 +475,7 @@ public sealed class CertsFlowServiceTests
         using var fx = new WebApiTestFixture();
         var sessionId = Guid.NewGuid();
         var le = new Mock<ILetsEncryptService>();
-        le.Setup(x => x.GetOrder(sessionId, It.IsAny<string[]>()))
+        le.Setup(x => x.GetOrder(sessionId, It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Ok());
         var sut = CreateSut(fx, le);
 

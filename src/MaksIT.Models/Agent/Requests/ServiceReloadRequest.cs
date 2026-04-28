@@ -4,5 +4,5 @@
 namespace MaksIT.Models.Agent.Requests;
 
 public class ServiceReloadRequest : RequestModelBase {
-  public string ServiceName { get; set; }
+  public required string ServiceName { get; set; }
 }

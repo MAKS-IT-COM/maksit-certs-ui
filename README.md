@@ -282,7 +282,7 @@ sudo tee /opt/Compose/MaksIT.CertsUI/secrets/appsecrets.json > /dev/null <<EOF
 {
   "Configuration": {
     "CertsEngineConfiguration": {
-      "ConnectionString": "Host=postgres;Port=5432;Database=maksit_certs;Username=maksit;Password=maksit;SslMode=Prefer"
+      "ConnectionString": "Host=postgres;Port=5432;Database=certsui;Username=certsui;Password=certsui;SslMode=Prefer"
     },
     "Auth": {
       "Secret": "<your-auth-secret>",
@@ -297,7 +297,7 @@ EOF
 ```
 
 **Note:**  
-PostgreSQL is configured as **`Configuration:CertsEngineConfiguration:ConnectionString`** — same structural pattern as MaksIT.Vault’s **`Configuration:VaultEngineConfiguration:ConnectionString`**. For Docker Compose, use the Postgres service hostname (here `postgres`) and credentials that match the `postgres` service. The host also accepts legacy **`ConnectionStrings:Certs`** if needed. Replace placeholder values `<your-auth-secret>`, `<your-pepper>`, `<your-agent-key>`, with secure, your environment-specific values.
+PostgreSQL is configured as **`Configuration:CertsUIEngineConfiguration:ConnectionString`** — same structural pattern as MaksIT.Vault’s **`Configuration:VaultEngineConfiguration:ConnectionString`**. For Docker Compose, use the Postgres service hostname (here **`postgres`**) and credentials that match **`docker-compose.override.yml`** (**`certsui`** / **`certsui`** / database **`certsui`** by default). The host also accepts legacy **`ConnectionStrings:Certs`** if needed. Replace placeholder values `<your-auth-secret>`, `<your-pepper>`, `<your-agent-key>`, with secure, your environment-specific values.
 Make sure `<your-agent-key>` matches the key configured in your agent deployment.
 
 **2. Create the file  `/opt/Compose/MaksIT.CertsUI/configMap/appsettings.json` with this command:**
@@ -325,15 +325,13 @@ sudo tee /opt/Compose/MaksIT.CertsUI/configMap/appsettings.json <<EOF
     },
     "Production": "https://acme-v02.api.letsencrypt.org/directory",
     "Staging": "https://acme-staging-v02.api.letsencrypt.org/directory",
-    "AcmeFolder": "/acme",
-    "DataFolder": "/data"
   }
 }
 EOF
 ```
 
 **Note:**  
-`DataFolder` holds ACME subscriber agreement PDFs and an empty `init` bootstrap marker (users and registration data live in PostgreSQL). Replace all JWT-related placeholder values `<your-issuer>`, `<your-audience>` and `<your-agent-hostname>` with your environment-specific values.
+ACME sessions, HTTP-01 challenges, Terms of Service caching, and registration data live in PostgreSQL. Replace all JWT-related placeholder values `<your-issuer>`, `<your-audience>` and `<your-agent-hostname>` with your environment-specific values.
 
 **3. Create the file `/opt/Compose/MaksIT.CertsUI/client/config.js` with this command:**
 
@@ -515,7 +513,7 @@ Set-Content -Path 'C:\Compose\MaksIT.CertsUI\secrets\appsecrets.json' -Value @'
 {
   "Configuration": {
     "CertsEngineConfiguration": {
-      "ConnectionString": "Host=postgres;Port=5432;Database=maksit_certs;Username=maksit;Password=maksit;SslMode=Prefer"
+      "ConnectionString": "Host=postgres;Port=5432;Database=certsui;Username=certsui;Password=certsui;SslMode=Prefer"
     },
     "Auth": {
       "Secret": "<your-auth-secret>",
@@ -530,7 +528,7 @@ Set-Content -Path 'C:\Compose\MaksIT.CertsUI\secrets\appsecrets.json' -Value @'
 ```
 
 **Note:**  
-PostgreSQL is **`Configuration:CertsEngineConfiguration:ConnectionString`** (same pattern as MaksIT.Vault **`VaultEngineConfiguration:ConnectionString`**). For Docker Compose, use the Postgres service hostname (here `postgres`) and credentials that match the `postgres` service. Legacy **`ConnectionStrings:Certs`** is still supported. Replace placeholder values `<your-auth-secret>`, `<your-pepper>`, `<your-agent-key>`, with secure, your environment-specific values.
+PostgreSQL is **`Configuration:CertsUIEngineConfiguration:ConnectionString`** (same pattern as MaksIT.Vault **`VaultEngineConfiguration:ConnectionString`**). For Docker Compose, use the Postgres service hostname (here **`postgres`**) and credentials that match **`docker-compose.override.yml`** (**`certsui`** defaults). Legacy **`ConnectionStrings:Certs`** is still supported. Replace placeholder values `<your-auth-secret>`, `<your-pepper>`, `<your-agent-key>`, with secure, your environment-specific values.
 Make sure `<your-agent-key>` matches the key configured in your agent deployment.
 
 **2. Create the file  `C:\Compose\MaksIT.CertsUI\configMap\appsettings.json` with this command:**
@@ -558,15 +556,13 @@ Set-Content -Path 'C:\Compose\MaksIT.CertsUI\configMap\appsettings.json' -Value 
     },
     "Production": "https://acme-v02.api.letsencrypt.org/directory",
     "Staging": "https://acme-staging-v02.api.letsencrypt.org/directory",
-    "AcmeFolder": "/acme",
-    "DataFolder": "/data"
   }
 }
 '@
 ```
 
 **Note:**  
-`DataFolder` holds ACME subscriber agreement PDFs and an empty `init` bootstrap marker (users and registration data live in PostgreSQL). Replace all JWT-related placeholder values `<your-issuer>`, `<your-audience>` and `<your-agent-hostname>` with your environment-specific values.
+ACME sessions, HTTP-01 challenges, Terms of Service caching, and registration data live in PostgreSQL. Replace all JWT-related placeholder values `<your-issuer>`, `<your-audience>` and `<your-agent-hostname>` with your environment-specific values.
 
 **3. Create the file `C:\Compose\MaksIT.CertsUI\client\config.js` with this command:**
 
@@ -680,7 +676,7 @@ Replace the placeholder values with your actual secrets. This secret contains th
 {
   "Configuration": {
     "CertsEngineConfiguration": {
-      "ConnectionString": "Host=<postgres-host>;Port=5432;Database=maksit_certs;Username=<user>;Password=<password>;SslMode=Prefer"
+      "ConnectionString": "Host=<postgres-host>;Port=5432;Database=certsui;Username=certsui;Password=certsui;SslMode=Prefer"
     },
     "Auth": {
       "Secret": "<your-auth-secret>",
@@ -698,7 +694,7 @@ kubectl create secret generic certs-ui-server-secrets \
   --from-literal=appsecrets.json='{
     "Configuration": {
       "CertsEngineConfiguration": {
-        "ConnectionString": "Host=<postgres-host>;Port=5432;Database=maksit_certs;Username=<user>;Password=<password>;SslMode=Prefer"
+        "ConnectionString": "Host=<postgres-host>;Port=5432;Database=certsui;Username=certsui;Password=certsui;SslMode=Prefer"
       },
       "Auth": {
         "Secret": "<your-auth-secret>",
@@ -743,8 +739,6 @@ Edit the values as needed for your environment. This configmap contains applicat
     },
     "Production": "https://acme-v02.api.letsencrypt.org/directory",
     "Staging": "https://acme-staging-v02.api.letsencrypt.org/directory",
-    "AcmeFolder": "/acme",
-    "DataFolder": "/data"
   }
 }
 ```
@@ -773,8 +767,6 @@ kubectl create configmap certs-ui-server-configmap \
       },
       "Production": "https://acme-v02.api.letsencrypt.org/directory",
       "Staging": "https://acme-staging-v02.api.letsencrypt.org/directory",
-      "AcmeFolder": "/acme",
-      "DataFolder": "/data"
     }
   }' \
   -n certs-ui

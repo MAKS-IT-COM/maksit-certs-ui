@@ -84,6 +84,13 @@ public static class CertsLinq2DbMapping {
       .Property(x => x.FetchedAtUtc).HasColumnName("fetched_at_utc")
       .Property(x => x.ExpiresAtUtc).HasColumnName("expires_at_utc");
 
+    builder.Entity<AcmeSessionDto>()
+      .HasTableName(Table.AcmeSessions.Name)
+      .Property(x => x.SessionId).HasColumnName("session_id").IsPrimaryKey()
+      .Property(x => x.PayloadJson).HasColumnName("payload_json")
+      .Property(x => x.UpdatedAtUtc).HasColumnName("updated_at_utc")
+      .Property(x => x.ExpiresAtUtc).HasColumnName("expires_at_utc");
+
     builder.Build();
     return schema;
   }

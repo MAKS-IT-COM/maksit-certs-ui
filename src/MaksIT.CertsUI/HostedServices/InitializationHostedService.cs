@@ -1,62 +1,63 @@
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 using MaksIT.CertsUI.Engine;
 using MaksIT.CertsUI.Engine.DomainServices;
 using MaksIT.CertsUI.Engine.Infrastructure;
 using MaksIT.CertsUI.Engine.RuntimeCoordination;
-using MaksIT.CertsUI.Infrastructure;
 
 namespace MaksIT.CertsUI.HostedServices;
 
 /// <summary>
-/// Exactly one instance holds <see cref="RuntimeLeaseNames.PrimaryReplica"/> and runs coordination DDL plus identity bootstrap.
-/// Other instances wait until the database (and optional shared <c>init</c> marker under <see cref="Configuration.CertsUIEngineConfiguration.DataFolder"/>) shows bootstrap complete, then start without ACME privileges.
+/// Uses a short-lived Postgres lease (<see cref="RuntimeLeaseNames.BootstrapCoordinator"/>) so exactly one pod runs
+/// coordination DDL + default admin creation; other pods wait until <c>users</c> exist. No long-lived leader role.
 /// </summary>
 public sealed class InitializationHostedService(
   ILogger<InitializationHostedService> logger,
   IServiceProvider serviceProvider,
-  IOptions<Configuration> appSettings,
-  PrimaryReplicaGate primaryGate
+  IRuntimeLeaseService leaseService,
+  IRuntimeInstanceId runtimeInstance
 ) : IHostedService {
+
+  private static readonly TimeSpan BootstrapLeaseTtl = TimeSpan.FromMinutes(5);
 
   public async Task StartAsync(CancellationToken cancellationToken) {
     const int delayMilliseconds = 2000;
-    var appLifetime = serviceProvider.GetRequiredService<IHostApplicationLifetime>();
-
     while (!cancellationToken.IsCancellationRequested) {
       try {
-        logger.LogInformation("Running startup initialization (primary replica election)...");
+        logger.LogInformation("Running startup coordination (Postgres bootstrap lease)...");
 
-        if (await primaryGate.TryAcquirePrimaryLeaseAsync(cancellationToken).ConfigureAwait(false)) {
-          primaryGate.StartLeaseRenewal(appLifetime);
+        var holder = runtimeInstance.InstanceId;
+        var acquired = await leaseService.TryAcquireAsync(RuntimeLeaseNames.BootstrapCoordinator, holder, BootstrapLeaseTtl, cancellationToken).ConfigureAwait(false);
+        if (!acquired.IsSuccess)
+          throw new InvalidOperationException(string.Join(", ", acquired.Messages ?? ["Bootstrap lease acquire failed."]));
+
+        if (acquired.Value) {
           try {
             var engineConfig = serviceProvider.GetRequiredService<ICertsEngineConfiguration>();
             await CoordinationTableProvisioner.EnsureAsync(engineConfig.ConnectionString, cancellationToken).ConfigureAwait(false);
 
             await using var scope = serviceProvider.CreateAsyncScope();
             var identityDomainService = scope.ServiceProvider.GetRequiredService<IIdentityDomainService>();
-            await EnsureIdentityAsLeaderAsync(appSettings.Value, identityDomainService, cancellationToken).ConfigureAwait(false);
+            await EnsureIdentityAsLeaderAsync(identityDomainService, cancellationToken).ConfigureAwait(false);
           }
-          catch {
-            await primaryGate.AbandonPrimaryAsync().ConfigureAwait(false);
-            throw;
+          finally {
+            var released = await leaseService.ReleaseAsync(RuntimeLeaseNames.BootstrapCoordinator, holder, CancellationToken.None).ConfigureAwait(false);
+            if (!released.IsSuccess && logger.IsEnabled(LogLevel.Warning))
+              logger.LogWarning("Bootstrap lease release: {Messages}", string.Join("; ", released.Messages ?? []));
           }
 
-          primaryGate.EnablePrimaryWorkload();
-          logger.LogInformation("Startup initialization completed; this instance is the primary replica.");
+          logger.LogInformation("Startup coordination completed (this instance held the bootstrap lease).");
           return;
         }
 
         await using (var followerScope = serviceProvider.CreateAsyncScope()) {
           var identityFollower = followerScope.ServiceProvider.GetRequiredService<IIdentityDomainService>();
-          var cfg = appSettings.Value;
           while (!cancellationToken.IsCancellationRequested) {
-            if (await IsClusterIdentityReadyAsync(cfg, identityFollower, cancellationToken).ConfigureAwait(false)) {
-              logger.LogInformation("Startup initialization completed; this instance is a secondary replica.");
+            if (await IsClusterIdentityReadyAsync(identityFollower, cancellationToken).ConfigureAwait(false)) {
+              logger.LogInformation("Startup coordination completed (another instance bootstrapped identity).");
               return;
             }
 
-            logger.LogInformation("Waiting for primary replica to finish database bootstrap...");
+            logger.LogInformation("Waiting for bootstrap to finish (checking database)...");
             await Task.Delay(delayMilliseconds, cancellationToken).ConfigureAwait(false);
           }
         }
@@ -64,20 +65,20 @@ public sealed class InitializationHostedService(
         cancellationToken.ThrowIfCancellationRequested();
       }
       catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
-        logger.LogInformation("Startup initialization canceled (host is stopping).");
+        logger.LogInformation("Startup coordination canceled (host is stopping).");
         throw;
       }
       catch (Exception ex) {
         if (cancellationToken.IsCancellationRequested) {
-          logger.LogInformation(ex, "Startup initialization aborted while stopping host.");
-          throw new OperationCanceledException("Host stopped during startup initialization.", ex, cancellationToken);
+          logger.LogInformation(ex, "Startup coordination aborted while stopping host.");
+          throw new OperationCanceledException("Host stopped during startup coordination.", ex, cancellationToken);
         }
-        logger.LogError(ex, "Startup initialization failed. Retrying...");
+        logger.LogError(ex, "Startup coordination failed. Retrying...");
         try {
           await Task.Delay(delayMilliseconds, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
-          logger.LogInformation("Startup initialization retry wait canceled (host is stopping).");
+          logger.LogInformation("Startup coordination retry wait canceled (host is stopping).");
           throw;
         }
       }
@@ -87,53 +88,29 @@ public sealed class InitializationHostedService(
   public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
   private static async Task EnsureIdentityAsLeaderAsync(
-    Configuration appSettings,
     IIdentityDomainService identityDomainService,
     CancellationToken cancellationToken
   ) {
-    var dataDir = appSettings.CertsUIEngineConfiguration.DataFolder;
-    if (!Directory.Exists(dataDir))
-      Directory.CreateDirectory(dataDir);
-
-    var initPath = Path.Combine(dataDir, "init");
-    if (File.Exists(initPath))
-      return;
-
     var count = await identityDomainService.CountUsersAsync(cancellationToken).ConfigureAwait(false);
     if (!count.IsSuccess)
       throw new InvalidOperationException(string.Join(", ", count.Messages));
 
-    if (count.Value == 0) {
-      var bootstrap = await identityDomainService.EnsureDefaultAdminAsync(cancellationToken).ConfigureAwait(false);
-      if (!bootstrap.IsSuccess)
-        throw new InvalidOperationException(string.Join(", ", bootstrap.Messages));
-    }
+    if (count.Value != 0)
+      return;
 
-    await File.WriteAllTextAsync(initPath, string.Empty, cancellationToken).ConfigureAwait(false);
+    var bootstrap = await identityDomainService.EnsureDefaultAdminAsync(cancellationToken).ConfigureAwait(false);
+    if (!bootstrap.IsSuccess)
+      throw new InvalidOperationException(string.Join(", ", bootstrap.Messages));
   }
 
   private static async Task<bool> IsClusterIdentityReadyAsync(
-    Configuration appSettings,
     IIdentityDomainService identityDomainService,
     CancellationToken cancellationToken
   ) {
-    var dataDir = appSettings.CertsUIEngineConfiguration.DataFolder;
-    if (!Directory.Exists(dataDir))
-      Directory.CreateDirectory(dataDir);
-
-    var initPath = Path.Combine(dataDir, "init");
-    if (File.Exists(initPath))
-      return true;
-
     var count = await identityDomainService.CountUsersAsync(cancellationToken).ConfigureAwait(false);
     if (!count.IsSuccess)
       throw new InvalidOperationException(string.Join(", ", count.Messages));
 
-    if (count.Value > 0) {
-      await File.WriteAllTextAsync(initPath, string.Empty, cancellationToken).ConfigureAwait(false);
-      return true;
-    }
-
-    return false;
+    return count.Value > 0;
   }
 }

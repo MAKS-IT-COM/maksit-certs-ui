@@ -67,14 +67,9 @@ builder.Services.AddOptions<JsonOptions>().Configure(o =>
 builder.Services.AddScoped<JwtAuthorizationFilter>();
 builder.Services.AddScoped<JwtOrApiKeyAuthorizationFilter>();
 
-// Primary replica: one elected instance (Postgres lease) runs ACME + renewal; register shutdown last so StopAsync releases the lease first.
-builder.Services.AddSingleton<PrimaryReplicaGate>();
-builder.Services.AddSingleton<IPrimaryReplicaWorkload>(sp => sp.GetRequiredService<PrimaryReplicaGate>());
-
-// Hosted services: initialization first, then autorenewal loop.
+// Hosted services: coordination/bootstrap lease, then renewal sweeps (each uses short-lived Postgres leases — symmetric pods).
 builder.Services.AddHostedService<InitializationHostedService>();
 builder.Services.AddHostedService<AutoRenewal>();
-builder.Services.AddHostedService<PrimaryReplicaShutdownHostedService>();
 
 // PostgreSQL: prefer Configuration:CertsUIEngineConfiguration:ConnectionString in appsecrets.json; fallback ConnectionStrings:Certs for older files.
 var certsConnectionString = appSettings.CertsUIEngineConfiguration.ConnectionString
@@ -85,7 +80,7 @@ if (string.IsNullOrWhiteSpace(certsConnectionString))
 
 var engineSection = appSettings.CertsUIEngineConfiguration;
 
-// Identity / flow configuration must be registered before AddCertsEngine (engine domain services depend on pepper and paths).
+// Identity / flow configuration must be registered before AddCertsEngine (engine domain services depend on pepper, etc.).
 builder.Services.AddSingleton<IIdentityDomainConfiguration>(sp =>
   sp.GetRequiredService<IOptions<Configuration>>().Value.CertsUIEngineConfiguration.JwtSettingsConfiguration);
 builder.Services.AddSingleton<ITwoFactorSettingsConfiguration>(sp =>
@@ -105,7 +100,6 @@ builder.Services.AddCertsEngine(new MaksIT.CertsUI.Engine.CertsEngineConfigurati
   LetsEncryptStaging = engineSection.Staging,
 });
 
-builder.Services.AddMemoryCache();
 builder.Services.AddScoped<ICacheService, CacheService>();
 
 // Controller services
@@ -140,7 +134,7 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
-// FluentMigrator must complete before any IHostedService starts; bootstrap lease uses app_runtime_leases.
+// FluentMigrator must complete before any IHostedService starts; bootstrap uses app_runtime_leases.
 await app.Services.EnsureCertsEngineMigratedAsync();
 
 app.UseMiddleware<ErrorHandlingMiddleware>();

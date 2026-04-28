@@ -11,10 +11,10 @@ This document explains how HA works in `MaksIT.CertsUI` after moving mutable ACM
 
 ## Runtime model
 
-- **Shared source of truth:** PostgreSQL stores ACME challenge rows and runtime leases.
+- **Shared source of truth:** PostgreSQL stores ACME sessions, challenge rows, ToS cache, registration caches, and runtime leases.
 - **Per-instance identity:** each running server process gets one canonical `InstanceId` (`IRuntimeInstanceId` singleton).
-- **Lease holder:** mutating ACME paths acquire a PostgreSQL lease row (`app_runtime_leases`) with TTL.
-- **Challenge reads:** `/.well-known/acme-challenge/{token}` reads token value from PostgreSQL and materializes a short-lived file in `/acme` for compatibility.
+- **Lease holder:** `NewOrderAsync` acquires **AcmeWriter**; startup uses **BootstrapCoordinator**; each renewal sweep uses **RenewalSweep** (see `RuntimeLeaseNames`). All leases are rows in **`app_runtime_leases`** with TTL semantics—no long-lived leader object in the app.
+- **Challenge reads:** `/.well-known/acme-challenge/{token}` returns the token value from PostgreSQL (no local ACME directory).
 - **Background coordination:** bootstrap and renewal hosted services use named leases to avoid duplicate work.
 
 ## Lease design
@@ -33,8 +33,7 @@ This is implemented as an optimistic single-statement `INSERT ... ON CONFLICT ..
 ## HTTP-01 coherence design
 
 - `NewOrderAsync` stores challenge tokens in `acme_http_challenges` via `UpsertAsync`.
-- Challenge handler (`AcmeChallengeAsync`) reads token value from DB, writes `/acme/{token}`, and returns the value.
-- Fallback: if DB row is missing, legacy on-disk token read remains available for migration compatibility.
+- Challenge handler (`AcmeChallengeAsync`) reads the token value from the database and returns it as plain text.
 - Cleanup: auto-renewal loop calls `DeleteOlderThanAsync(TimeSpan.FromDays(10))`.
 
 ## Kubernetes behavior

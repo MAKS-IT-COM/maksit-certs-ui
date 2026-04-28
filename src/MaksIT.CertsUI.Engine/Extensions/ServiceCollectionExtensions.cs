@@ -64,7 +64,7 @@ public static class ServiceCollectionExtensions {
     #endregion
 
     #region ACME / Let's Encrypt
-    services.AddSingleton<AcmeSessionStore>();
+    services.AddSingleton<IAcmeSessionStore, AcmePostgresSessionStore>();
     services.AddHttpClient<ILetsEncryptService, LetsEncryptService>();
     #endregion
   }

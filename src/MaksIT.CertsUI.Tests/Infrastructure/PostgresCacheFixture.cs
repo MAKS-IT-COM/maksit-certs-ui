@@ -21,8 +21,7 @@ public class PostgresCacheFixture : IAsyncLifetime, IDisposable {
   public WebApiTestFixture Config { get; private set; } = null!;
 
   public async Task InitializeAsync() {
-    _container = new PostgreSqlBuilder()
-      .WithImage("postgres:16-alpine")
+    _container = new PostgreSqlBuilder("postgres:16-alpine")
       .Build();
     await _container.StartAsync();
 

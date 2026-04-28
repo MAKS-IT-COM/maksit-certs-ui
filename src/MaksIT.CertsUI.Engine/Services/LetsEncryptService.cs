@@ -16,6 +16,7 @@ using MaksIT.CertsUI.Engine.Dto.LetsEncrypt.Responses;
 using MaksIT.Results;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Headers;
+using System.Threading;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -24,15 +25,15 @@ using System.Text;
 namespace MaksIT.CertsUI.Engine.Services;
 
 public interface ILetsEncryptService {
-  Result<RegistrationCache?> GetRegistrationCache(Guid sessionId);
-  Task<Result> ConfigureClient(Guid sessionId, bool isStaging);
-  Task<Result> Init(Guid sessionId, Guid accountId, string description, string[] contacts, RegistrationCache? registrationCache);
-  Result<string?> GetTermsOfServiceUri(Guid sessionId);
-  Task<Result<Dictionary<string, string>?>> NewOrder(Guid sessionId, string[] hostnames, string challengeType);
-  Task<Result> CompleteChallenges(Guid sessionId);
-  Task<Result> GetOrder(Guid sessionId, string[] hostnames);
-  Task<Result> GetCertificate(Guid sessionId, string subject);
-  Task<Result> RevokeCertificate(Guid sessionId, string subject, RevokeReason reason);
+  Task<Result<RegistrationCache?>> GetRegistrationCacheAsync(Guid sessionId, CancellationToken cancellationToken = default);
+  Task<Result> ConfigureClient(Guid sessionId, bool isStaging, CancellationToken cancellationToken = default);
+  Task<Result> Init(Guid sessionId, Guid accountId, string description, string[] contacts, RegistrationCache? registrationCache, CancellationToken cancellationToken = default);
+  Task<Result<string?>> GetTermsOfServiceUriAsync(Guid sessionId, CancellationToken cancellationToken = default);
+  Task<Result<Dictionary<string, string>?>> NewOrder(Guid sessionId, string[] hostnames, string challengeType, CancellationToken cancellationToken = default);
+  Task<Result> CompleteChallenges(Guid sessionId, CancellationToken cancellationToken = default);
+  Task<Result> GetOrder(Guid sessionId, string[] hostnames, CancellationToken cancellationToken = default);
+  Task<Result> GetCertificate(Guid sessionId, string subject, CancellationToken cancellationToken = default);
+  Task<Result> RevokeCertificate(Guid sessionId, string subject, RevokeReason reason, CancellationToken cancellationToken = default);
 }
 
 public partial class LetsEncryptService : ILetsEncryptService {
@@ -44,78 +45,72 @@ public partial class LetsEncryptService : ILetsEncryptService {
   private readonly ILogger<LetsEncryptService> _logger;
   private readonly ICertsEngineConfiguration _engineConfiguration;
   private readonly HttpClient _httpClient;
-  private readonly AcmeSessionStore _sessions;
+  private readonly IAcmeSessionStore _sessionStore;
 
   public LetsEncryptService(
       ILogger<LetsEncryptService> logger,
       ICertsEngineConfiguration engineConfiguration,
       HttpClient httpClient,
-      AcmeSessionStore sessions
+      IAcmeSessionStore sessionStore
    ) {
     _logger = logger;
     _engineConfiguration = engineConfiguration;
     _httpClient = httpClient;
-    _sessions = sessions;
+    _sessionStore = sessionStore;
   }
 
-  public Result<RegistrationCache?> GetRegistrationCache(Guid sessionId) {
-    var state = GetOrCreateState(sessionId);
-
-    if (state.Cache == null)
-      return Result<RegistrationCache?>.InternalServerError(null);
-
-    return Result<RegistrationCache?>.Ok(state.Cache);
-  }
+  public Task<Result<RegistrationCache?>> GetRegistrationCacheAsync(Guid sessionId, CancellationToken cancellationToken = default) =>
+    WithPersistedSessionAsync<RegistrationCache?>(sessionId, cancellationToken, async state => {
+      if (state.Cache == null)
+        return Result<RegistrationCache?>.InternalServerError(null);
+      return Result<RegistrationCache?>.Ok(state.Cache);
+    });
 
   #region ConfigureClient
-  public async Task<Result> ConfigureClient(Guid sessionId, bool isStaging) {
-    try {
-      var state = GetOrCreateState(sessionId);
+  public Task<Result> ConfigureClient(Guid sessionId, bool isStaging, CancellationToken cancellationToken = default) =>
+    WithPersistedSessionAsync(sessionId, cancellationToken, async state => {
+      try {
+        state.IsStaging = isStaging;
 
-      state.IsStaging = isStaging;
+        if (state.Directory == null) {
+          var directoryUri = AcmeDirectoryAbsoluteUri(isStaging);
+          var request = new HttpRequestMessage(HttpMethod.Get, directoryUri);
 
-      _httpClient.BaseAddress ??= new Uri(isStaging ? _engineConfiguration.LetsEncryptStaging : _engineConfiguration.LetsEncryptProduction);
+          var requestResult = await SendAcmeRequest<AcmeDirectory>(request, state, HttpMethod.Get);
+          if (!requestResult.IsSuccess || requestResult.Value == null)
+            return requestResult;
 
-      if (state.Directory == null) {
-        var request = new HttpRequestMessage(HttpMethod.Get, new Uri(DirectoryEndpoint, UriKind.Relative));
+          var directory = requestResult.Value;
 
-        var requestResult = await SendAcmeRequest<AcmeDirectory>(request, state, HttpMethod.Get);
-        if (!requestResult.IsSuccess || requestResult.Value == null)
-          return requestResult;
+          state.Directory = directory.Result ?? throw new InvalidOperationException("Directory response is null");
+        }
 
-        var directory = requestResult.Value;
-
-        state.Directory = directory.Result ?? throw new InvalidOperationException("Directory response is null");
+        return Result.Ok("Client configured successfully.");
       }
-
-      return Result.Ok("Client configured successfully.");
-    }
-    catch (LetsEncrytException ex) {
-      var state = GetOrCreateState(sessionId);
-      return MapLetsEncryptException(state, ex);
-    }
-    catch (Exception ex) {
-      return HandleUnhandledException(ex);
-    }
-  }
+      catch (LetsEncrytException ex) {
+        return MapLetsEncryptException(state, ex);
+      }
+      catch (Exception ex) {
+        return HandleUnhandledException(ex);
+      }
+    });
   #endregion
 
   #region Init
-  public async Task<Result> Init(Guid sessionId, Guid accountId, string description, string[] contacts, RegistrationCache? cache) {
+  public Task<Result> Init(Guid sessionId, Guid accountId, string description, string[] contacts, RegistrationCache? cache, CancellationToken cancellationToken = default) {
     if (sessionId == Guid.Empty) {
       const string message = "Invalid sessionId";
       _logger.LogError(message);
-      return Result.InternalServerError(message);
+      return Task.FromResult(Result.InternalServerError(message));
     }
 
     if (contacts == null || contacts.Length == 0) {
       const string message = "Contacts are null or empty";
       _logger.LogError(message);
-      return Result.InternalServerError(message);
+      return Task.FromResult(Result.InternalServerError(message));
     }
 
-    var state = GetOrCreateState(sessionId);
-
+    return WithPersistedSessionAsync(sessionId, cancellationToken, async state => {
     if (state.Directory == null) {
       const string message = "State directory is null";
       _logger.LogError(message);
@@ -159,13 +154,13 @@ public partial class LetsEncryptService : ILetsEncryptService {
 
         var request = new HttpRequestMessage(HttpMethod.Post, newAccountUri);
 
-        var nonceResult = await GetNonceAsync(sessionId, newAccountUri);
+        var nonceResult = await GetNonceAsync(state, newAccountUri);
         if (!nonceResult.IsSuccess || nonceResult.Value == null)
           return nonceResult;
 
         var nonce = nonceResult.Value;
 
-        var jsonResult = EncodeMessage(sessionId, false, letsEncryptOrder, new ACMEJwsHeader {
+        var jsonResult = EncodeMessage(state, false, letsEncryptOrder, new ACMEJwsHeader {
           Url = newAccountUri.ToString(),
           Nonce = nonce
         });
@@ -212,235 +207,234 @@ public partial class LetsEncryptService : ILetsEncryptService {
     catch (Exception ex) {
       return HandleUnhandledException(ex);
     }
+    });
   }
   #endregion
 
   #region GetTermsOfService
-  public Result<string?> GetTermsOfServiceUri(Guid sessionId) {
-    try {
-      var state = GetOrCreateState(sessionId);
+  public Task<Result<string?>> GetTermsOfServiceUriAsync(Guid sessionId, CancellationToken cancellationToken = default) =>
+    WithPersistedSessionAsync<string?>(sessionId, cancellationToken, async state => {
+      try {
+        _logger.LogInformation($"Executing {nameof(GetTermsOfServiceUriAsync)}...");
 
-      _logger.LogInformation($"Executing {nameof(GetTermsOfServiceUri)}...");
+        if (state.Directory?.Meta?.TermsOfService == null) {
+          return Result<string?>.Ok(null);
+        }
 
-      if (state.Directory?.Meta?.TermsOfService == null) {
-        return Result<string?>.Ok(null);
+        return Result<string?>.Ok(state.Directory.Meta.TermsOfService);
       }
-
-      return Result<string?>.Ok(state.Directory.Meta.TermsOfService);
-    }
-    catch (Exception ex) {
-      return HandleUnhandledException<string?>(ex);
-    }
-  }
+      catch (Exception ex) {
+        return HandleUnhandledException<string?>(ex);
+      }
+    });
   #endregion
 
   #region NewOrder
-  public async Task<Result<Dictionary<string, string>?>> NewOrder(Guid sessionId, string[] hostnames, string challengeType) {
-    try {
-      var state = GetOrCreateState(sessionId);
+  public Task<Result<Dictionary<string, string>?>> NewOrder(Guid sessionId, string[] hostnames, string challengeType, CancellationToken cancellationToken = default) =>
+    WithPersistedSessionAsync<Dictionary<string, string>?>(sessionId, cancellationToken, async state => {
+      try {
+        _logger.LogInformation($"Executing {nameof(NewOrder)}...");
 
-      _logger.LogInformation($"Executing {nameof(NewOrder)}...");
+        state.Challenges.Clear();
 
-      state.Challenges.Clear();
+        var letsEncryptOrder = new Order {
+          Expires = DateTime.UtcNow.AddDays(2),
+          Identifiers = hostnames?.Where(h => h != null).Select(hostname => new OrderIdentifier {
+            Type = DnsType,
+            Value = hostname ?? string.Empty
+          }).ToArray() ?? []
+        };
 
-      var letsEncryptOrder = new Order {
-        Expires = DateTime.UtcNow.AddDays(2),
-        Identifiers = hostnames?.Where(h => h != null).Select(hostname => new OrderIdentifier {
-          Type = DnsType,
-          Value = hostname ?? string.Empty
-        }).ToArray() ?? []
-      };
+        if (state.Directory?.NewOrder is not { } newOrderUri)
+          return Result<Dictionary<string, string>?>.InternalServerError(null);
 
-      if (state.Directory?.NewOrder is not { } newOrderUri)
-        return Result<Dictionary<string, string>?>.InternalServerError(null);
+        var request = new HttpRequestMessage(HttpMethod.Post, newOrderUri);
 
-      var request = new HttpRequestMessage(HttpMethod.Post, newOrderUri);
-
-      var nonceResult = await GetNonceAsync(sessionId, newOrderUri);
-      if (!nonceResult.IsSuccess || nonceResult.Value == null)
-        return nonceResult.ToResultOfType<Dictionary<string, string>?>(_ => null);
-
-      var nonce = nonceResult.Value;
-
-      var jsonResult = EncodeMessage(sessionId, false, letsEncryptOrder, new ACMEJwsHeader {
-        Url = newOrderUri.ToString(),
-        Nonce = nonce
-      });
-
-      if (!jsonResult.IsSuccess || jsonResult.Value == null)
-        return jsonResult.ToResultOfType<Dictionary<string, string>?>(_ => null);
-
-      var json = jsonResult.Value;
-
-      PrepareRequestContent(request, json, HttpMethod.Post);
-
-      var requestResult = await SendAcmeRequest<Order>(request, state, HttpMethod.Post);
-      if (!requestResult.IsSuccess || requestResult.Value == null)
-        return requestResult.ToResultOfType<Dictionary<string, string>?>(_ => null);
-
-      var order = requestResult.Value;
-
-      if (StatusEquals(order.Result?.Status, OrderStatus.Ready))
-        return Result<Dictionary<string, string>?>.Ok(new Dictionary<string, string>());
-
-      if (!StatusEquals(order.Result?.Status, OrderStatus.Pending)) {
-        _logger.LogError($"Created new order and expected status '{OrderStatus.Pending.GetDisplayName()}', but got: {order.Result?.Status} \r\n {order.Result}");
-        return Result<Dictionary<string, string>?>.InternalServerError(null);
-      }
-
-      state.CurrentOrder = order.Result;
-
-      var results = new Dictionary<string, string>();
-
-      foreach (var item in state.CurrentOrder?.Authorizations ?? Array.Empty<Uri>()) {
-        if (item == null)
-          continue;
-
-        request = new HttpRequestMessage(HttpMethod.Post, item);
-
-        nonceResult = await GetNonceAsync(sessionId, item);
+        var nonceResult = await GetNonceAsync(state, newOrderUri);
         if (!nonceResult.IsSuccess || nonceResult.Value == null)
           return nonceResult.ToResultOfType<Dictionary<string, string>?>(_ => null);
 
-        nonce = nonceResult.Value;
+        var nonce = nonceResult.Value;
 
-        jsonResult = EncodeMessage(sessionId, true, null, new ACMEJwsHeader {
-          Url = item.ToString(),
+        var jsonResult = EncodeMessage(state, false, letsEncryptOrder, new ACMEJwsHeader {
+          Url = newOrderUri.ToString(),
           Nonce = nonce
         });
 
         if (!jsonResult.IsSuccess || jsonResult.Value == null)
           return jsonResult.ToResultOfType<Dictionary<string, string>?>(_ => null);
 
-        json = jsonResult.Value;
-
-        PrepareRequestContent(request, json, HttpMethod.Post);
-
-        var challengeResult = await SendAcmeRequest<AuthorizationChallengeResponse>(request, state, HttpMethod.Post);
-        if (!challengeResult.IsSuccess || challengeResult.Value == null)
-          return challengeResult.ToResultOfType<Dictionary<string, string>?>(_ => null);
-
-        var challengeResponse = challengeResult.Value;
-
-        if (StatusEquals(challengeResponse.Result?.Status, OrderStatus.Valid))
-          continue;
-
-        if (!StatusEquals(challengeResponse.Result?.Status, OrderStatus.Pending)) {
-          _logger.LogError($"Expected authorization status '{OrderStatus.Pending.GetDisplayName()}', but got: {challengeResponse.Result?.Status} \r\n {challengeResponse.ResponseText}");
-          return Result<Dictionary<string, string>?>.InternalServerError(null);
-        }
-
-        var challenge = challengeResponse.Result?.Challenges?
-          .FirstOrDefault(x => x?.Type == challengeType);
-
-        if (challenge == null || challenge.Token == null) {
-          _logger.LogError("Challenge or token is null");
-          return Result<Dictionary<string, string>?>.InternalServerError(null);
-        }
-
-        state.Challenges.Add(challenge);
-        
-        if (state.Cache != null)
-          state.Cache.ChallengeType = challengeType;
-
-        if (state.Jwk is null)
-          return Result<Dictionary<string, string>?>.InternalServerError(null, AccountKeyMissingMessage);
-
-        if (!JwkThumbprintUtility.TryGetKeyAuthorization(state.Jwk, challenge.Token, out var keyToken, out var errorMessage))
-          return Result<Dictionary<string, string>?>.InternalServerError(null, errorMessage);
-
-        switch (challengeType) {
-          case "dns-01":
-            using (var sha256 = SHA256.Create()) {
-              var dnsToken = Base64UrlUtility.Encode(sha256.ComputeHash(Encoding.UTF8.GetBytes(keyToken ?? string.Empty)));
-
-              results[challengeResponse.Result?.Identifier?.Value ?? string.Empty] = dnsToken;
-            }
-            break;
-          case "http-01":
-            results[challengeResponse.Result?.Identifier?.Value ?? string.Empty] = keyToken ?? string.Empty;
-            break;
-          default:
-            throw new NotImplementedException();
-        }
-      }
-
-      return Result<Dictionary<string, string>?>.Ok(results);
-    }
-    catch (Exception ex) {
-      return HandleUnhandledException<Dictionary<string, string>?>(ex);
-    }
-  }
-  #endregion
-
-  #region CompleteChallenges
-  public async Task<Result> CompleteChallenges(Guid sessionId) {
-    try {
-      var state = GetOrCreateState(sessionId);
-
-      _logger.LogInformation($"Executing {nameof(CompleteChallenges)}...");
-
-      if (state.CurrentOrder?.Identifiers == null) {
-        return Result.InternalServerError("Current order identifiers are null");
-      }
-
-      for (var index = 0; index < state.Challenges.Count; index++) {
-        var challenge = state.Challenges[index];
-
-        if (challenge is null) {
-          _logger.LogError("Challenge entry is null");
-          return Result.InternalServerError("Challenge entry is null");
-        }
-
-        if (challenge.Url is null) {
-          _logger.LogError("Challenge URL is null");
-          return Result.InternalServerError("Challenge URL is null");
-        }
-
-        var request = new HttpRequestMessage(HttpMethod.Post, challenge.Url);
-
-        var nonceResult = await GetNonceAsync(sessionId, challenge.Url);
-        if (!nonceResult.IsSuccess || nonceResult.Value == null)
-          return nonceResult;
-
-        var nonce = nonceResult.Value;
-
-        var jsonResult = EncodeMessage(sessionId, false, "{}", new ACMEJwsHeader {
-          Url = challenge.Url.ToString(),
-          Nonce = nonce
-        });
-
-        if (!jsonResult.IsSuccess || jsonResult.Value == null)
-          return jsonResult;
-
         var json = jsonResult.Value;
 
         PrepareRequestContent(request, json, HttpMethod.Post);
 
-        _ = await SendAcmeRequest<AuthorizationChallengeResponse>(request, state, HttpMethod.Post);
+        var requestResult = await SendAcmeRequest<Order>(request, state, HttpMethod.Post);
+        if (!requestResult.IsSuccess || requestResult.Value == null)
+          return requestResult.ToResultOfType<Dictionary<string, string>?>(_ => null);
 
-        var result = await PollChallengeStatus(sessionId, challenge);
+        var order = requestResult.Value;
 
-        if (!result.IsSuccess)
-          return result;
+        if (StatusEquals(order.Result?.Status, OrderStatus.Ready))
+          return Result<Dictionary<string, string>?>.Ok(new Dictionary<string, string>());
+
+        if (!StatusEquals(order.Result?.Status, OrderStatus.Pending)) {
+          _logger.LogError($"Created new order and expected status '{OrderStatus.Pending.GetDisplayName()}', but got: {order.Result?.Status} \r\n {order.Result}");
+          return Result<Dictionary<string, string>?>.InternalServerError(null);
+        }
+
+        state.CurrentOrder = order.Result;
+
+        var results = new Dictionary<string, string>();
+
+        foreach (var item in state.CurrentOrder?.Authorizations ?? Array.Empty<Uri>()) {
+          if (item == null)
+            continue;
+
+          request = new HttpRequestMessage(HttpMethod.Post, item);
+
+          nonceResult = await GetNonceAsync(state, item);
+          if (!nonceResult.IsSuccess || nonceResult.Value == null)
+            return nonceResult.ToResultOfType<Dictionary<string, string>?>(_ => null);
+
+          nonce = nonceResult.Value;
+
+          jsonResult = EncodeMessage(state, true, null, new ACMEJwsHeader {
+            Url = item.ToString(),
+            Nonce = nonce
+          });
+
+          if (!jsonResult.IsSuccess || jsonResult.Value == null)
+            return jsonResult.ToResultOfType<Dictionary<string, string>?>(_ => null);
+
+          json = jsonResult.Value;
+
+          PrepareRequestContent(request, json, HttpMethod.Post);
+
+          var challengeResult = await SendAcmeRequest<AuthorizationChallengeResponse>(request, state, HttpMethod.Post);
+          if (!challengeResult.IsSuccess || challengeResult.Value == null)
+            return challengeResult.ToResultOfType<Dictionary<string, string>?>(_ => null);
+
+          var challengeResponse = challengeResult.Value;
+
+          if (StatusEquals(challengeResponse.Result?.Status, OrderStatus.Valid))
+            continue;
+
+          if (!StatusEquals(challengeResponse.Result?.Status, OrderStatus.Pending)) {
+            _logger.LogError($"Expected authorization status '{OrderStatus.Pending.GetDisplayName()}', but got: {challengeResponse.Result?.Status} \r\n {challengeResponse.ResponseText}");
+            return Result<Dictionary<string, string>?>.InternalServerError(null);
+          }
+
+          var challenge = challengeResponse.Result?.Challenges?
+            .FirstOrDefault(x => x?.Type == challengeType);
+
+          if (challenge == null || challenge.Token == null) {
+            _logger.LogError("Challenge or token is null");
+            return Result<Dictionary<string, string>?>.InternalServerError(null);
+          }
+
+          state.Challenges.Add(challenge);
+
+          if (state.Cache != null)
+            state.Cache.ChallengeType = challengeType;
+
+          if (state.Jwk is null)
+            return Result<Dictionary<string, string>?>.InternalServerError(null, AccountKeyMissingMessage);
+
+          if (!JwkThumbprintUtility.TryGetKeyAuthorization(state.Jwk, challenge.Token, out var keyToken, out var errorMessage))
+            return Result<Dictionary<string, string>?>.InternalServerError(null, errorMessage);
+
+          switch (challengeType) {
+            case "dns-01":
+              using (var sha256 = SHA256.Create()) {
+                var dnsToken = Base64UrlUtility.Encode(sha256.ComputeHash(Encoding.UTF8.GetBytes(keyToken ?? string.Empty)));
+
+                results[challengeResponse.Result?.Identifier?.Value ?? string.Empty] = dnsToken;
+              }
+              break;
+            case "http-01":
+              results[challengeResponse.Result?.Identifier?.Value ?? string.Empty] = keyToken ?? string.Empty;
+              break;
+            default:
+              throw new NotImplementedException();
+          }
+        }
+
+        return Result<Dictionary<string, string>?>.Ok(results);
       }
-      return Result.Ok();
-    }
-    catch (LetsEncrytException ex) {
-      return MapLetsEncryptException(GetOrCreateState(sessionId), ex);
-    }
-    catch (Exception ex) {
-      return HandleUnhandledException(ex);
-    }
-  }
+      catch (Exception ex) {
+        return HandleUnhandledException<Dictionary<string, string>?>(ex);
+      }
+    });
+  #endregion
+
+  #region CompleteChallenges
+  public Task<Result> CompleteChallenges(Guid sessionId, CancellationToken cancellationToken = default) =>
+    WithPersistedSessionAsync(sessionId, cancellationToken, async state => {
+      try {
+        _logger.LogInformation($"Executing {nameof(CompleteChallenges)}...");
+
+        if (state.CurrentOrder?.Identifiers == null) {
+          return Result.InternalServerError("Current order identifiers are null");
+        }
+
+        for (var index = 0; index < state.Challenges.Count; index++) {
+          var challenge = state.Challenges[index];
+
+          if (challenge is null) {
+            _logger.LogError("Challenge entry is null");
+            return Result.InternalServerError("Challenge entry is null");
+          }
+
+          if (challenge.Url is null) {
+            _logger.LogError("Challenge URL is null");
+            return Result.InternalServerError("Challenge URL is null");
+          }
+
+          var request = new HttpRequestMessage(HttpMethod.Post, challenge.Url);
+
+          var nonceResult = await GetNonceAsync(state, challenge.Url);
+          if (!nonceResult.IsSuccess || nonceResult.Value == null)
+            return nonceResult;
+
+          var nonce = nonceResult.Value;
+
+          var jsonResult = EncodeMessage(state, false, "{}", new ACMEJwsHeader {
+            Url = challenge.Url.ToString(),
+            Nonce = nonce
+          });
+
+          if (!jsonResult.IsSuccess || jsonResult.Value == null)
+            return jsonResult;
+
+          var json = jsonResult.Value;
+
+          PrepareRequestContent(request, json, HttpMethod.Post);
+
+          _ = await SendAcmeRequest<AuthorizationChallengeResponse>(request, state, HttpMethod.Post);
+
+          var result = await PollChallengeStatus(state, challenge);
+
+          if (!result.IsSuccess)
+            return result;
+        }
+        return Result.Ok();
+      }
+      catch (LetsEncrytException ex) {
+        return MapLetsEncryptException(state, ex);
+      }
+      catch (Exception ex) {
+        return HandleUnhandledException(ex);
+      }
+    });
   #endregion
 
   #region GetOrder
-  public async Task<Result> GetOrder(Guid sessionId, string[] hostnames) {
+  public Task<Result> GetOrder(Guid sessionId, string[] hostnames, CancellationToken cancellationToken = default) =>
+    WithPersistedSessionAsync(sessionId, cancellationToken, state => GetOrderCoreAsync(state, hostnames));
+
+  private async Task<Result> GetOrderCoreAsync(State state, string[] hostnames) {
     try {
       _logger.LogInformation($"Executing {nameof(GetOrder)}");
-
-      var state = GetOrCreateState(sessionId);
 
       if (state.Directory?.NewOrder is not { } newOrderUri)
         return Result.InternalServerError("Directory is not configured. Run ConfigureClient first.");
@@ -455,13 +449,13 @@ public partial class LetsEncryptService : ILetsEncryptService {
 
       var request = new HttpRequestMessage(HttpMethod.Post, newOrderUri);
 
-      var nonceResult = await GetNonceAsync(sessionId, newOrderUri);
+      var nonceResult = await GetNonceAsync(state, newOrderUri);
       if (!nonceResult.IsSuccess || nonceResult.Value == null)
         return nonceResult;
 
       var nonce = nonceResult.Value;
 
-      var jsonResult = EncodeMessage(sessionId, false, letsEncryptOrder, new ACMEJwsHeader {
+      var jsonResult = EncodeMessage(state, false, letsEncryptOrder, new ACMEJwsHeader {
         Url = newOrderUri.ToString(),
         Nonce = nonce
       });
@@ -490,10 +484,9 @@ public partial class LetsEncryptService : ILetsEncryptService {
   #endregion
 
   #region GetCertificates
-  public async Task<Result> GetCertificate(Guid sessionId, string subject) {
-    try {
-      var state = GetOrCreateState(sessionId);
-
+  public Task<Result> GetCertificate(Guid sessionId, string subject, CancellationToken cancellationToken = default) =>
+    WithPersistedSessionAsync(sessionId, cancellationToken, async state => {
+      try {
       _logger.LogInformation($"Executing {nameof(GetCertificate)}...");
 
       if (state.CurrentOrder?.Identifiers is not { } initialIdentifiers)
@@ -525,7 +518,7 @@ public partial class LetsEncryptService : ILetsEncryptService {
 
         var hostnames = idents.Select(x => x?.Value).Where(x => x != null).Cast<string>().ToArray();
 
-        await GetOrder(sessionId, hostnames);
+        await GetOrderCoreAsync(state, hostnames);
 
         activeOrder = state.CurrentOrder;
         if (activeOrder is null)
@@ -539,13 +532,13 @@ public partial class LetsEncryptService : ILetsEncryptService {
 
           var request = new HttpRequestMessage(HttpMethod.Post, finalizeUri);
 
-          var nonceResult = await GetNonceAsync(sessionId, finalizeUri);
+          var nonceResult = await GetNonceAsync(state, finalizeUri);
           if (!nonceResult.IsSuccess || nonceResult.Value == null)
             return nonceResult;
 
           var nonce = nonceResult.Value;
 
-          var jsonResult = EncodeMessage(sessionId, false, letsEncryptOrder, new ACMEJwsHeader {
+          var jsonResult = EncodeMessage(state, false, letsEncryptOrder, new ACMEJwsHeader {
             Url = finalizeUri.ToString(),
             Nonce = nonce
           });
@@ -570,13 +563,13 @@ public partial class LetsEncryptService : ILetsEncryptService {
 
             request = new HttpRequestMessage(HttpMethod.Post, orderLocation);
 
-            nonceResult = await GetNonceAsync(sessionId, orderLocation);
+            nonceResult = await GetNonceAsync(state, orderLocation);
             if (!nonceResult.IsSuccess || nonceResult.Value == null)
               return nonceResult;
 
             nonce = nonceResult.Value;
 
-            jsonResult = EncodeMessage(sessionId, true, null, new ACMEJwsHeader {
+            jsonResult = EncodeMessage(state, true, null, new ACMEJwsHeader {
               Url = orderLocation.ToString(),
               Nonce = nonce
             });
@@ -619,13 +612,13 @@ public partial class LetsEncryptService : ILetsEncryptService {
 
       var finalRequest = new HttpRequestMessage(HttpMethod.Post, certificateUrl);
 
-      var finalNonceResult = await GetNonceAsync(sessionId, certificateUrl);
+      var finalNonceResult = await GetNonceAsync(state, certificateUrl);
       if (!finalNonceResult.IsSuccess || finalNonceResult.Value == null)
         return finalNonceResult;
 
       var finalNonce = finalNonceResult.Value;
 
-      var finalJsonResult = EncodeMessage(sessionId, true, null, new ACMEJwsHeader {
+      var finalJsonResult = EncodeMessage(state, true, null, new ACMEJwsHeader {
         Url = certificateUrl.ToString(),
         Nonce = finalNonce
       });
@@ -661,12 +654,12 @@ public partial class LetsEncryptService : ILetsEncryptService {
       return Result.Ok();
     }
     catch (LetsEncrytException ex) {
-      return MapLetsEncryptException(GetOrCreateState(sessionId), ex);
+      return MapLetsEncryptException(state, ex);
     }
     catch (Exception ex) {
       return HandleUnhandledException(ex);
     }
-  }
+    });
   #endregion
 
   #region Key change
@@ -676,91 +669,105 @@ public partial class LetsEncryptService : ILetsEncryptService {
   #endregion
 
   #region RevokeCertificate
-  public async Task<Result> RevokeCertificate(Guid sessionId, string subject, RevokeReason reason) {
-    try {
-      var state = GetOrCreateState(sessionId);
-
-      _logger.LogInformation($"Executing {nameof(RevokeCertificate)}...");
-
-      if (state.Cache?.CachedCerts == null || !state.Cache.CachedCerts.TryGetValue(subject, out var certificateCache) || certificateCache == null) {
-        _logger.LogError("Certificate not found in cache");
-        return Result.InternalServerError("Certificate not found");
-      }
-
-      var certPem = certificateCache.Cert ?? string.Empty;
-
-      if (string.IsNullOrEmpty(certPem)) {
-        _logger.LogError("Certificate PEM is null or empty");
-        return Result.InternalServerError("Certificate PEM is null or empty");
-      }
-
-      var certificate = X509Certificate2.CreateFromPem(certPem);
-      
-      var derEncodedCert = certificate.Export(X509ContentType.Cert);
-      
-      var base64UrlEncodedCert = Base64UrlUtility.Encode(derEncodedCert);
-      
-      var revokeRequest = new RevokeRequest {
-        Certificate = base64UrlEncodedCert,
-        Reason = (int)reason
-      };
-
-      if (state.Directory?.RevokeCert is not { } revokeUri)
-        return Result.InternalServerError("Directory is not configured or RevokeCert URL is missing.");
-
-      if (!state.TryGetAccountKey(out var rsa, out var jwk))
-        return Result.InternalServerError(AccountKeyMissingMessage);
-
-      var request = new HttpRequestMessage(HttpMethod.Post, revokeUri);
-
-      var nonceResult = await GetNonceAsync(sessionId, revokeUri);
-      if (!nonceResult.IsSuccess || nonceResult.Value == null)
-        return nonceResult;
-
-      var nonce = nonceResult.Value;
-
-      var jwsHeader = new ACMEJwsHeader {
-        Url = revokeUri.ToString(),
-        Nonce = nonce
-      };
-
-      if (!JwsGenerator.TryEncode(rsa, jwk, jwsHeader, revokeRequest, out var jwsMessage, out var errorMessage)) {
-        return Result.InternalServerError(errorMessage);
-      }
-
-      var json = jwsMessage.ToJson();
-
-      request.Content = new StringContent(json);
-
-      request.Content.Headers.ContentType = new MediaTypeHeaderValue(GetContentType(ContentType.JoseJson));
-
-      var response = await _httpClient.SendAsync(request);
-
-      var responseText = await response.Content.ReadAsStringAsync();
-
-      HandleProblemResponseAsync(response, responseText);
-
+  public Task<Result> RevokeCertificate(Guid sessionId, string subject, RevokeReason reason, CancellationToken cancellationToken = default) =>
+    WithPersistedSessionAsync(sessionId, cancellationToken, async state => {
       try {
-        if (!response.IsSuccessStatusCode)
-          return Result.InternalServerError(responseText);
+        _logger.LogInformation($"Executing {nameof(RevokeCertificate)}...");
 
-        state.Cache.CachedCerts.Remove(subject);
-        _logger.LogInformation("Certificate revoked successfully");
+        if (state.Cache?.CachedCerts == null || !state.Cache.CachedCerts.TryGetValue(subject, out var certificateCache) || certificateCache == null) {
+          _logger.LogError("Certificate not found in cache");
+          return Result.InternalServerError("Certificate not found");
+        }
 
-        return Result.Ok();
+        var certPem = certificateCache.Cert ?? string.Empty;
+
+        if (string.IsNullOrEmpty(certPem)) {
+          _logger.LogError("Certificate PEM is null or empty");
+          return Result.InternalServerError("Certificate PEM is null or empty");
+        }
+
+        var certificate = X509Certificate2.CreateFromPem(certPem);
+
+        var derEncodedCert = certificate.Export(X509ContentType.Cert);
+
+        var base64UrlEncodedCert = Base64UrlUtility.Encode(derEncodedCert);
+
+        var revokeRequest = new RevokeRequest {
+          Certificate = base64UrlEncodedCert,
+          Reason = (int)reason
+        };
+
+        if (state.Directory?.RevokeCert is not { } revokeUri)
+          return Result.InternalServerError("Directory is not configured or RevokeCert URL is missing.");
+
+        if (!state.TryGetAccountKey(out var rsa, out var jwk))
+          return Result.InternalServerError(AccountKeyMissingMessage);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, revokeUri);
+
+        var nonceResult = await GetNonceAsync(state, revokeUri);
+        if (!nonceResult.IsSuccess || nonceResult.Value == null)
+          return nonceResult;
+
+        var nonce = nonceResult.Value;
+
+        var jwsHeader = new ACMEJwsHeader {
+          Url = revokeUri.ToString(),
+          Nonce = nonce
+        };
+
+        if (!JwsGenerator.TryEncode(rsa, jwk, jwsHeader, revokeRequest, out var jwsMessage, out var errorMessage)) {
+          return Result.InternalServerError(errorMessage);
+        }
+
+        var json = jwsMessage.ToJson();
+
+        request.Content = new StringContent(json);
+
+        request.Content.Headers.ContentType = new MediaTypeHeaderValue(GetContentType(ContentType.JoseJson));
+
+        var response = await _httpClient.SendAsync(request);
+
+        var responseText = await response.Content.ReadAsStringAsync();
+
+        HandleProblemResponseAsync(response, responseText);
+
+        try {
+          if (!response.IsSuccessStatusCode)
+            return Result.InternalServerError(responseText);
+
+          state.Cache.CachedCerts.Remove(subject);
+          _logger.LogInformation("Certificate revoked successfully");
+
+          return Result.Ok();
+        }
+        finally {
+          response.Dispose();
+        }
       }
-      finally {
-        response.Dispose();
+      catch (LetsEncrytException ex) {
+        return MapLetsEncryptException(state, ex);
       }
-
-    }
-    catch (LetsEncrytException ex) {
-      var state = GetOrCreateState(sessionId);
-      return MapLetsEncryptException(state, ex);
-    }
-    catch (Exception ex) {
-      return HandleUnhandledException(ex);
-    }
-  }
+      catch (Exception ex) {
+        return HandleUnhandledException(ex);
+      }
+    });
   #endregion
+
+  private Uri AcmeDirectoryAbsoluteUri(bool isStaging) {
+    var configured = (isStaging ? _engineConfiguration.LetsEncryptStaging : _engineConfiguration.LetsEncryptProduction).Trim();
+    if (string.IsNullOrWhiteSpace(configured))
+      throw new InvalidOperationException("Let's Encrypt directory URL is empty.");
+
+    if (Uri.TryCreate(configured, UriKind.Absolute, out var absolute)) {
+      // Config already points to the ACME directory endpoint.
+      if (absolute.AbsolutePath.TrimEnd('/').EndsWith($"/{DirectoryEndpoint}", StringComparison.OrdinalIgnoreCase))
+        return absolute;
+
+      // Backward compatibility: treat configured value as ACME base URL.
+      return new Uri(absolute, $"{DirectoryEndpoint}");
+    }
+
+    throw new InvalidOperationException($"Invalid Let's Encrypt URL: '{configured}'.");
+  }
 }

@@ -4,23 +4,14 @@ using Microsoft.Extensions.Options;
 namespace MaksIT.CertsUI.Tests.Infrastructure;
 
 /// <summary>
-/// Creates a disposable temp workspace and <see cref="IOptions{Configuration}"/> with valid auth and paths.
+/// Creates <see cref="IOptions{Configuration}"/> with valid auth and agent settings for API/domain tests.
 /// </summary>
 public sealed class WebApiTestFixture : IDisposable
 {
-    public string Root { get; }
     public IOptions<Configuration> AppOptions { get; }
 
     public WebApiTestFixture()
     {
-        Root = Path.Combine(Path.GetTempPath(), "maksit-webapi-tests-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(Root);
-
-        var dataFolder = Path.Combine(Root, "data");
-        Directory.CreateDirectory(dataFolder);
-        var acmeFolder = Path.Combine(Root, "acme");
-        Directory.CreateDirectory(acmeFolder);
-
         var configuration = new Configuration
         {
             CertsUIEngineConfiguration = new CertsUIEngineConfiguration
@@ -47,8 +38,6 @@ public sealed class WebApiTestFixture : IDisposable
                 },
                 Production = "https://acme-v02.api.letsencrypt.org/directory",
                 Staging = "https://acme-staging-v02.api.letsencrypt.org/directory",
-                AcmeFolder = acmeFolder,
-                DataFolder = dataFolder,
                 Agent = new Agent
                 {
                     AgentHostname = "http://127.0.0.1",
@@ -62,16 +51,5 @@ public sealed class WebApiTestFixture : IDisposable
         AppOptions = Microsoft.Extensions.Options.Options.Create(configuration);
     }
 
-    public void Dispose()
-    {
-        try
-        {
-            if (Directory.Exists(Root))
-                Directory.Delete(Root, recursive: true);
-        }
-        catch
-        {
-            // best-effort cleanup of temp dir
-        }
-    }
+    public void Dispose() { }
 }

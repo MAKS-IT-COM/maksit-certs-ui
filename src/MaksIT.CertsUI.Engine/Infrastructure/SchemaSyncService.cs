@@ -69,6 +69,12 @@ public class SchemaSyncService(ICertsEngineConfiguration config, ILogger<SchemaS
         ("acquired_at_utc", "timestamp with time zone"),
         ("expires_at_utc", "timestamp with time zone"),
       ],
+      ["acme_sessions"] = [
+        ("session_id", "uuid"),
+        ("payload_json", "text"),
+        ("updated_at_utc", "timestamp with time zone"),
+        ("expires_at_utc", "timestamp with time zone"),
+      ],
       ["api_keys"] = [
         ("Id", "uuid"),
         ("Description", "text"),

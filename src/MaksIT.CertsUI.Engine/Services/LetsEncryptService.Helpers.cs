@@ -16,14 +16,37 @@ public partial class LetsEncryptService {
 
   #region Internal helpers
 
-  private State GetOrCreateState(Guid sessionId) => _sessions.GetOrCreate(sessionId);
+  private async Task<Result> WithPersistedSessionAsync(
+    Guid sessionId,
+    CancellationToken cancellationToken,
+    Func<State, Task<Result>> body) {
+    var state = await _sessionStore.LoadOrCreateAsync(sessionId, cancellationToken).ConfigureAwait(false);
+    try {
+      return await body(state).ConfigureAwait(false);
+    }
+    finally {
+      await _sessionStore.PersistAsync(sessionId, state, cancellationToken).ConfigureAwait(false);
+    }
+  }
 
-  private async Task<Result<string?>> GetNonceAsync(Guid sessionId, Uri uri) {
+  private async Task<Result<T?>> WithPersistedSessionAsync<T>(
+    Guid sessionId,
+    CancellationToken cancellationToken,
+    Func<State, Task<Result<T?>>> body) {
+    var state = await _sessionStore.LoadOrCreateAsync(sessionId, cancellationToken).ConfigureAwait(false);
+    try {
+      return await body(state).ConfigureAwait(false);
+    }
+    finally {
+      await _sessionStore.PersistAsync(sessionId, state, cancellationToken).ConfigureAwait(false);
+    }
+  }
+
+  private async Task<Result<string?>> GetNonceAsync(State state, Uri uri) {
     if (uri == null)
       return Result<string?>.InternalServerError(null, "URI is null");
 
     try {
-      var state = GetOrCreateState(sessionId);
 
       _logger.LogInformation($"Executing {nameof(GetNonceAsync)}...");
 
@@ -65,9 +88,7 @@ public partial class LetsEncryptService {
     }
   }
 
-  private Result<string?> EncodeMessage(Guid sessionId, bool isPostAsGet, object? requestModel, ACMEJwsHeader protectedHeader) {
-    var state = GetOrCreateState(sessionId);
-
+  private Result<string?> EncodeMessage(State state, bool isPostAsGet, object? requestModel, ACMEJwsHeader protectedHeader) {
     if (!state.TryGetAccountKey(out var rsa, out var jwk))
       return Result<string?>.InternalServerError(AccountKeyMissingMessage);
 
@@ -94,7 +115,7 @@ public partial class LetsEncryptService {
     request.Content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
   }
 
-  private async Task<Result> PollChallengeStatus(Guid sessionId, AuthorizationChallengeChallenge challenge) {
+  private async Task<Result> PollChallengeStatus(State state, AuthorizationChallengeChallenge challenge) {
     if (challenge?.Url == null)
       return Result.InternalServerError("Challenge URL is null");
 
@@ -103,13 +124,13 @@ public partial class LetsEncryptService {
     while (true) {
       var pollRequest = new HttpRequestMessage(HttpMethod.Post, challenge.Url);
 
-      var nonceResult = await GetNonceAsync(sessionId, challenge.Url);
+      var nonceResult = await GetNonceAsync(state, challenge.Url);
       if (!nonceResult.IsSuccess || nonceResult.Value == null)
         return nonceResult;
 
       var nonce = nonceResult.Value;
 
-      var pollJsonResult = EncodeMessage(sessionId, true, null, new ACMEJwsHeader {
+      var pollJsonResult = EncodeMessage(state, true, null, new ACMEJwsHeader {
         Url = challenge.Url.ToString(),
         Nonce = nonce
       });

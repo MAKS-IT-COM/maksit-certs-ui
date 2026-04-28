@@ -63,8 +63,6 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
   private readonly IAcmeHttpChallengePersistenceService _httpChallenges;
   private readonly IRuntimeLeaseService _runtimeLease;
   private readonly IRuntimeInstanceId _runtimeInstance;
-  private readonly IPrimaryReplicaWorkload _primaryReplica;
-  private readonly string _acmePath;
 
   public CertsFlowDomainService(
     ILogger<CertsFlowDomainService> logger,
@@ -76,8 +74,7 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
     ITermsOfServiceCachePersistenceService termsOfServiceCache,
     IAcmeHttpChallengePersistenceService httpChallenges,
     IRuntimeLeaseService runtimeLease,
-    IRuntimeInstanceId runtimeInstance,
-    IPrimaryReplicaWorkload primaryReplica) {
+    IRuntimeInstanceId runtimeInstance) {
     _logger = logger;
     _httpClient = httpClient;
     _letsEncryptService = letsEncryptService;
@@ -88,14 +85,12 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
     _httpChallenges = httpChallenges;
     _runtimeLease = runtimeLease;
     _runtimeInstance = runtimeInstance;
-    _primaryReplica = primaryReplica;
-    _acmePath = config.AcmeFolder;
   }
 
   #region Terms of service
 
   public async Task<Result<string?>> GetTermsOfServiceAsync(Guid sessionId) {
-    var termsUriResult = _letsEncryptService.GetTermsOfServiceUri(sessionId);
+    var termsUriResult = await _letsEncryptService.GetTermsOfServiceUriAsync(sessionId, CancellationToken.None).ConfigureAwait(false);
     if (!termsUriResult.IsSuccess || termsUriResult.Value == null)
       return termsUriResult;
 
@@ -178,24 +173,18 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
   #region Session, orders, and certificates
 
   public async Task<Result> CompleteChallengesAsync(Guid sessionId) {
-    if (!_primaryReplica.IsPrimary)
-      return Result.ServiceUnavailable(CertsFlowPrimaryReplica.ServiceUnavailableMessages);
-    return await _letsEncryptService.CompleteChallenges(sessionId);
+    return await _letsEncryptService.CompleteChallenges(sessionId, CancellationToken.None).ConfigureAwait(false);
   }
 
   public async Task<Result<Guid?>> ConfigureClientAsync(bool isStaging) {
-    if (!_primaryReplica.IsPrimary)
-      return Result<Guid?>.ServiceUnavailable(null, CertsFlowPrimaryReplica.ServiceUnavailableMessages);
     var sessionId = Guid.NewGuid();
-    var result = await _letsEncryptService.ConfigureClient(sessionId, isStaging);
+    var result = await _letsEncryptService.ConfigureClient(sessionId, isStaging, CancellationToken.None).ConfigureAwait(false);
     if (!result.IsSuccess)
       return result.ToResultOfType<Guid?>(default);
     return Result<Guid?>.Ok(sessionId);
   }
 
   public async Task<Result<Guid?>> InitAsync(Guid sessionId, Guid? accountId, string description, string[] contacts) {
-    if (!_primaryReplica.IsPrimary)
-      return Result<Guid?>.ServiceUnavailable(null, CertsFlowPrimaryReplica.ServiceUnavailableMessages);
     RegistrationCache? cache = null;
     if (accountId == null) {
       accountId = Guid.NewGuid();
@@ -209,15 +198,13 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
         cache = cacheResult.Value;
       }
     }
-    var result = await _letsEncryptService.Init(sessionId, accountId.Value, description, contacts, cache);
+    var result = await _letsEncryptService.Init(sessionId, accountId.Value, description, contacts, cache, CancellationToken.None).ConfigureAwait(false);
     if (!result.IsSuccess)
       return result.ToResultOfType<Guid?>(default);
     return Result<Guid?>.Ok(accountId.Value);
   }
 
   public async Task<Result<List<string>?>> NewOrderAsync(Guid sessionId, string[] hostnames, string challengeType) {
-    if (!_primaryReplica.IsPrimary)
-      return Result<List<string>?>.ServiceUnavailable(null, CertsFlowPrimaryReplica.ServiceUnavailableMessages);
     var holder = _runtimeInstance.InstanceId;
     var acquired = await _runtimeLease.TryAcquireAsync(RuntimeLeaseNames.AcmeWriter, holder, AcmeWriterLeaseTtl, CancellationToken.None);
     if (!acquired.IsSuccess)
@@ -228,7 +215,7 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
     }
 
     try {
-      var orderResult = await _letsEncryptService.NewOrder(sessionId, hostnames, challengeType);
+      var orderResult = await _letsEncryptService.NewOrder(sessionId, hostnames, challengeType, CancellationToken.None).ConfigureAwait(false);
       if (!orderResult.IsSuccess || orderResult.Value == null)
         return orderResult.ToResultOfType<List<string>?>(_ => null);
       var challenges = new List<string>();
@@ -253,15 +240,13 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
   }
 
   public async Task<Result> GetCertificatesAsync(Guid sessionId, string[] hostnames) {
-    if (!_primaryReplica.IsPrimary)
-      return Result.ServiceUnavailable(CertsFlowPrimaryReplica.ServiceUnavailableMessages);
     foreach (var subject in hostnames) {
-      var result = await _letsEncryptService.GetCertificate(sessionId, subject);
+      var result = await _letsEncryptService.GetCertificate(sessionId, subject, CancellationToken.None).ConfigureAwait(false);
       if (!result.IsSuccess)
         return result;
       Thread.Sleep(1000);
     }
-    var cacheResult = _letsEncryptService.GetRegistrationCache(sessionId);
+    var cacheResult = await _letsEncryptService.GetRegistrationCacheAsync(sessionId, CancellationToken.None).ConfigureAwait(false);
     if (!cacheResult.IsSuccess || cacheResult.Value == null)
       return cacheResult;
     var saveResult = await _registrationCache.SaveAsync(cacheResult.Value.AccountId, cacheResult.Value);
@@ -271,9 +256,7 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
   }
 
   public async Task<Result> GetOrderAsync(Guid sessionId, string[] hostnames) {
-    if (!_primaryReplica.IsPrimary)
-      return Result.ServiceUnavailable(CertsFlowPrimaryReplica.ServiceUnavailableMessages);
-    return await _letsEncryptService.GetOrder(sessionId, hostnames);
+    return await _letsEncryptService.GetOrder(sessionId, hostnames, CancellationToken.None).ConfigureAwait(false);
   }
 
   #endregion
@@ -281,8 +264,6 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
   #region Deploy and revoke
 
   public async Task<Result<Dictionary<string, string>?>> ApplyCertificatesAsync(Guid accountId) {
-    if (!_primaryReplica.IsPrimary)
-      return Result<Dictionary<string, string>?>.ServiceUnavailable(null, CertsFlowPrimaryReplica.ServiceUnavailableMessages);
     var cacheResult = await _registrationCache.LoadAsync(accountId);
     if (!cacheResult.IsSuccess || cacheResult.Value?.CachedCerts == null)
       return cacheResult.ToResultOfType<Dictionary<string, string>?>(_ => null);
@@ -302,14 +283,12 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
   }
 
   public async Task<Result> RevokeCertificatesAsync(Guid sessionId, string[] hostnames) {
-    if (!_primaryReplica.IsPrimary)
-      return Result.ServiceUnavailable(CertsFlowPrimaryReplica.ServiceUnavailableMessages);
     foreach (var hostname in hostnames) {
-      var result = await _letsEncryptService.RevokeCertificate(sessionId, hostname, RevokeReason.Unspecified);
+      var result = await _letsEncryptService.RevokeCertificate(sessionId, hostname, RevokeReason.Unspecified, CancellationToken.None).ConfigureAwait(false);
       if (!result.IsSuccess)
         return result;
     }
-    var cacheResult = _letsEncryptService.GetRegistrationCache(sessionId);
+    var cacheResult = await _letsEncryptService.GetRegistrationCacheAsync(sessionId, CancellationToken.None).ConfigureAwait(false);
     if (!cacheResult.IsSuccess || cacheResult.Value == null)
       return cacheResult;
     var saveResult = await _registrationCache.SaveAsync(cacheResult.Value.AccountId, cacheResult.Value);
@@ -397,18 +376,8 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
       return Result<string?>.BadRequest(null, "fileName is required.");
 
     var fromDb = await _httpChallenges.GetTokenValueAsync(fileName, cancellationToken).ConfigureAwait(false);
-    if (fromDb.IsSuccess && !string.IsNullOrEmpty(fromDb.Value)) {
-      Directory.CreateDirectory(_acmePath);
-      var path = Path.Combine(_acmePath, fileName);
-      await File.WriteAllTextAsync(path, fromDb.Value!, cancellationToken).ConfigureAwait(false);
+    if (fromDb.IsSuccess && !string.IsNullOrEmpty(fromDb.Value))
       return Result<string?>.Ok(fromDb.Value);
-    }
-
-    var legacyPath = Path.Combine(_acmePath, fileName);
-    if (File.Exists(legacyPath)) {
-      var legacy = await File.ReadAllTextAsync(legacyPath, cancellationToken).ConfigureAwait(false);
-      return Result<string?>.Ok(legacy);
-    }
 
     return Result<string?>.NotFound(null, $"Challenge token not found: {fileName}");
   }
@@ -416,7 +385,7 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
   #endregion
 
   private async Task TryPersistRegistrationCacheFromSessionAsync(Guid sessionId) {
-    var cacheResult = _letsEncryptService.GetRegistrationCache(sessionId);
+    var cacheResult = await _letsEncryptService.GetRegistrationCacheAsync(sessionId, CancellationToken.None).ConfigureAwait(false);
     if (!cacheResult.IsSuccess || cacheResult.Value == null)
       return;
 

@@ -8,7 +8,7 @@ namespace MaksIT.CertsUI.Engine.Infrastructure;
 /// </summary>
 public static class CoordinationTableProvisioner {
 
-  /// <summary>Creates <c>public.acme_http_challenges</c> and <c>public.app_runtime_leases</c> if missing.</summary>
+  /// <summary>Creates <c>public.acme_http_challenges</c>, <c>public.app_runtime_leases</c>, and <c>public.acme_sessions</c> if missing.</summary>
   public static async Task EnsureAsync(string? connectionString, CancellationToken cancellationToken = default) {
     if (string.IsNullOrWhiteSpace(connectionString))
       return;
@@ -31,6 +31,13 @@ public static class CoordinationTableProvisioner {
         acquired_at_utc timestamp with time zone NOT NULL,
         expires_at_utc timestamp with time zone NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS public.acme_sessions (
+        session_id uuid NOT NULL PRIMARY KEY,
+        payload_json text NOT NULL,
+        updated_at_utc timestamp with time zone NOT NULL,
+        expires_at_utc timestamp with time zone NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS "IX_acme_sessions_expires_at_utc" ON public.acme_sessions (expires_at_utc);
       """,
       conn);
     await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);

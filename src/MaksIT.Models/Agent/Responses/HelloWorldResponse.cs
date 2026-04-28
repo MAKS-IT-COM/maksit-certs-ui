@@ -4,5 +4,5 @@
 namespace MaksIT.Models.Agent.Responses;
 
 public class HelloWorldResponse : ResponseModelBase {
-  public string Message { get; set; }
+  public required string Message { get; set; }
 }

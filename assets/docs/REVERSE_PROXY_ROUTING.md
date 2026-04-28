@@ -30,7 +30,7 @@ Controllers use the usual **`/api/...`** prefix (e.g. `api/identity`, account an
 
 ### HTTP-01 (Let’s Encrypt)
 
-Traffic for **`/.well-known/acme-challenge/*`** must reach **MaksIT.CertsUI** so the HTTP-01 validator can fetch the token file. The dedicated route sends that path to the **`server`** service (same `webapiCluster` as `/api`).
+Traffic for **`/.well-known/acme-challenge/*`** must reach **MaksIT.CertsUI** so the HTTP-01 validator can fetch the token body from the API (backed by PostgreSQL). The dedicated route sends that path to the **`server`** service (same `webapiCluster` as `/api`).
 
 ### Kubernetes (Helm)
 

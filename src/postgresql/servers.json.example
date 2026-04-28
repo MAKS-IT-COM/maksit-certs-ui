@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "CertsUI (Compose)",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "certsui",
+      "Username": "certsui",
+      "SSLMode": "prefer",
+      "PassFile": ""
+    }
+  }
+}
