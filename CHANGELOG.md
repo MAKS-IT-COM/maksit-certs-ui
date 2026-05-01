@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.1] - 2026-04-30
+
+### Breaking
+
+- **Engine query ports (Vault-style):** **`IUserQueryService`**, **`IApiKeyQueryService`**, and **`IApiKeyEntityScopeQueryService`** no longer expose async paged **`Search…Async`** with string filters. They now use synchronous **`Search`** / **`Count`** with optional **`Expression<Func<TDto, bool>>?`** predicates (Linq2Db-translatable), **`skip` / `limit`**, and **`Result`** types—matching the thin-search wiring in **`IdentityService`** / **`ApiKeyService`**. Custom Engine hosts must update call sites and registrations.
+- **ACME session persistence:** **`IAcmeSessionStore`**, **`AcmePostgresSessionStore`**, **`AcmeSessionSnapshot`**, and **`AcmeSessionJsonSerializer`** are removed. **`ILetsEncryptService`** now depends on **`IAcmeSessionPersistanceService`** (**`AcmeSessionPersistanceServiceLinq2Db`**) for **`acme_sessions`** JSON load/save.
+- **`ICertsFlowDomainService`:** Constructor takes **`IRegistrationCacheDomainService`** instead of **`IRegistrationCachePersistanceService`** (registration cache orchestration moved behind **`RegistrationCacheDomainService`**).
+
+### Added
+
+- **`ExpressionCompose`** (`QueryServices/ExpressionCompose.cs`) for composing nested Linq2Db predicates (Vault parity).
+- **`IRegistrationCacheDomainService`** / **`RegistrationCacheDomainService`**, **`RegistrationCachePayloadDocument`**, and **`RegistrationCachePayloadJsonTests`** (Engine unit tests) for registration-cache JSON handling; **`RegistrationCacheDto`** now extends **`DtoDocumentBase<Guid>`** with **`AccountId`** as an alias of **`Id`**; persistence and mapping updates in **`RegistrationCachePersistanceServiceLinq2Db`** / **`CertsLinq2DbMapping`**.
+- **`IAcmeSessionPersistanceService`**, **`AcmeSessionPersistanceServiceLinq2Db`**, and **`AcmeSessionPayloadMapper`** for PostgreSQL-backed ACME **`State`** persistence.
+- **`ApiKeyEntityScopeDto`** and **`ApiKeyEntityScopeQueryServiceStub`** adjustments for entity-scope search parity.
+- **Docs:** **`assets/docs/ARCHITECTURE_LAYERING.md`** (layering, spine flows, Pattern A/B); **[CONTRIBUTING.md](CONTRIBUTING.md)** links to it and documents **`dotnet test`** for **`MaksIT.CertsUI.Engine.Tests`** / **`MaksIT.CertsUI.Tests`**.
+
+### Changed
+
+- **`LetsEncryptService`:** Uses **`IAcmeSessionPersistanceService`**; helper updates in **`LetsEncryptService.Helpers.cs`**.
+- **`CertsFlowDomainService`:** **`PurgeStaleHttpChallengesAsync`** (HTTP-01 cleanup); **`AutoRenewal`** calls it before renewal work.
+- **`CacheService`:** Thin façade over **`IRegistrationCacheDomainService`** (host API unchanged for callers).
+- **`IdentityService`** / **`ApiKeyService`:** Build predicates and call **`Count`** + **`Search`** on **`IUserQueryService`** / **`IApiKeyQueryService`** / **`IApiKeyEntityScopeQueryService`**.
+- **Engine:** Dropped **`Newtonsoft.Json`** package reference from **`MaksIT.CertsUI.Engine`** (STJ-only JSON paths).
+- **Web UI:** **`axiosConfig`** **`getData`** / **`postData`** (and related helpers) return **`{ payload, status, ok }`** so callers can distinguish HTTP status; forms and slices updated (**`SearchUser`**, **`SearchApiKey`**, **`Utilities`**, **`EditUser`**, **`Home`**, **`FileUploadComponent`**, **`identitySlice`**, etc.).
+- **Integration tests:** **`InMemoryUserStore`**, **`CacheServiceTests`**, **`CertsFlowServiceTests`**, **`ApiKeyQueryServiceIntegrationTests`**, **`AccountServicePatchAccountIntegrationTests`** aligned with the new ports.
+
 ## [3.4.0] - 2026-04-27
 
 ### Breaking

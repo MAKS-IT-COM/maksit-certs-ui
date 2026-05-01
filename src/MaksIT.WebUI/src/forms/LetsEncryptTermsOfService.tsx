@@ -20,15 +20,15 @@ const LetsEncryptTermsOfService: FC = () => {
       isStaging: true
     })
       .then(response => {
-        if (!response) return
+        if (!response.ok || !response.payload) return
         return getData<string>(
-          GetApiRoute(ApiRoutes.CERTS_FLOW_TERMS_OF_SERVICE).route.replace('{sessionId}', response),
+          GetApiRoute(ApiRoutes.CERTS_FLOW_TERMS_OF_SERVICE).route.replace('{sessionId}', response.payload),
           120_000
         )
       })
-      .then(base64Pdf => {
-        if (typeof base64Pdf === 'string' && base64Pdf.length > 0) {
-          setPdfUrl(base64Pdf)
+      .then(response => {
+        if (response?.ok && typeof response.payload === 'string' && response.payload.length > 0) {
+          setPdfUrl(response.payload)
         } else {
           setError('Failed to retrieve PDF.')
         }

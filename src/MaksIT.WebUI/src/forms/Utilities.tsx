@@ -16,9 +16,9 @@ const Utilities: FC = () => {
   const hadnleTestAgent = () => {
     getData<HelloWorldResponse>(GetApiRoute(ApiRoutes.AGENT_TEST).route)
       .then((response) => {
-        if (!response) return
+        if (!response.ok || !response.payload) return
 
-        addToast(response.message, 'info')
+        addToast(response.payload.message, 'info')
       })
   }
 
@@ -29,20 +29,25 @@ const Utilities: FC = () => {
     }
 
     const zipBlob = await downloadZip(files).blob()
-    // Option A: direct file helper
-    postFile(GetApiRoute(ApiRoutes.FULL_CACHE_UPLOAD_POST).route, zipBlob, 'file', 'cache.zip')
-      .then((_) => {
-        setFiles([])
-        addToast('Files uploaded successfully', 'success')
-      })
+    const response = await postFile(
+      GetApiRoute(ApiRoutes.FULL_CACHE_UPLOAD_POST).route,
+      zipBlob,
+      'file',
+      'cache.zip'
+    )
+    if (!response.ok)
+      return
+    
+    setFiles([])
+    addToast('Files uploaded successfully', 'success')
   }
 
   const handleDownloadFiles = () => {
     getBinary(GetApiRoute(ApiRoutes.FULL_CACHE_DOWNLOAD_GET).route
     ).then((response) => {
-      if (!response) return
+      if (!response.ok || !response.payload) return
 
-      const { data, headers } = response
+      const { data, headers } = response.payload
       const filename = extractFilenameFromHeaders(headers, 'cache.zip')
       saveBinaryToDisk(data, filename)
     })
@@ -50,7 +55,8 @@ const Utilities: FC = () => {
 
   const handleDestroyFiles = () => {
     deleteData(GetApiRoute(ApiRoutes.FULL_CACHE_DELETE).route)
-      .then((_) => {
+      .then((response) => {
+        if (!response.ok) return
         addToast('Cache files destroyed successfully', 'success')
       })
   }
@@ -72,6 +78,7 @@ const Utilities: FC = () => {
           colspan={6}
           label={'Select cache files'}
           multiple={true}
+          files={files}
           onChange={setFiles}
         />
 
@@ -82,7 +89,7 @@ const Utilities: FC = () => {
           onClick={handleUploadFiles}
         />
 
-        <span className={'col-span-3'}></span>
+        <span className={'col-span-12'}></span>
 
         <ButtonComponent
           colspan={3}

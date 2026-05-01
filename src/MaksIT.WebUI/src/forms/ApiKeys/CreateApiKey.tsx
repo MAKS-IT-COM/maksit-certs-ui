@@ -77,9 +77,9 @@ const CreateApiKey: FC<CreateApiKeyProps> = (props) => {
 
     postData<CreateApiKeyRequest, ApiKeyResponse>(GetApiRoute(ApiRoutes.apikeyPost).route, request.data)
       .then(response => {
-        if (!response) return
+        if (!response.ok || !response.payload) return
 
-        onSubmitted?.(response)
+        onSubmitted?.(response.payload)
       })
   }
 

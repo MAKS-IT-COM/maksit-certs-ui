@@ -52,6 +52,8 @@ public static class ServiceCollectionExtensions {
 
     #region Registration cache
     services.AddScoped<IRegistrationCachePersistanceService, RegistrationCachePersistanceServiceLinq2Db>();
+    services.AddScoped<IRegistrationCacheDomainService, RegistrationCacheDomainService>();
+    services.AddScoped<IAcmeSessionPersistanceService, AcmeSessionPersistanceServiceLinq2Db>();
     services.AddScoped<IAcmeHttpChallengePersistenceService, AcmeHttpChallengePersistenceServiceLinq2Db>();
     services.AddScoped<ITermsOfServiceCachePersistenceService, TermsOfServiceCachePersistenceServiceLinq2Db>();
     services.AddSingleton<IRuntimeLeaseService, RuntimeLeaseServiceNpgsql>();
@@ -64,7 +66,6 @@ public static class ServiceCollectionExtensions {
     #endregion
 
     #region ACME / Let's Encrypt
-    services.AddSingleton<IAcmeSessionStore, AcmePostgresSessionStore>();
     services.AddHttpClient<ILetsEncryptService, LetsEncryptService>();
     #endregion
   }

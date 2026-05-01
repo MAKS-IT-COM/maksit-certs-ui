@@ -50,10 +50,10 @@ const SecretComponent: FC<PasswordGeneratorProps> = (props) => {
   const handleGenerateSecret = () => {
     getData<TrngResponse>(`${GetApiRoute(ApiRoutes.generateSecret).route}`)
       .then(response => {
-        if (!response) return
+        if (!response.ok || !response.payload) return
   
         const fakeEvent = {
-          target: { value: response.secret }
+          target: { value: response.payload.secret }
         } as ChangeEvent<HTMLInputElement>
 
         handleOnChange(fakeEvent)

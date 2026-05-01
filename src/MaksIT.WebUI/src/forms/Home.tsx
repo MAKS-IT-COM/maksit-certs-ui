@@ -17,8 +17,8 @@ const Home: FC = () => {
   
   const loadData = useCallback(() => {
     getData<GetAccountResponse[]>(GetApiRoute(ApiRoutes.ACCOUNTS_GET).route).then((response) => {
-      if (!response) return
-      setRawd(response)
+      if (!response.ok || !response.payload) return
+      setRawd(response.payload)
     })
   }, [])
 
@@ -30,7 +30,8 @@ const Home: FC = () => {
     deleteData<void>(
       GetApiRoute(ApiRoutes.ACCOUNT_DELETE)
         .route.replace('{accountId}', accountId)
-    ).then(_ => {
+    ).then(response => {
+      if (!response.ok) return
       setRawd(rawd.filter((account) => account.accountId !== accountId))
     })
   }
@@ -43,9 +44,9 @@ const Home: FC = () => {
     postData<void, { [key: string]: string }>(GetApiRoute(ApiRoutes.CERTS_FLOW_CERTIFICATES_APPLY).route
       .replace('{accountId}', accountId)
     ).then(response => {
-      if (!response?.message) return
+      if (!response.ok || !response.payload?.message) return
 
-      addToast(response?.message, 'info')
+      addToast(response.payload.message, 'info')
     })
   }
 

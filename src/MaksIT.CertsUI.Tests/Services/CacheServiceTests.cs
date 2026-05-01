@@ -2,6 +2,7 @@ using LinqToDB;
 using LinqToDB.Data;
 using MaksIT.CertsUI.Engine.Dto.Certs;
 using MaksIT.CertsUI.Engine.Domain.Certs;
+using MaksIT.CertsUI.Engine.DomainServices;
 using MaksIT.CertsUI.Engine.Persistance.Services.Linq2Db;
 using MaksIT.CertsUI.Services;
 using MaksIT.CertsUI.Tests.Infrastructure;
@@ -13,12 +14,11 @@ namespace MaksIT.CertsUI.Tests.Services;
 [Collection("postgres-cache")]
 public class CacheServiceTests(PostgresCacheFixture pg) {
 
-  private CacheService CreateSut() =>
-    new(
-      NullLogger<CacheService>.Instance,
-      pg.Config.AppOptions,
-      new RegistrationCachePersistanceServiceLinq2Db(NullLogger<RegistrationCachePersistanceServiceLinq2Db>.Instance, pg.ConnectionFactory)
-    );
+  private CacheService CreateSut() {
+    var persistence = new RegistrationCachePersistanceServiceLinq2Db(NullLogger<RegistrationCachePersistanceServiceLinq2Db>.Instance, pg.ConnectionFactory);
+    var domain = new RegistrationCacheDomainService(NullLogger<RegistrationCacheDomainService>.Instance, persistence);
+    return new CacheService(NullLogger<CacheService>.Instance, pg.Config.AppOptions, domain);
+  }
 
   [Fact]
   public async Task LoadAccountsFromCacheAsync_WhenNoRows_ReturnsEmptyArray() {
@@ -77,8 +77,8 @@ public class CacheServiceTests(PostgresCacheFixture pg) {
   public async Task LoadAccountFromCacheAsync_WhenPayloadEmpty_ReturnsError() {
     await ClearCachesAsync();
     var id = Guid.NewGuid();
-    using (var db = (DataConnection)pg.ConnectionFactory.Create()) {
-      db.Insert(new RegistrationCacheDto { AccountId = id, PayloadJson = "" });
+    using (var db = pg.ConnectionFactory.Create()) {
+      db.Insert(new RegistrationCacheDto { Id = id, AccountId = id, PayloadJson = "" });
     }
 
     var sut = CreateSut();

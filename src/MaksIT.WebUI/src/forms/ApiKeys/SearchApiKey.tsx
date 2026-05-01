@@ -95,7 +95,7 @@ const SearchApiKey: FC = () => {
 
   const loadData = useCallback(() => {
     postData<SearchAPIKeyRequest, PagedResponse<SearchAPIKeyResponse>>(GetApiRoute(ApiRoutes.apikeySearch).route, pagedRequest).then((response) => {
-      setRawd(response ?? undefined)
+      setRawd(response.payload ?? undefined)
     }).finally(() => {})
   }, [pagedRequest])
 
@@ -113,7 +113,10 @@ const SearchApiKey: FC = () => {
   const handleDeleteRow = (ids: {[key: string]: string}) => {
     deleteData(GetApiRoute(ApiRoutes.apikeyDelete).route
       .replace('{apiKeyId}', ids.id)
-    ).then(() => loadData())
+    ).then((response) => {
+      if (!response.ok) return
+      loadData()
+    })
   }
 
   const handleEditCancel = () => {

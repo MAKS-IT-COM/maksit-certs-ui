@@ -45,9 +45,9 @@ const DataTableLabel = <T extends { [key: string]: never }>(props: LabelProps) =
 
     getDataWithoutLoader<T>(route)
       .then(response => {
-        if (!response) return
+        if (!response.ok || !response.payload) return
 
-        setRemoteLabel(response[accessorKey])
+        setRemoteLabel(response.payload[accessorKey])
       }).finally(() => {})
   }, [props])
 

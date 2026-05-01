@@ -44,6 +44,11 @@ public interface ICertsFlowDomainService {
   #region HTTP-01 challenge
   Task<Result<string?>> AcmeChallengeAsync(string fileName, CancellationToken cancellationToken = default);
   #endregion
+
+  #region Maintenance
+  /// <summary>Deletes HTTP-01 challenge rows older than <paramref name="maxAge"/> (used by renewal sweep).</summary>
+  Task<Result<int>> PurgeStaleHttpChallengesAsync(TimeSpan maxAge, CancellationToken cancellationToken = default);
+  #endregion
 }
 
 /// <summary>
@@ -56,7 +61,7 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
   private readonly ILogger<CertsFlowDomainService> _logger;
   private readonly HttpClient _httpClient;
   private readonly ILetsEncryptService _letsEncryptService;
-  private readonly IRegistrationCachePersistanceService _registrationCache;
+  private readonly IRegistrationCacheDomainService _registrationCache;
   private readonly IAgentDeploymentService _agentDeployment;
   private readonly ICertsFlowEngineConfiguration _config;
   private readonly ITermsOfServiceCachePersistenceService _termsOfServiceCache;
@@ -68,7 +73,7 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
     ILogger<CertsFlowDomainService> logger,
     HttpClient httpClient,
     ILetsEncryptService letsEncryptService,
-    IRegistrationCachePersistanceService registrationCache,
+    IRegistrationCacheDomainService registrationCache,
     IAgentDeploymentService agentDeployment,
     ICertsFlowEngineConfiguration config,
     ITermsOfServiceCachePersistenceService termsOfServiceCache,
@@ -190,7 +195,7 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
       accountId = Guid.NewGuid();
     }
     else {
-      var cacheResult = await _registrationCache.LoadAsync(accountId.Value);
+      var cacheResult = await _registrationCache.LoadAsync(accountId.Value, CancellationToken.None).ConfigureAwait(false);
       if (!cacheResult.IsSuccess || cacheResult.Value == null) {
         accountId = Guid.NewGuid();
       }
@@ -249,7 +254,7 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
     var cacheResult = await _letsEncryptService.GetRegistrationCacheAsync(sessionId, CancellationToken.None).ConfigureAwait(false);
     if (!cacheResult.IsSuccess || cacheResult.Value == null)
       return cacheResult;
-    var saveResult = await _registrationCache.SaveAsync(cacheResult.Value.AccountId, cacheResult.Value);
+    var saveResult = await _registrationCache.SaveAsync(cacheResult.Value.AccountId, cacheResult.Value, CancellationToken.None).ConfigureAwait(false);
     if (!saveResult.IsSuccess)
       return saveResult;
     return Result.Ok();
@@ -264,7 +269,7 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
   #region Deploy and revoke
 
   public async Task<Result<Dictionary<string, string>?>> ApplyCertificatesAsync(Guid accountId) {
-    var cacheResult = await _registrationCache.LoadAsync(accountId);
+    var cacheResult = await _registrationCache.LoadAsync(accountId, CancellationToken.None).ConfigureAwait(false);
     if (!cacheResult.IsSuccess || cacheResult.Value?.CachedCerts == null)
       return cacheResult.ToResultOfType<Dictionary<string, string>?>(_ => null);
     var cache = cacheResult.Value;
@@ -291,7 +296,7 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
     var cacheResult = await _letsEncryptService.GetRegistrationCacheAsync(sessionId, CancellationToken.None).ConfigureAwait(false);
     if (!cacheResult.IsSuccess || cacheResult.Value == null)
       return cacheResult;
-    var saveResult = await _registrationCache.SaveAsync(cacheResult.Value.AccountId, cacheResult.Value);
+    var saveResult = await _registrationCache.SaveAsync(cacheResult.Value.AccountId, cacheResult.Value, CancellationToken.None).ConfigureAwait(false);
     if (!saveResult.IsSuccess)
       return saveResult;
     return Result.Ok();
@@ -384,12 +389,19 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
 
   #endregion
 
+  #region Maintenance
+
+  public Task<Result<int>> PurgeStaleHttpChallengesAsync(TimeSpan maxAge, CancellationToken cancellationToken = default) =>
+    _httpChallenges.DeleteOlderThanAsync(maxAge, cancellationToken);
+
+  #endregion
+
   private async Task TryPersistRegistrationCacheFromSessionAsync(Guid sessionId) {
     var cacheResult = await _letsEncryptService.GetRegistrationCacheAsync(sessionId, CancellationToken.None).ConfigureAwait(false);
     if (!cacheResult.IsSuccess || cacheResult.Value == null)
       return;
 
-    var saveResult = await _registrationCache.SaveAsync(cacheResult.Value.AccountId, cacheResult.Value);
+    var saveResult = await _registrationCache.SaveAsync(cacheResult.Value.AccountId, cacheResult.Value, CancellationToken.None).ConfigureAwait(false);
     if (!saveResult.IsSuccess)
       _logger.LogWarning("Could not persist registration cache after ACME flow step for account {AccountId}.", cacheResult.Value.AccountId);
   }

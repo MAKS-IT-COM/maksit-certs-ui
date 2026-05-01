@@ -1,4 +1,6 @@
+using System.Linq.Expressions;
 using MaksIT.CertsUI.Engine.DomainServices;
+using MaksIT.CertsUI.Engine.Dto.Identity;
 using MaksIT.CertsUI.Engine.QueryServices.Identity;
 using MaksIT.Models.LetsEncryptServer.ApiKeys;
 using MaksIT.Models.LetsEncryptServer.ApiKeys.Search;
@@ -75,16 +77,27 @@ public sealed class ApiKeyService(
     _ = _jwtTokenData;
     var page = Math.Max(1, requestData.PageNumber);
     var size = Math.Clamp(requestData.PageSize, 1, 500);
-    var query = await apiKeyQueryService.SearchApiKeysAsync(requestData.DescriptionFilter?.Trim(), page, size, cancellationToken);
-    if (!query.IsSuccess || query.Value == null)
-      return query.ToResultOfType<PagedResponse<SearchAPIKeyResponse>?>(_ => null);
+    var filter = requestData.DescriptionFilter?.Trim();
+    Expression<Func<ApiKeyDto, bool>>? predicate = string.IsNullOrWhiteSpace(filter)
+      ? null
+      : k => (k.Description ?? string.Empty).Contains(filter!);
 
-    var paged = query.Value;
+    var skip = (page - 1) * size;
+    var countResult = apiKeyQueryService.Count(predicate);
+    if (!countResult.IsSuccess)
+      return countResult.ToResultOfType<PagedResponse<SearchAPIKeyResponse>?>(_ => null);
+
+    var searchResult = apiKeyQueryService.Search(predicate, skip, size);
+    if (!searchResult.IsSuccess || searchResult.Value == null)
+      return searchResult.ToResultOfType<PagedResponse<SearchAPIKeyResponse>?>(_ => null);
+
+    var total = countResult.Value ?? 0;
+    var list = searchResult.Value;
     return Result<PagedResponse<SearchAPIKeyResponse>?>.Ok(new PagedResponse<SearchAPIKeyResponse> {
-      Data = [.. paged.Data.Select(apiKeyToResponseMapper.MapToSearchResponse)],
-      TotalRecords = paged.TotalRecords,
-      PageNumber = paged.PageNumber,
-      PageSize = paged.PageSize,
+      Data = [.. list.Select(apiKeyToResponseMapper.MapToSearchResponse)],
+      TotalRecords = total,
+      PageNumber = page,
+      PageSize = size,
     });
   }
 
@@ -96,16 +109,26 @@ public sealed class ApiKeyService(
     _ = _jwtTokenData;
     var page = Math.Max(1, requestData.PageNumber);
     var size = Math.Clamp(requestData.PageSize, 1, 500);
-    var query = await apiKeyEntityScopeQueryService.SearchApiKeyEntityScopesAsync(requestData.ApiKeyId, page, size, cancellationToken);
-    if (!query.IsSuccess || query.Value == null)
-      return query.ToResultOfType<PagedResponse<SearchApiKeyEntityScopeResponse>?>(_ => null);
+    Expression<Func<ApiKeyEntityScopeDto, bool>>? predicate = requestData.ApiKeyId.HasValue
+      ? s => s.ApiKeyId == requestData.ApiKeyId!.Value
+      : null;
 
-    var paged = query.Value;
+    var skip = (page - 1) * size;
+    var countResult = apiKeyEntityScopeQueryService.Count(predicate);
+    if (!countResult.IsSuccess)
+      return countResult.ToResultOfType<PagedResponse<SearchApiKeyEntityScopeResponse>?>(_ => null);
+
+    var searchResult = apiKeyEntityScopeQueryService.Search(predicate, skip, size);
+    if (!searchResult.IsSuccess || searchResult.Value == null)
+      return searchResult.ToResultOfType<PagedResponse<SearchApiKeyEntityScopeResponse>?>(_ => null);
+
+    var total = countResult.Value ?? 0;
+    var list = searchResult.Value;
     return Result<PagedResponse<SearchApiKeyEntityScopeResponse>?>.Ok(new PagedResponse<SearchApiKeyEntityScopeResponse> {
-      Data = [.. paged.Data.Select(apiKeyToResponseMapper.MapToSearchResponse)],
-      TotalRecords = paged.TotalRecords,
-      PageNumber = paged.PageNumber,
-      PageSize = paged.PageSize,
+      Data = [.. list.Select(apiKeyToResponseMapper.MapToSearchResponse)],
+      TotalRecords = total,
+      PageNumber = page,
+      PageSize = size,
     });
   }
 

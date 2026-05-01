@@ -12,6 +12,12 @@ Useful contributions include bug fixes, documentation improvements, Helm chart u
 
 Large or architectural changes are best discussed first (see [Contact](#contact)) so effort aligns with project goals.
 
+## Architecture and code layout
+
+**Where the rules live:** layering, folder responsibilities, persistence vs host boundaries, DI lifetimes, and an AI/contributor checklist are documented in **[assets/docs/ARCHITECTURE_LAYERING.md](assets/docs/ARCHITECTURE_LAYERING.md)**. Read that before adding new Engine persistence, services, or cross-project dependencies.
+
+**Summary:** `MaksIT.CertsUI.Engine` holds domain, PostgreSQL persistence (Linq2Db), migrations, and ACME engine code; it returns `MaksIT.Results` types, not HTTP responses. `MaksIT.CertsUI` is the web host (controllers, app services, ProblemDetails). Topic-specific design notes also live under [assets/docs/](assets/docs/) (HA, auth, proxy, etc.).
+
 ## Development setup
 
 ### Prerequisites
@@ -34,7 +40,7 @@ Use `Debug` while iterating locally if you prefer.
 
 Follow [README.md](README.md) for Podman Compose, Docker Compose, or Kubernetes (Helm). That is the supported way to exercise the WebAPI, WebUI, and reverse proxy together.
 
-There is no separate automated test project in this repository today; manual verification through the WebUI and your compose or cluster setup is the practical check for most changes.
+**Automated tests:** from the repo root, `dotnet test src/MaksIT.CertsUI.Engine.Tests` and `dotnet test src/MaksIT.CertsUI.Tests` (the latter may require a reachable PostgreSQL when integration tests run). For UI-only or deployment changes, manual verification through the WebUI and compose or cluster setup still applies.
 
 ## Pull requests
 

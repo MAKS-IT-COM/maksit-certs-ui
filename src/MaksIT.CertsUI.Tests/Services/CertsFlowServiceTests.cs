@@ -1,6 +1,7 @@
 using System.Net;
 using MaksIT.CertsUI.Engine.Domain.Certs;
 using MaksIT.CertsUI.Engine.DomainServices;
+using Microsoft.Extensions.Logging.Abstractions;
 using MaksIT.CertsUI.Engine.Dto.Certs;
 using MaksIT.CertsUI.Engine.Infrastructure;
 using MaksIT.CertsUI.Engine.Persistance.Services;
@@ -8,7 +9,6 @@ using MaksIT.CertsUI.Engine.RuntimeCoordination;
 using MaksIT.CertsUI.Engine.Services;
 using MaksIT.Results;
 using MaksIT.CertsUI.Tests.Infrastructure;
-using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
 
@@ -32,6 +32,9 @@ public sealed class CertsFlowServiceTests
         HttpMessageHandler? httpHandler = null)
     {
         registrationCache ??= new Mock<IRegistrationCachePersistanceService>();
+        var registrationDomain = new RegistrationCacheDomainService(
+            NullLogger<RegistrationCacheDomainService>.Instance,
+            registrationCache.Object);
         agent ??= new Mock<IAgentDeploymentService>();
         var tosCacheProvided = termsOfServiceCache is not null;
         termsOfServiceCache ??= new Mock<ITermsOfServiceCachePersistenceService>();
@@ -69,7 +72,7 @@ public sealed class CertsFlowServiceTests
             NullLogger<CertsFlowDomainService>.Instance,
             httpClient,
             le.Object,
-            registrationCache.Object,
+            registrationDomain,
             agent.Object,
             new TestCertsFlowEngineConfiguration(fx),
             termsOfServiceCache.Object,

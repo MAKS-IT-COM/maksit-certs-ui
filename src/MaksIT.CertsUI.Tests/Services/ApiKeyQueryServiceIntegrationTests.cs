@@ -45,10 +45,10 @@ public class ApiKeyQueryServiceIntegrationTests(PostgresCacheFixture pg) {
     Assert.False(string.IsNullOrWhiteSpace(created.Value!.ApiKey));
     Assert.Contains('|', created.Value.ApiKey);
 
-    var search = await queryService.SearchApiKeysAsync(null, 1, 50);
+    var search = queryService.Search(apiKeysPredicate: null, skip: 0, limit: 50);
 
     Assert.True(search.IsSuccess);
     Assert.NotNull(search.Value);
-    Assert.Contains(search.Value!.Data, x => x.Id == created.Value!.Id);
+    Assert.Contains(search.Value!, x => x.Id == created.Value!.Id);
   }
 }

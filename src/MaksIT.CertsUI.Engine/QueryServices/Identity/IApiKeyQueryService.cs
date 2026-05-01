@@ -1,17 +1,19 @@
-using MaksIT.CertsUI.Engine.Query;
+using System.Linq.Expressions;
+using MaksIT.CertsUI.Engine.Dto.Identity;
 using MaksIT.CertsUI.Engine.Query.Identity;
 using MaksIT.Results;
 
 namespace MaksIT.CertsUI.Engine.QueryServices.Identity;
 
 /// <summary>
-/// Read-only paged API key search for list views.
+/// Read-only API key search (Vault <c>IApiKeyQueryService</c> pattern): optional predicate on <see cref="ApiKeyDto"/>, skip/limit, and count.
 /// </summary>
 public interface IApiKeyQueryService {
 
-  Task<Result<PagedQueryResult<ApiKeyQueryResult>>> SearchApiKeysAsync(
-    string? descriptionFilter,
-    int pageNumber,
-    int pageSize,
-    CancellationToken cancellationToken = default);
+  Result<List<ApiKeyQueryResult>?> Search(
+    Expression<Func<ApiKeyDto, bool>>? apiKeysPredicate,
+    int? skip,
+    int? limit);
+
+  Result<int?> Count(Expression<Func<ApiKeyDto, bool>>? apiKeysPredicate);
 }

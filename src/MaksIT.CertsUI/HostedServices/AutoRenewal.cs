@@ -1,6 +1,6 @@
 using MaksIT.CertsUI.Engine.Domain.Certs;
+using MaksIT.CertsUI.Engine.DomainServices;
 using MaksIT.CertsUI.Engine.Infrastructure;
-using MaksIT.CertsUI.Engine.Persistance.Services;
 using MaksIT.CertsUI.Engine.RuntimeCoordination;
 using MaksIT.CertsUI.Services;
 
@@ -38,15 +38,15 @@ public sealed class AutoRenewal(
           logger.LogInformation("Running certificate renewal sweep (lease holder {Holder}).", holder);
 
         using var scope = scopeFactory.CreateScope();
-        var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
+        var registrationCacheDomain = scope.ServiceProvider.GetRequiredService<IRegistrationCacheDomainService>();
+        var certsFlowDomain = scope.ServiceProvider.GetRequiredService<ICertsFlowDomainService>();
         var certsFlowService = scope.ServiceProvider.GetRequiredService<ICertsFlowService>();
-        var httpChallenges = scope.ServiceProvider.GetRequiredService<IAcmeHttpChallengePersistenceService>();
 
-        var purge = await httpChallenges.DeleteOlderThanAsync(TimeSpan.FromDays(10), stoppingToken).ConfigureAwait(false);
+        var purge = await certsFlowDomain.PurgeStaleHttpChallengesAsync(TimeSpan.FromDays(10), stoppingToken).ConfigureAwait(false);
         if (purge.IsSuccess && purge.Value > 0)
           logger.LogInformation("Purged {Count} HTTP-01 challenge row(s) older than 10 days.", purge.Value);
 
-        var loadAccountsFromCacheResult = await cacheService.LoadAccountsFromCacheAsync().ConfigureAwait(false);
+        var loadAccountsFromCacheResult = await registrationCacheDomain.LoadAllAsync(stoppingToken).ConfigureAwait(false);
         if (!loadAccountsFromCacheResult.IsSuccess || loadAccountsFromCacheResult.Value == null) {
           LogErrorMessages(loadAccountsFromCacheResult.Messages);
           await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken).ConfigureAwait(false);

@@ -111,9 +111,9 @@ const EditAccount: FC<EditAccountProps> = (props) => {
     getData<GetAccountResponse>(GetApiRoute(ApiRoutes.ACCOUNT_GET).route
       .replace('{accountId}', accountId)
     ).then((response) => {
-      if (!response) return
+      if (!response.ok || !response.payload) return
 
-      handleInitialization(response)
+      handleInitialization(response.payload)
     })
   }, [accountId, handleInitialization])
 
@@ -168,10 +168,10 @@ const EditAccount: FC<EditAccountProps> = (props) => {
       .replace('{accountId}', accountId), delta, 120000
     )
 
-    if (!response) return
+    if (!response.ok || !response.payload) return
 
-    handleInitialization(response)
-    onSubmitted?.(response)
+    handleInitialization(response.payload)
+    onSubmitted?.(response.payload)
 
   }
 

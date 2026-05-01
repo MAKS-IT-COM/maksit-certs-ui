@@ -1,13 +1,12 @@
 using System.Net.Http.Headers;
 using Microsoft.Extensions.Logging;
+using MaksIT.Results;
 using MaksIT.Core.Extensions;
 using MaksIT.Core.Security.JWS;
-using MaksIT.CertsUI.Engine.Domain.Certs;
 using MaksIT.CertsUI.Engine.Domain.LetsEncrypt;
 using MaksIT.CertsUI.Engine.Domain.LetsEncrypt.Jws;
 using MaksIT.CertsUI.Engine.Dto.LetsEncrypt.Interfaces;
 using MaksIT.CertsUI.Engine.Dto.LetsEncrypt.Responses;
-using MaksIT.Results;
 
 
 namespace MaksIT.CertsUI.Engine.Services;
@@ -16,16 +15,39 @@ public partial class LetsEncryptService {
 
   #region Internal helpers
 
+  private async Task<State> LoadAcmeSessionStateAsync(Guid sessionId, CancellationToken cancellationToken) {
+    var result = await _acmeSessionPersistence.LoadAsync(sessionId, cancellationToken).ConfigureAwait(false);
+    if (!result.IsSuccess) {
+      _logger.LogWarning(
+        "ACME session load failed for {SessionId}: {Messages}",
+        sessionId,
+        result.Messages != null ? string.Join("; ", result.Messages) : "(no detail)");
+      return new State();
+    }
+
+    return result.Value ?? new State();
+  }
+
+  private async Task PersistAcmeSessionStateAsync(Guid sessionId, State state, CancellationToken cancellationToken) {
+    var result = await _acmeSessionPersistence.SaveAsync(sessionId, state, cancellationToken).ConfigureAwait(false);
+    if (!result.IsSuccess) {
+      _logger.LogError(
+        "ACME session save failed for {SessionId}: {Messages}",
+        sessionId,
+        result.Messages != null ? string.Join("; ", result.Messages) : "(no detail)");
+    }
+  }
+
   private async Task<Result> WithPersistedSessionAsync(
     Guid sessionId,
     CancellationToken cancellationToken,
     Func<State, Task<Result>> body) {
-    var state = await _sessionStore.LoadOrCreateAsync(sessionId, cancellationToken).ConfigureAwait(false);
+    var state = await LoadAcmeSessionStateAsync(sessionId, cancellationToken).ConfigureAwait(false);
     try {
       return await body(state).ConfigureAwait(false);
     }
     finally {
-      await _sessionStore.PersistAsync(sessionId, state, cancellationToken).ConfigureAwait(false);
+      await PersistAcmeSessionStateAsync(sessionId, state, cancellationToken).ConfigureAwait(false);
     }
   }
 
@@ -33,12 +55,12 @@ public partial class LetsEncryptService {
     Guid sessionId,
     CancellationToken cancellationToken,
     Func<State, Task<Result<T?>>> body) {
-    var state = await _sessionStore.LoadOrCreateAsync(sessionId, cancellationToken).ConfigureAwait(false);
+    var state = await LoadAcmeSessionStateAsync(sessionId, cancellationToken).ConfigureAwait(false);
     try {
       return await body(state).ConfigureAwait(false);
     }
     finally {
-      await _sessionStore.PersistAsync(sessionId, state, cancellationToken).ConfigureAwait(false);
+      await PersistAcmeSessionStateAsync(sessionId, state, cancellationToken).ConfigureAwait(false);
     }
   }
 

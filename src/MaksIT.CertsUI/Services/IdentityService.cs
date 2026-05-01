@@ -1,7 +1,9 @@
+using System.Linq.Expressions;
 using Microsoft.Extensions.Options;
 using MaksIT.Core.Security;
 using MaksIT.Core.Webapi.Models;
 using MaksIT.CertsUI.Engine.DomainServices;
+using MaksIT.CertsUI.Engine.Dto.Identity;
 using MaksIT.CertsUI.Engine.QueryServices.Identity;
 using MaksIT.Models.LetsEncryptServer.Identity.Login;
 using MaksIT.Models.LetsEncryptServer.Identity.Logout;
@@ -16,7 +18,7 @@ using DomainUser = MaksIT.CertsUI.Engine.Domain.Identity.User;
 namespace MaksIT.CertsUI.Services;
 
 public interface IIdentityService {
-  Task<Result<MaksIT.Models.LetsEncryptServer.Common.PagedResponse<SearchUserResponse>>> SearchUsersAsync(JwtTokenData jwtTokenData, SearchUserRequest requestData);
+  Task<Result<Models.LetsEncryptServer.Common.PagedResponse<SearchUserResponse>?>> SearchUsersAsync(JwtTokenData jwtTokenData, SearchUserRequest requestData);
   Task<Result<UserResponse?>> ReadUserAsync(JwtTokenData jwtTokenData, Guid id);
   Task<Result<UserResponse?>> PostUserAsync(JwtTokenData jwtTokenData, CreateUserRequest requestData);
   Task<Result<UserResponse?>> PatchUserAsync(JwtTokenData jwtTokenData, Guid id, PatchUserRequest requestData);
@@ -37,27 +39,42 @@ public sealed class IdentityService(
 
   private readonly ITwoFactorSettingsConfiguration _twoFactorSettings = twoFactorSettings;
 
-  public async Task<Result<MaksIT.Models.LetsEncryptServer.Common.PagedResponse<SearchUserResponse>>> SearchUsersAsync(JwtTokenData _jwtTokenData, SearchUserRequest requestData) {
+  public Task<Result<MaksIT.Models.LetsEncryptServer.Common.PagedResponse<SearchUserResponse>?>> SearchUsersAsync(JwtTokenData _jwtTokenData, SearchUserRequest requestData) {
     _ = _jwtTokenData;
     var page = Math.Max(1, requestData.PageNumber);
     var size = Math.Clamp(requestData.PageSize, 1, 500);
+    var filter = requestData.UsernameFilter?.Trim();
+    Expression<Func<UserDto, bool>>? predicate = string.IsNullOrWhiteSpace(filter)
+      ? null
+      : u => u.Name.Contains(filter!);
 
-    var query = await userQueryService.SearchUsersAsync(requestData.UsernameFilter?.Trim(), page, size);
-    if (!query.IsSuccess || query.Value == null)
-      return query.ToResultOfType<MaksIT.Models.LetsEncryptServer.Common.PagedResponse<SearchUserResponse>>(_ => new MaksIT.Models.LetsEncryptServer.Common.PagedResponse<SearchUserResponse> {
+    var skip = (page - 1) * size;
+    var countResult = userQueryService.Count(predicate);
+    if (!countResult.IsSuccess)
+      return Task.FromResult(countResult.ToResultOfType<MaksIT.Models.LetsEncryptServer.Common.PagedResponse<SearchUserResponse>?>(_ => new MaksIT.Models.LetsEncryptServer.Common.PagedResponse<SearchUserResponse> {
         Data = [],
         TotalRecords = 0,
         PageNumber = page,
         PageSize = size,
-      })!;
+      })!);
 
-    var paged = query.Value;
-    return Result<MaksIT.Models.LetsEncryptServer.Common.PagedResponse<SearchUserResponse>>.Ok(new MaksIT.Models.LetsEncryptServer.Common.PagedResponse<SearchUserResponse> {
-      Data = [.. paged.Data.Select(userToResponseMapper.MapToSearchResponse)],
-      TotalRecords = paged.TotalRecords,
-      PageNumber = paged.PageNumber,
-      PageSize = paged.PageSize,
-    });
+    var searchResult = userQueryService.Search(predicate, skip, size);
+    if (!searchResult.IsSuccess || searchResult.Value == null)
+      return Task.FromResult(searchResult.ToResultOfType<MaksIT.Models.LetsEncryptServer.Common.PagedResponse<SearchUserResponse>?>(_ => new MaksIT.Models.LetsEncryptServer.Common.PagedResponse<SearchUserResponse> {
+        Data = [],
+        TotalRecords = 0,
+        PageNumber = page,
+        PageSize = size,
+      })!);
+
+    var total = countResult.Value ?? 0;
+    var list = searchResult.Value;
+    return Task.FromResult(Result<MaksIT.Models.LetsEncryptServer.Common.PagedResponse<SearchUserResponse>?>.Ok(new MaksIT.Models.LetsEncryptServer.Common.PagedResponse<SearchUserResponse> {
+      Data = [.. list.Select(userToResponseMapper.MapToSearchResponse)],
+      TotalRecords = total,
+      PageNumber = page,
+      PageSize = size,
+    }));
   }
 
   public async Task<Result<UserResponse?>> ReadUserAsync(JwtTokenData _jwtTokenData, Guid id) {

@@ -13,6 +13,12 @@ interface RequestOptions {
   skipLoader?: boolean
 }
 
+interface ApiResponse<T> {
+  payload: T | undefined
+  status: number | undefined
+  ok: boolean
+}
+
 // Create an Axios instance
 const axiosInstance = axios.create({
   timeout: 10000, // Set a timeout if needed
@@ -166,7 +172,7 @@ const getData = async <TResponse>(
   url: string,
   timeout?: number,
   options?: RequestOptions
-): Promise<TResponse | undefined> => {
+): Promise<ApiResponse<TResponse>> => {
   try {
     const config: any = {
       headers: {
@@ -180,12 +186,12 @@ const getData = async <TResponse>(
     }
 
     const response = await axiosInstance.get<TResponse>(url, config)
-    return response.data
-  } catch {
-    // Error is already handled by interceptors, so just return undefined
-    return undefined
+    return { payload: response.data, status: response.status, ok: true }
+  } catch (error: any) {
+    return { payload: undefined, status: error?.response?.status, ok: false }
   }
 }
+
 
 /**
  * Performs a POST request with the given data and returns the response data.
@@ -199,7 +205,7 @@ const postData = async <TRequest, TResponse>(
   data?: TRequest,
   timeout?: number,
   options?: RequestOptions
-): Promise<TResponse | undefined> => {
+): Promise<ApiResponse<TResponse>> => {
   try {
     const config: any = {
       headers: {
@@ -213,13 +219,12 @@ const postData = async <TRequest, TResponse>(
     }
 
     const response = await axiosInstance.post<TResponse>(url, data, config)
-
-    return response.data
-  } catch {
-    // Error is already handled by interceptors, so just return undefined
-    return undefined
+    return { payload: response.data, status: response.status, ok: true }
+  } catch (error: any) {
+    return { payload: undefined, status: error?.response?.status, ok: false }
   }
 }
+
 
 /**
  * Performs a PATCH request with the given data and returns the response data.
@@ -233,7 +238,7 @@ const patchData = async <TRequest, TResponse>(
   data: TRequest,
   timeout?: number,
   options?: RequestOptions
-): Promise<TResponse | undefined> => {
+): Promise<ApiResponse<TResponse>> => {
   try {
     const config: any = {
       headers: {
@@ -247,12 +252,12 @@ const patchData = async <TRequest, TResponse>(
     }
 
     const response = await axiosInstance.patch<TResponse>(url, data, config)
-    return response.data
-  } catch {
-    // Error is already handled by interceptors, so just return undefined
-    return undefined
+    return { payload: response.data, status: response.status, ok: true }
+  } catch (error: any) {
+    return { payload: undefined, status: error?.response?.status, ok: false }
   }
 }
+
   
 /**
  * Performs a PUT request with the given data and returns the response data.
@@ -266,7 +271,7 @@ const putData = async <TRequest, TResponse>(
   data: TRequest,
   timeout?: number,
   options?: RequestOptions
-): Promise<TResponse | undefined> => {
+): Promise<ApiResponse<TResponse>> => {
   try {
     const config: any = {
       headers: {
@@ -280,12 +285,12 @@ const putData = async <TRequest, TResponse>(
     }
 
     const response = await axiosInstance.put<TResponse>(url, data, config)
-    return response.data
-  } catch {
-    // Error is already handled by interceptors, so just return undefined
-    return undefined
+    return { payload: response.data, status: response.status, ok: true }
+  } catch (error: any) {
+    return { payload: undefined, status: error?.response?.status, ok: false }
   }
 }
+
   
 /**
  * Performs a DELETE request and returns the response data.
@@ -297,7 +302,7 @@ const deleteData = async <TResponse>(
   url: string,
   timeout?: number,
   options?: RequestOptions
-): Promise<TResponse | undefined> => {
+): Promise<ApiResponse<TResponse>> => {
   try {
     const config: any = {
       headers: {
@@ -311,12 +316,12 @@ const deleteData = async <TResponse>(
     }
 
     const response = await axiosInstance.delete<TResponse>(url, config)
-    return response.data
-  } catch {
-    // Error is already handled by interceptors, so just return undefined
-    return undefined
+    return { payload: response.data, status: response.status, ok: true }
+  } catch (error: any) {
+    return { payload: undefined, status: error?.response?.status, ok: false }
   }
 }
+
 
 /**
  * Performs a POST request with binary payload (e.g., file upload) and returns the response data.
@@ -330,7 +335,7 @@ const postBinary = async <TResponse>(
   data: Blob | ArrayBuffer | Uint8Array,
   timeout?: number,
   options?: RequestOptions
-): Promise<TResponse | undefined> => {
+): Promise<ApiResponse<TResponse>> => {
   try {
     const config: any = {
       headers: {
@@ -344,12 +349,12 @@ const postBinary = async <TResponse>(
     }
 
     const response = await axiosInstance.post<TResponse>(url, data, config)
-    return response.data
-  } catch {
-    // Error is already handled by interceptors, so just return undefined
-    return undefined
+    return { payload: response.data, status: response.status, ok: true }
+  } catch (error: any) {
+    return { payload: undefined, status: error?.response?.status, ok: false }
   }
 }
+
 
 /**
  * Performs a GET request to retrieve binary data (e.g., file download).
@@ -363,7 +368,7 @@ const getBinary = async (
   timeout?: number,
   as: 'arraybuffer' | 'blob' = 'arraybuffer',
   options?: RequestOptions
-): Promise<{ data: ArrayBuffer | Blob, headers: Record<string, string> } | undefined> => {
+): Promise<ApiResponse<{ data: ArrayBuffer | Blob, headers: Record<string, string> }>> => {
   try {
     const config: any = {
       responseType: as,
@@ -377,14 +382,18 @@ const getBinary = async (
     const response = await axiosInstance.get(url, config)
 
     return {
-      data: response.data,
-      headers: response.headers as Record<string, string>
+      payload: {
+        data: response.data,
+        headers: response.headers as Record<string, string>
+      },
+      status: response.status,
+      ok: true
     }
-  } catch {
-    // Error is already handled by interceptors, so just return undefined
-    return undefined
+  } catch (error: any) {
+    return { payload: undefined, status: error?.response?.status, ok: false }
   }
 }
+
 
 /**
  * Performs a POST request using multipart/form-data.
@@ -401,7 +410,7 @@ const postFormData = async <TResponse>(
   form: FormData | Record<string, string | Blob | File | (string | Blob | File)[]>,
   timeout?: number,
   options?: RequestOptions
-): Promise<TResponse | undefined> => {
+): Promise<ApiResponse<TResponse>> => {
   try {
     const formData =
       form instanceof FormData
@@ -428,13 +437,12 @@ const postFormData = async <TResponse>(
     }
 
     const response = await axiosInstance.post<TResponse>(url, formData, config)
-
-    return response.data
-  } catch {
-    // Error is already handled by interceptors, so just return undefined
-    return undefined
+    return { payload: response.data, status: response.status, ok: true }
+  } catch (error: any) {
+    return { payload: undefined, status: error?.response?.status, ok: false }
   }
 }
+
 
 /**
  * Convenience helper for uploading a single file via multipart/form-data.
@@ -454,7 +462,7 @@ const postFile = async <TResponse>(
   extraFields?: Record<string, string>,
   timeout?: number,
   options?: RequestOptions
-): Promise<TResponse | undefined> => {
+): Promise<ApiResponse<TResponse>> => {
   const fd = new FormData()
   const inferredName = filename ?? (file instanceof File ? file.name : 'file')
   fd.append(fieldName, file, inferredName)
@@ -466,6 +474,7 @@ const postFile = async <TResponse>(
   return postFormData<TResponse>(url, fd, timeout, options)
 }
 
+
 /** Options that disable the global loader for a request (for background/UI-only fetches). */
 const noLoaderOptions: RequestOptions = { skipLoader: true }
 
@@ -475,7 +484,7 @@ const noLoaderOptions: RequestOptions = { skipLoader: true }
 const getDataWithoutLoader = async <TResponse>(
   url: string,
   timeout?: number
-): Promise<TResponse | undefined> =>
+): Promise<ApiResponse<TResponse>> =>
   getData<TResponse>(url, timeout, noLoaderOptions)
 
 /**
@@ -485,10 +494,11 @@ const postDataWithoutLoader = async <TRequest, TResponse>(
   url: string,
   data?: TRequest,
   timeout?: number
-): Promise<TResponse | undefined> =>
+): Promise<ApiResponse<TResponse>> =>
   postData<TRequest, TResponse>(url, data, timeout, noLoaderOptions)
 
 export {
+  type ApiResponse,
   axiosInstance,
   getData,
   postData,

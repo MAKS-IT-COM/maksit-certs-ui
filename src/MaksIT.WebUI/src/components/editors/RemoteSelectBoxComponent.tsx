@@ -70,8 +70,8 @@ const RemoteSelectBoxComponent = <TRequest extends PagedRequest>(props: RemoteSe
 
     postData<TRequest, PagedResponse<SearchResponseBase>>(GetApiRoute(apiRoute).route, pagedRequest)
       .then((response) => {
-        if (!response) return
-        setOptions(response.items)
+        if (!response.ok || !response.payload) return
+        setOptions(response.payload.items)
       })
       .catch((error) => {
         console.error('RemoteSelectBox fetch error:', error)

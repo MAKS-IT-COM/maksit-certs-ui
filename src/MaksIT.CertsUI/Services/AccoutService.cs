@@ -98,7 +98,7 @@ public class AccountService(
           if (requestData.Description == null)
             return PatchFieldIsNotDefined<GetAccountResponse?>(nameof(requestData.Description));
 
-            cache.Description = requestData.Description;
+          cache.Description = requestData.Description;
           break;
         default:
           return UnsupportedPatchOperationResponse<GetAccountResponse?>();

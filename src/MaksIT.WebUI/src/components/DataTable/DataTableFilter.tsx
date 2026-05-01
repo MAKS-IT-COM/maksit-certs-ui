@@ -58,9 +58,9 @@ const DataTableFilter = <T extends { [key: string]: string }>(props: FilterProps
         pageSize: 100,
         filters
       }).then((response) => {
-        if (!response) return
+        if (!response.ok || !response.payload) return
 
-        const rows = response.data ?? []
+        const rows = response.payload.data ?? []
         const linqQuery = rows.map(item => `${columnId} == "${item['id']}"`).join(' || ')
         onFilterChange?.(filterId, columnId, linqQuery)
 

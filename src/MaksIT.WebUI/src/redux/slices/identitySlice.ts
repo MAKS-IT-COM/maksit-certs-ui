@@ -37,7 +37,7 @@ const login = createAsyncThunk(
   async (requestData: LoginRequest) => {
     const apiRoute = GetApiRoute(ApiRoutes.identityLogin)
     const response = await postData<LoginRequest, LoginResponse>(apiRoute.route, requestData)
-    return response
+    return response.payload
   }
 )
 
@@ -53,7 +53,7 @@ const logout = createAsyncThunk(
       logoutFromAllDevices,
       token: identity.token,
     })
-    return response
+    return response.payload
   }
 )
 
@@ -70,7 +70,7 @@ const refreshJwt = createAsyncThunk(
       force,
     })
 
-    return response
+    return response.payload
   }
 )
 

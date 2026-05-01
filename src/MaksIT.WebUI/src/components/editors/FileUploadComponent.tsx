@@ -6,6 +6,7 @@ interface FileUploadComponentProps {
   label?: string
   colspan?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
   multiple?: boolean
+  files?: File[]
   onChange?: (files: File[]) => void
   disabled?: boolean
 }
@@ -14,6 +15,7 @@ const FileUploadComponent: React.FC<FileUploadComponentProps> = ({
   label = 'Select files',
   colspan = 6,
   multiple = true,
+  files,
   onChange,
   disabled = false,
 }) => {
@@ -30,16 +32,47 @@ const FileUploadComponent: React.FC<FileUploadComponentProps> = ({
     }
   }, [showPopup])
 
+  const areFilesEqual = (left: File[], right: File[]) =>
+    left.length === right.length &&
+    left.every((file, index) => {
+      const other = right[index]
+      return other &&
+        file.name === other.name &&
+        file.size === other.size &&
+        file.lastModified === other.lastModified &&
+        file.type === other.type
+    })
+
+  const displayFiles = files ?? selectedFiles
+
+  // Keep native input in sync for controlled resets.
+  React.useEffect(() => {
+    if (files !== undefined && files.length === 0 && inputRef.current)
+      inputRef.current.value = ''
+  }, [files])
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files ? Array.from(e.target.files) : []
-    setSelectedFiles(files)
-    onChange?.(files)
+    const nextFiles = e.target.files ? Array.from(e.target.files) : []
+
+    if (files === undefined) {
+      setSelectedFiles(nextFiles)
+    }
+
+    if (!areFilesEqual(nextFiles, displayFiles)) {
+      onChange?.(nextFiles)
+    }
   }
 
   const handleClear = () => {
-    setSelectedFiles([])
+    if (files === undefined) {
+      setSelectedFiles([])
+    }
+
     if (inputRef.current) inputRef.current.value = ''
-    onChange?.([])
+
+    if (displayFiles.length > 0) {
+      onChange?.([])
+    }
   }
 
   const handleSelectFiles = () => {
@@ -78,9 +111,9 @@ const FileUploadComponent: React.FC<FileUploadComponentProps> = ({
           className={'bg-gray-200 px-4 py-2 rounded w-full text-center select-none block'}
           style={{ minHeight: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
-          {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}
+          {displayFiles.length} file{displayFiles.length !== 1 ? 's' : ''}
         </span>
-        {showPopup && selectedFiles.length > 0 && (
+        {showPopup && displayFiles.length > 0 && (
           <div
             ref={popupRef}
             className={'fixed z-50 bg-white border border-gray-300 rounded shadow-lg p-2 text-sm'}
@@ -111,7 +144,7 @@ const FileUploadComponent: React.FC<FileUploadComponentProps> = ({
             onFocus={() => {}}
           >
             <ul className={'max-h-40 overflow-auto'} tabIndex={0} style={{outline: 'none'}}>
-              {selectedFiles.map((file, idx) => (
+              {displayFiles.map((file, idx) => (
                 <li key={file.name + idx} className={'truncate'} title={file.name}>
                   {file.name}
                 </li>
@@ -127,7 +160,7 @@ const FileUploadComponent: React.FC<FileUploadComponentProps> = ({
       <ButtonComponent
         buttonHierarchy={'secondary'}
         onClick={handleClear}
-        disabled={disabled || selectedFiles.length === 0}
+        disabled={disabled || displayFiles.length === 0}
         colspan={1}
       >
         <TrashIcon />

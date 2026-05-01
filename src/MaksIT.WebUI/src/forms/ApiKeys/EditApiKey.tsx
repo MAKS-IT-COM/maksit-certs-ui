@@ -125,7 +125,7 @@ const EditApiKey: FC<EditApiKeyProps> = (props) => {
     getData<ApiKeyResponse>(GetApiRoute(ApiRoutes.apikeyGet).route
       .replace('{apiKeyId}', apiKeyId))
       .then(response => {
-        if (!response) {
+        if (!response.ok || !response.payload) {
           // Leave form state as initial defaults; id will remain empty and
           // the "not found" UI will be shown below.
           setInitialState(deepCopy(initialFormState))
@@ -133,7 +133,7 @@ const EditApiKey: FC<EditApiKeyProps> = (props) => {
           return
         }
 
-        handleInitialization(response)
+        handleInitialization(response.payload)
       })
       .finally(() => {
         setHasLoaded(true)
@@ -169,10 +169,10 @@ const EditApiKey: FC<EditApiKeyProps> = (props) => {
     patchData<PatchApiKeyRequest, ApiKeyResponse>(GetApiRoute(ApiRoutes.apikeyPatch).route
       .replace('{apiKeyId}', apiKeyId), request.data)
       .then(response => {
-        if (!response) return
+        if (!response.ok || !response.payload) return
 
-        handleInitialization(response)
-        onSubmitted?.(response)
+        handleInitialization(response.payload)
+        onSubmitted?.(response.payload)
       })
   }
 

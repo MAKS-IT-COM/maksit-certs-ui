@@ -48,11 +48,11 @@ const EditUser: FC<EditUserProps> = (props) => {
   const handleLoad = useCallback(() => {
     getData<UserResponse>(GetApiRoute(ApiRoutes.identityGet).route.replace('{userId}', userId))
       .then((response) => {
-        setUser(response ?? null)
-        if (response) {
-          setTwoFactorEnabled(!!response.twoFactorEnabled)
-          setRecoveryCodesLeft(response.recoveryCodesLeft)
-          setIsActive(response.isActive !== false)
+        setUser(response.payload ?? null)
+        if (response.ok && response.payload) {
+          setTwoFactorEnabled(!!response.payload.twoFactorEnabled)
+          setRecoveryCodesLeft(response.payload.recoveryCodesLeft)
+          setIsActive(response.payload.isActive !== false)
           setDirtyIsActive(false)
         }
       })
@@ -88,11 +88,11 @@ const EditUser: FC<EditUserProps> = (props) => {
       GetApiRoute(ApiRoutes.identityPatch).route.replace('{userId}', userId),
       body
     ).then((response) => {
-      if (!response) return
-      setUser(response)
-      setIsActive(response.isActive !== false)
+      if (!response.ok || !response.payload) return
+      setUser(response.payload)
+      setIsActive(response.payload.isActive !== false)
       setDirtyIsActive(false)
-      onSubmitted?.(response)
+      onSubmitted?.(response.payload)
     })
   }
 
@@ -162,27 +162,27 @@ const EditUser: FC<EditUserProps> = (props) => {
                     GetApiRoute(ApiRoutes.identityPatch).route.replace('{userId}', userId),
                     { twoFactorEnabled: true }
                   ).then((response) => {
-                    if (!response) return
+                    if (!response.ok || !response.payload) return
                     setShowEnableTwoFactor(true)
-                    setTwoFactorEnabled(!!response.twoFactorEnabled)
-                    setQrCodeUrl(response.qrCodeUrl)
-                    setRecoveryCodes(response.twoFactorRecoveryCodes)
-                    setRecoveryCodesLeft(response.recoveryCodesLeft)
-                    setUser(response)
-                    onSubmitted?.(response)
+                    setTwoFactorEnabled(!!response.payload.twoFactorEnabled)
+                    setQrCodeUrl(response.payload.qrCodeUrl)
+                    setRecoveryCodes(response.payload.twoFactorRecoveryCodes)
+                    setRecoveryCodesLeft(response.payload.recoveryCodesLeft)
+                    setUser(response.payload)
+                    onSubmitted?.(response.payload)
                   })
                 } else {
                   patchData<PatchUserEnabeleTwoFactorRequest, UserResponse>(
                     GetApiRoute(ApiRoutes.identityPatch).route.replace('{userId}', userId),
                     { twoFactorEnabled: false }
                   ).then((response) => {
-                    if (!response) return
-                    setTwoFactorEnabled(!!response.twoFactorEnabled)
+                    if (!response.ok || !response.payload) return
+                    setTwoFactorEnabled(!!response.payload.twoFactorEnabled)
                     setQrCodeUrl(undefined)
                     setRecoveryCodes(undefined)
-                    setRecoveryCodesLeft(response.recoveryCodesLeft)
-                    setUser(response)
-                    onSubmitted?.(response)
+                    setRecoveryCodesLeft(response.payload.recoveryCodesLeft)
+                    setUser(response.payload)
+                    onSubmitted?.(response.payload)
                   })
                 }
               }}

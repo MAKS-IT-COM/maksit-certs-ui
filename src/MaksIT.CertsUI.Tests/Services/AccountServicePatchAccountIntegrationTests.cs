@@ -5,6 +5,7 @@ using MaksIT.Results;
 using MaksIT.CertsUI.Mappers;
 using MaksIT.CertsUI.Services;
 using LinqToDB.Data;
+using MaksIT.CertsUI.Engine.DomainServices;
 using MaksIT.CertsUI.Engine.Persistance.Services.Linq2Db;
 using MaksIT.CertsUI.Tests.Infrastructure;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -35,7 +36,8 @@ public class AccountServicePatchAccountIntegrationTests(PostgresCacheFixture pg)
       IsDisabled = false
     };
     var cachePersistence = new RegistrationCachePersistanceServiceLinq2Db(NullLogger<RegistrationCachePersistanceServiceLinq2Db>.Instance, pg.ConnectionFactory);
-    var cacheSvc = new CacheService(NullLogger<CacheService>.Instance, fx.AppOptions, cachePersistence);
+    var cacheDomain = new RegistrationCacheDomainService(NullLogger<RegistrationCacheDomainService>.Instance, cachePersistence);
+    var cacheSvc = new CacheService(NullLogger<CacheService>.Instance, fx.AppOptions, cacheDomain);
     await cacheSvc.SaveToCacheAsync(accountId, reg);
 
     var cacheMock = new Mock<ICacheService>();

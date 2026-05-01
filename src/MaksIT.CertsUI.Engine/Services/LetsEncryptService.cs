@@ -3,6 +3,12 @@
  * https://datatracker.ietf.org/doc/html/draft-ietf-acme-acme-12
  */
 
+using System.Text;
+using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using Microsoft.Extensions.Logging;
+using MaksIT.Results;
 using MaksIT.Core.Extensions;
 using MaksIT.Core.Security;
 using MaksIT.Core.Security.JWK;
@@ -10,16 +16,9 @@ using MaksIT.Core.Security.JWS;
 using MaksIT.CertsUI.Engine.Domain.Certs;
 using MaksIT.CertsUI.Engine.Domain.LetsEncrypt;
 using MaksIT.CertsUI.Engine.Domain.LetsEncrypt.Jws;
-using MaksIT.CertsUI.Engine.Dto.LetsEncrypt.Interfaces;
 using MaksIT.CertsUI.Engine.Dto.LetsEncrypt.Requests;
 using MaksIT.CertsUI.Engine.Dto.LetsEncrypt.Responses;
-using MaksIT.Results;
-using Microsoft.Extensions.Logging;
-using System.Net.Http.Headers;
-using System.Threading;
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
+using MaksIT.CertsUI.Engine.Persistance.Services;
 
 
 namespace MaksIT.CertsUI.Engine.Services;
@@ -45,18 +44,18 @@ public partial class LetsEncryptService : ILetsEncryptService {
   private readonly ILogger<LetsEncryptService> _logger;
   private readonly ICertsEngineConfiguration _engineConfiguration;
   private readonly HttpClient _httpClient;
-  private readonly IAcmeSessionStore _sessionStore;
+  private readonly IAcmeSessionPersistanceService _acmeSessionPersistence;
 
   public LetsEncryptService(
       ILogger<LetsEncryptService> logger,
       ICertsEngineConfiguration engineConfiguration,
       HttpClient httpClient,
-      IAcmeSessionStore sessionStore
+      IAcmeSessionPersistanceService acmeSessionPersistence
    ) {
     _logger = logger;
     _engineConfiguration = engineConfiguration;
     _httpClient = httpClient;
-    _sessionStore = sessionStore;
+    _acmeSessionPersistence = acmeSessionPersistence;
   }
 
   public Task<Result<RegistrationCache?>> GetRegistrationCacheAsync(Guid sessionId, CancellationToken cancellationToken = default) =>

@@ -63,7 +63,8 @@ public static class CertsLinq2DbMapping {
     // RegistrationCacheDto -> registration_caches
     builder.Entity<RegistrationCacheDto>()
       .HasTableName(Table.RegistrationCaches.Name)
-      .Property(x => x.AccountId).HasColumnName("AccountId").IsPrimaryKey()
+      .Property(x => x.Id).HasColumnName("AccountId").IsPrimaryKey()
+      .Property(x => x.AccountId).IsNotColumn()
       .Property(x => x.Version).HasColumnName("Version")
       .Property(x => x.PayloadJson).HasColumnName("PayloadJson");
 

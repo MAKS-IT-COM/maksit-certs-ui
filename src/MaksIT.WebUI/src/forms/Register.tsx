@@ -137,7 +137,7 @@ const Register: FC<RegisterProps> = () => {
       120000
     )
 
-    if (!response) return
+    if (!response.ok) return
 
     navigate('/')
   }

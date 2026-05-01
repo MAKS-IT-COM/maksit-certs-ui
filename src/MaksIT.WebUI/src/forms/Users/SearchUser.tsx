@@ -119,7 +119,7 @@ const SearchUser: FC = () => {
       GetApiRoute(ApiRoutes.identitySearch).route,
       pagedRequest
     ).then((response) => {
-      setRawd(response ?? undefined)
+      setRawd(response.payload ?? undefined)
     }).finally(() => {})
   }, [pagedRequest])
 
@@ -135,7 +135,10 @@ const SearchUser: FC = () => {
 
   const handleDeleteRow = (ids: Record<string, string>) => {
     deleteData(GetApiRoute(ApiRoutes.identityDelete).route.replace('{userId}', ids.id))
-      .then(() => loadData())
+      .then((response) => {
+        if (!response.ok) return
+        loadData()
+      })
   }
 
   const handleEditCancel = () => {

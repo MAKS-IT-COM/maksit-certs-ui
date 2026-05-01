@@ -61,10 +61,10 @@ const ChangePassword: FC<ChangePasswordProps> = (props) => {
       data
     )
 
-    if (!response) return
+    if (!response.ok || !response.payload) return
 
     addToast('Password updated.', 'success')
-    onSubmitted?.(response)
+    onSubmitted?.(response.payload)
     handleOnClose()
   }
 

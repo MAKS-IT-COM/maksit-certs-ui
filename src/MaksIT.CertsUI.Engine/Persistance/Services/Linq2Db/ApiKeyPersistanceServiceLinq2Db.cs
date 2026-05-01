@@ -1,11 +1,9 @@
 using LinqToDB;
-using LinqToDB.Data;
 using MaksIT.Core.Extensions;
 using MaksIT.CertsUI.Engine.Domain.Identity;
 using MaksIT.CertsUI.Engine.Dto.Identity;
 using MaksIT.CertsUI.Engine.Infrastructure;
 using MaksIT.CertsUI.Engine.Persistance.Mappers;
-using MaksIT.CertsUI.Engine.Persistance.Services;
 using MaksIT.Results;
 using Microsoft.Extensions.Logging;
 

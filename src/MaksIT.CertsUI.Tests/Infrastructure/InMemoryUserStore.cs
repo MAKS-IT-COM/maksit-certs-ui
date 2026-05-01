@@ -1,7 +1,8 @@
 using System.Linq;
+using System.Linq.Expressions;
 using MaksIT.CertsUI.Engine.Domain.Identity;
+using MaksIT.CertsUI.Engine.Dto.Identity;
 using MaksIT.CertsUI.Engine.Persistance.Services;
-using MaksIT.CertsUI.Engine.Query;
 using MaksIT.CertsUI.Engine.Query.Identity;
 using MaksIT.CertsUI.Engine.QueryServices.Identity;
 using MaksIT.Results;
@@ -25,35 +26,59 @@ public sealed class InMemoryUserStore : IIdentityPersistanceService, IUserQueryS
       return Task.FromResult(Result<List<User>>.Ok([.. _users]));
   }
 
-  public Task<Result<PagedQueryResult<UserQueryResult>>> SearchUsersAsync(
-    string? usernameFilter,
-    int pageNumber,
-    int pageSize,
-    CancellationToken cancellationToken = default) {
+  public Result<int?> Count(Expression<Func<UserDto, bool>>? usersPredicate) {
     lock (_lock) {
-      IEnumerable<User> filtered = _users;
-      if (!string.IsNullOrWhiteSpace(usernameFilter))
-        filtered = filtered.Where(u => u.Username.Contains(usernameFilter, StringComparison.OrdinalIgnoreCase));
-      var ordered = filtered.OrderBy(u => u.Username).ToList();
-      var page = Math.Max(1, pageNumber);
-      var size = Math.Clamp(pageSize, 1, 500);
-      var total = ordered.Count;
-      var slice = ordered.Skip((page - 1) * size).Take(size).ToList();
-      var data = slice.Select(u => new UserQueryResult {
-        Id = u.Id,
-        Username = u.Username,
-        IsActive = u.IsActive,
-        TwoFactorEnabled = u.TwoFactorEnabled,
-        LastLogin = u.LastLogin,
-      }).ToList();
-      return Task.FromResult(Result<PagedQueryResult<UserQueryResult>>.Ok(new PagedQueryResult<UserQueryResult>(
-        data,
-        total,
-        page,
-        size
-      )));
+      var q = _users.Select(ToUserDto).AsQueryable();
+      if (usersPredicate != null)
+        q = q.Where(usersPredicate);
+      return Result<int?>.Ok(q.Count());
     }
   }
+
+  public Result<List<UserQueryResult>?> Search(
+    Expression<Func<UserDto, bool>>? usersPredicate,
+    int? skip,
+    int? limit) {
+    lock (_lock) {
+      var q = _users.Select(ToUserDto).AsQueryable();
+      if (usersPredicate != null)
+        q = q.Where(usersPredicate);
+      q = q.OrderBy(x => x.Name);
+      if (skip.HasValue)
+        q = q.Skip(skip.Value);
+      if (limit.HasValue)
+        q = q.Take(limit.Value);
+      var dtos = q.ToList();
+      var results = dtos.Select(d => MapToQueryResult(d, d.TwoFactorRecoveryCodes.Count)).ToList();
+      return Result<List<UserQueryResult>?>.Ok(results);
+    }
+  }
+
+  private static UserDto ToUserDto(User u) => new() {
+    Id = u.Id,
+    Name = u.Username,
+    Salt = u.PasswordSalt,
+    Hash = u.PasswordHash,
+    LastLoginUtc = u.LastLogin ?? default,
+    IsActive = u.IsActive,
+    TwoFactorSharedKey = u.TwoFactorSharedKey,
+    JwtTokens = [],
+    TwoFactorRecoveryCodes = [.. u.TwoFactorRecoveryCodes.Select(rc => new TwoFactorRecoveryCodeDto {
+      Id = rc.Id,
+      UserId = u.Id,
+      Salt = rc.Salt,
+      Hash = rc.Hash,
+      IsUsed = rc.IsUsed
+    })]
+  };
+
+  private static UserQueryResult MapToQueryResult(UserDto row, int recoveryCount) => new() {
+    Id = row.Id,
+    Username = row.Name,
+    IsActive = row.IsActive,
+    TwoFactorEnabled = row.TwoFactorSharedKey != null && recoveryCount > 0,
+    LastLogin = row.LastLoginUtc == default ? null : row.LastLoginUtc,
+  };
 
   public Task<Result<User?>> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) {
     lock (_lock) {

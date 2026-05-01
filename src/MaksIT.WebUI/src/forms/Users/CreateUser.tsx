@@ -76,9 +76,9 @@ const CreateUser: FC<CreateUserProps> = (props) => {
 
     postData<CreateUserRequest, UserResponse>(GetApiRoute(ApiRoutes.identityPost).route, request.data)
       .then((response) => {
-        if (!response) return
+        if (!response.ok || !response.payload) return
         setInitialState(createUserFormPropsProto())
-        onSubmitted?.(response)
+        onSubmitted?.(response.payload)
       })
   }
 
