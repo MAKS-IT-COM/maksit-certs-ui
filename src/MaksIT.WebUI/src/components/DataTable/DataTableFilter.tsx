@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { debounce } from 'lodash'
 import { postDataWithoutLoader } from '../../axiosConfig'
 import { PagedRequest } from '../../models/PagedRequest'
-import { PagedResponse } from '../../models/letsEncryptServer/common/PagedResponse'
+import { PagedResponse } from '../../models/certsUI/common/PagedResponse'
 
 interface FilterPropsBase {
   filterId?: string

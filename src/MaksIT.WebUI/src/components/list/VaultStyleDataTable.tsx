@@ -1,6 +1,6 @@
 import { ReactNode } from 'react'
 
-/** Column definition for Vault-style dense list tables (MaksIT.Vault–style admin lists). */
+/** Column definition for dense list tables (sortable headers, optional filters). */
 export interface VaultStyleColumn<T> {
   id: string
   header: string
@@ -22,7 +22,7 @@ export interface VaultStyleDataTableProps<T> {
 }
 
 /**
- * Dense bordered table: neutral header bar, row dividers, hover — same structural pattern as Vault list views.
+ * Dense bordered table: neutral header bar, row dividers, hover.
  */
 function VaultStyleDataTable<T>(props: VaultStyleDataTableProps<T>) {
   const { columns, rows, rowKey, loading, emptyMessage, embedded } = props

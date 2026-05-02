@@ -1,27 +1,36 @@
 using MaksIT.CertsUI.Engine.Domain.Identity;
 using MaksIT.CertsUI.Engine.Query.Identity;
-using MaksIT.Models.LetsEncryptServer.Identity.User;
-using MaksIT.Models.LetsEncryptServer.Identity.User.Search;
+using MaksIT.CertsUI.Engine;
+using MaksIT.CertsUI.Models.Identity.User;
+using MaksIT.CertsUI.Models.Identity.User.Search;
 
 namespace MaksIT.CertsUI.Mappers;
 
 /// <summary>
-/// Maps User and UserQueryResult / UserEntityScopeQueryResult to API response models.
+/// Maps User / UserAuthorization and UserQueryResult to API response models.
 /// Used by IdentityService.
 /// </summary>
 public class UserToResponseMapper {
 
-  public UserResponse MapToResponse(User domain) {
+  public UserResponse MapToResponse(User domain, UserAuthorization? authorization) {
     ArgumentNullException.ThrowIfNull(domain);
     return new UserResponse {
       Id = domain.Id,
       Username = domain.Username,
+      Email = domain.Email,
+      MobileNumber = domain.MobileNumber,
       IsActive = domain.IsActive,
 
       TwoFactorEnabled = domain.TwoFactorEnabled,
       RecoveryCodesLeft = domain.TwoFactorRecoveryCodes.Count(x => !x.IsUsed),
 
-      LastLogin = domain.LastLogin
+      IsGlobalAdmin = authorization?.IsGlobalAdmin ?? false,
+      EntityScopes = (authorization?.EntityScopes ?? []).Select(sc => new UserEntityScopeResponse {
+        Id = sc.Id,
+        EntityId = sc.EntityId,
+        EntityType = sc.EntityType,
+        Scope = sc.Scope
+      }).ToList(),
     };
   }
 
@@ -30,11 +39,17 @@ public class UserToResponseMapper {
     return new SearchUserResponse {
       Id = queryResult.Id,
       Username = queryResult.Username,
+      Email = queryResult.Email,
+      MobileNumber = queryResult.MobileNumber,
       IsActive = queryResult.IsActive,
 
       TwoFactorEnabled = queryResult.TwoFactorEnabled,
+      RecoveryCodesLeft = queryResult.RecoveryCodesLeft,
 
-      LastLogin = queryResult.LastLogin
+      CreatedAt = queryResult.CreatedAt,
+      LastLogin = queryResult.LastLogin,
+
+      IsGlobalAdmin = queryResult.IsGlobalAdmin
     };
   }
 

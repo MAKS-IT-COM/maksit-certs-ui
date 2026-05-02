@@ -8,7 +8,6 @@ EXPOSE 5000
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["MaksIT.Models/MaksIT.Models.csproj", "MaksIT.Models/"]
 COPY ["MaksIT.CertsUI.Engine/MaksIT.CertsUI.Engine.csproj", "MaksIT.CertsUI.Engine/"]
 COPY ["MaksIT.CertsUI/MaksIT.CertsUI.csproj", "MaksIT.CertsUI/"]
 RUN dotnet restore "./MaksIT.CertsUI/MaksIT.CertsUI.csproj"

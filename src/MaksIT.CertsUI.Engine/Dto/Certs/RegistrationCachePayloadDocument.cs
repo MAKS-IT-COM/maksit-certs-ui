@@ -8,9 +8,7 @@ using MaksIT.CertsUI.Engine.Dto.LetsEncrypt.Responses;
 namespace MaksIT.CertsUI.Engine.Dto.Certs;
 
 public sealed class RegistrationCachePayloadDocument {
-
-  private Guid? _id;
-  public Guid Id { get => _id ?? AccountId; set => _id = value; }
+  public string? Id { get; set; }
 
   public Guid AccountId { get; set; }
 

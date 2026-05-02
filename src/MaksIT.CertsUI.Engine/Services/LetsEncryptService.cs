@@ -18,7 +18,7 @@ using MaksIT.CertsUI.Engine.Domain.LetsEncrypt;
 using MaksIT.CertsUI.Engine.Domain.LetsEncrypt.Jws;
 using MaksIT.CertsUI.Engine.Dto.LetsEncrypt.Requests;
 using MaksIT.CertsUI.Engine.Dto.LetsEncrypt.Responses;
-using MaksIT.CertsUI.Engine.Persistance.Services;
+using MaksIT.CertsUI.Engine.Persistence.Services;
 
 
 namespace MaksIT.CertsUI.Engine.Services;
@@ -44,13 +44,13 @@ public partial class LetsEncryptService : ILetsEncryptService {
   private readonly ILogger<LetsEncryptService> _logger;
   private readonly ICertsEngineConfiguration _engineConfiguration;
   private readonly HttpClient _httpClient;
-  private readonly IAcmeSessionPersistanceService _acmeSessionPersistence;
+  private readonly IAcmeSessionPersistenceService _acmeSessionPersistence;
 
   public LetsEncryptService(
       ILogger<LetsEncryptService> logger,
       ICertsEngineConfiguration engineConfiguration,
       HttpClient httpClient,
-      IAcmeSessionPersistanceService acmeSessionPersistence
+      IAcmeSessionPersistenceService acmeSessionPersistence
    ) {
     _logger = logger;
     _engineConfiguration = engineConfiguration;

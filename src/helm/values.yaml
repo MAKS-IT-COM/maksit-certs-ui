@@ -19,7 +19,7 @@ certsServerConfig:
     default: Information
     microsoftAspNetCore: Warning
   configuration:
-    certsUIEngineConfiguration:
+    certsEngineConfiguration:
       # Add-only column sync after FluentMigrator (ALTER ADD IF NOT EXISTS; never DROP). Set false to disable.
       autoSyncSchema: true
       admin:
@@ -44,13 +44,13 @@ certsServerConfig:
       staging: "https://acme-staging-v02.api.letsencrypt.org/directory"
 
 # Server Secret (appsecrets.json); referenced from components.server.secretsFile when tpl: true
-# Configuration:CertsUIEngineConfiguration:ConnectionString — same structural role as MaksIT.Vault VaultEngineConfiguration:ConnectionString.
+# Configuration:CertsEngineConfiguration:ConnectionString — same structural role as MaksIT.Vault VaultEngineConfiguration:ConnectionString.
 certsServerSecrets:
   authSecret: changeme-generate-a-long-random-string
   authPepper: ""
   agentKey: ""
   adminPassword: changeme-generate-a-strong-password
-  certsUIEngineConfiguration:
+  certsEngineConfiguration:
     connectionString: ""
 
 # Client ConfigMap (config.js); referenced when tpl: true. Prefer a relative URL (/api) when UI and API share one ingress origin.
@@ -103,8 +103,8 @@ components:
       content: |
         {
           "Configuration": {
-            "CertsUIEngineConfiguration": {
-              "ConnectionString": {{ .Values.certsServerSecrets.certsUIEngineConfiguration.connectionString | toJson }},
+            "CertsEngineConfiguration": {
+              "ConnectionString": {{ .Values.certsServerSecrets.certsEngineConfiguration.connectionString | toJson }},
               "Admin": {
                 "Password": {{ .Values.certsServerSecrets.adminPassword | toJson }}
               },
@@ -134,36 +134,36 @@ components:
           },
           "AllowedHosts": {{ .Values.certsServerConfig.allowedHosts | toJson }},
           "Configuration": {
-            "CertsUIEngineConfiguration": {
-              "AutoSyncSchema": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.autoSyncSchema }},
+            "CertsEngineConfiguration": {
+              "AutoSyncSchema": {{ .Values.certsServerConfig.configuration.certsEngineConfiguration.autoSyncSchema }},
               "Admin": {
-                "Username": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.admin.username | toJson }},
+                "Username": {{ .Values.certsServerConfig.configuration.certsEngineConfiguration.admin.username | toJson }},
                 "Password": ""
               },
               "JwtSettingsConfiguration": {
                 "JwtSecret": "",
-                "Issuer": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.jwt.issuer | toJson }},
-                "Audience": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.jwt.audience | toJson }},
-                "ExpiresIn": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.jwt.expiresIn }},
-                "RefreshTokenExpiresIn": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.jwt.refreshTokenExpiresIn }},
+                "Issuer": {{ .Values.certsServerConfig.configuration.certsEngineConfiguration.jwt.issuer | toJson }},
+                "Audience": {{ .Values.certsServerConfig.configuration.certsEngineConfiguration.jwt.audience | toJson }},
+                "ExpiresIn": {{ .Values.certsServerConfig.configuration.certsEngineConfiguration.jwt.expiresIn }},
+                "RefreshTokenExpiresIn": {{ .Values.certsServerConfig.configuration.certsEngineConfiguration.jwt.refreshTokenExpiresIn }},
                 "PasswordPepper": ""
               },
               "TwoFactorSettingsConfiguration": {
-                "Label": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.twoFactor.label | toJson }},
-                "Issuer": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.twoFactor.issuer | toJson }},
-                "Algorithm": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.twoFactor.algorithm | toJson }},
-                "Digits": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.twoFactor.digits }},
-                "Period": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.twoFactor.period }},
-                "TimeTolerance": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.twoFactor.timeTolerance }}
+                "Label": {{ .Values.certsServerConfig.configuration.certsEngineConfiguration.twoFactor.label | toJson }},
+                "Issuer": {{ .Values.certsServerConfig.configuration.certsEngineConfiguration.twoFactor.issuer | toJson }},
+                "Algorithm": {{ .Values.certsServerConfig.configuration.certsEngineConfiguration.twoFactor.algorithm | toJson }},
+                "Digits": {{ .Values.certsServerConfig.configuration.certsEngineConfiguration.twoFactor.digits }},
+                "Period": {{ .Values.certsServerConfig.configuration.certsEngineConfiguration.twoFactor.period }},
+                "TimeTolerance": {{ .Values.certsServerConfig.configuration.certsEngineConfiguration.twoFactor.timeTolerance }}
               },
               "Agent": {
-                "AgentHostname": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.agent.agentHostname | toJson }},
-                "AgentPort": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.agent.agentPort }},
+                "AgentHostname": {{ .Values.certsServerConfig.configuration.certsEngineConfiguration.agent.agentHostname | toJson }},
+                "AgentPort": {{ .Values.certsServerConfig.configuration.certsEngineConfiguration.agent.agentPort }},
                 "AgentKey": "",
-                "ServiceToReload": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.agent.serviceToReload | toJson }}
+                "ServiceToReload": {{ .Values.certsServerConfig.configuration.certsEngineConfiguration.agent.serviceToReload | toJson }}
               },
-              "Production": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.production | toJson }},
-              "Staging": {{ .Values.certsServerConfig.configuration.certsUIEngineConfiguration.staging | toJson }}
+              "Production": {{ .Values.certsServerConfig.configuration.certsEngineConfiguration.production | toJson }},
+              "Staging": {{ .Values.certsServerConfig.configuration.certsEngineConfiguration.staging | toJson }}
             }
           }
         }

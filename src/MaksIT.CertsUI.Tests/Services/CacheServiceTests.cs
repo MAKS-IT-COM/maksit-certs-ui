@@ -1,9 +1,11 @@
 using LinqToDB;
 using LinqToDB.Data;
+using MaksIT.Core.Webapi.Models;
+using MaksIT.CertsUI.Authorization;
 using MaksIT.CertsUI.Engine.Dto.Certs;
 using MaksIT.CertsUI.Engine.Domain.Certs;
 using MaksIT.CertsUI.Engine.DomainServices;
-using MaksIT.CertsUI.Engine.Persistance.Services.Linq2Db;
+using MaksIT.CertsUI.Engine.Persistence.Services.Linq2Db;
 using MaksIT.CertsUI.Services;
 using MaksIT.CertsUI.Tests.Infrastructure;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -14,8 +16,22 @@ namespace MaksIT.CertsUI.Tests.Services;
 [Collection("postgres-cache")]
 public class CacheServiceTests(PostgresCacheFixture pg) {
 
+  private static JwtTokenData TestJwt() =>
+    new() {
+      Token = "test",
+      Username = "test",
+      ClaimRoles = [],
+      IssuedAt = DateTime.UtcNow,
+      ExpiresAt = DateTime.UtcNow.AddHours(1),
+      UserId = Guid.Empty,
+      IsGlobalAdmin = true
+    };
+
+  private static CertsUIAuthorizationData TestAuth() =>
+    new() { JwtTokenData = TestJwt() };
+
   private CacheService CreateSut() {
-    var persistence = new RegistrationCachePersistanceServiceLinq2Db(NullLogger<RegistrationCachePersistanceServiceLinq2Db>.Instance, pg.ConnectionFactory);
+    var persistence = new RegistrationCachePersistenceServiceLinq2Db(NullLogger<RegistrationCachePersistenceServiceLinq2Db>.Instance, pg.ConnectionFactory);
     var domain = new RegistrationCacheDomainService(NullLogger<RegistrationCacheDomainService>.Instance, persistence);
     return new CacheService(NullLogger<CacheService>.Instance, pg.Config.AppOptions, domain);
   }
@@ -96,7 +112,7 @@ public class CacheServiceTests(PostgresCacheFixture pg) {
     await sut.SaveToCacheAsync(a, NewReg(a, "a"));
     await sut.SaveToCacheAsync(b, NewReg(b, "b"));
 
-    var result = await sut.DeleteCacheAsync();
+    var result = await sut.DeleteCacheAsync(TestAuth());
 
     Assert.True(result.IsSuccess);
     var load = await sut.LoadAccountsFromCacheAsync();

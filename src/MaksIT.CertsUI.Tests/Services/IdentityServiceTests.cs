@@ -1,9 +1,14 @@
+using LinqToDB.Data;
 using MaksIT.Core.Webapi.Models;
+using MaksIT.CertsUI.Engine;
 using MaksIT.CertsUI.Engine.DomainServices;
-using MaksIT.Models.LetsEncryptServer.Identity.Login;
-using MaksIT.Models.LetsEncryptServer.Identity.Logout;
-using MaksIT.Models.LetsEncryptServer.Identity.User;
+using MaksIT.CertsUI.Engine.Persistence.Mappers;
+using MaksIT.CertsUI.Engine.Persistence.Services.Linq2Db;
 using MaksIT.CertsUI.Engine.QueryServices.Identity;
+using MaksIT.CertsUI.Engine.QueryServices.Linq2Db.Identity;
+using MaksIT.CertsUI.Models.Identity.Login;
+using MaksIT.CertsUI.Models.Identity.Logout;
+using MaksIT.CertsUI.Models.Identity.User;
 using MaksIT.CertsUI.Authorization;
 using MaksIT.CertsUI.Mappers;
 using MaksIT.CertsUI.Services;
@@ -13,26 +18,58 @@ using Xunit;
 
 namespace MaksIT.CertsUI.Tests.Services;
 
-public class IdentityServiceTests {
-  private static TestIdentityDomainConfiguration BuildIdentityConfig(WebApiTestFixture fx) {
-    var jwt = fx.AppOptions.Value.CertsUIEngineConfiguration.JwtSettingsConfiguration;
-    return new(
-      jwt.JwtSecret,
-      jwt.Issuer,
-      jwt.Audience,
-      jwt.ExpiresIn,
-      jwt.RefreshTokenExpiresIn,
-      jwt.PasswordPepper
-    );
+/// <summary>Identity host service integration tests against PostgreSQL + Linq2DB.</summary>
+[Collection("postgres-cache")]
+public class IdentityServiceTests(PostgresCacheFixture pg) {
+
+  private ICertsEngineConfiguration EngineCfg => pg.Config.AppOptions.Value.CertsEngineConfiguration;
+
+  private IdentityDomainService CreateIdentityDomainService() {
+    var engineCfg = EngineCfg;
+    var userMapper = new UserMapper(engineCfg.JwtSettingsConfiguration.PasswordPepper);
+    var persistence = new IdentityPersistenceServiceLinq2Db(
+      NullLogger<IdentityPersistenceServiceLinq2Db>.Instance,
+      pg.ConnectionFactory,
+      userMapper);
+    var userAuthz = new UserAuthorizationPersistenceServiceLinq2Db(
+      NullLogger<UserAuthorizationPersistenceServiceLinq2Db>.Instance,
+      pg.ConnectionFactory);
+    return new IdentityDomainService(
+      NullLogger<IdentityDomainService>.Instance,
+      persistence,
+      userAuthz,
+      engineCfg,
+      engineCfg.Admin,
+      engineCfg.JwtSettingsConfiguration,
+      engineCfg.TwoFactorSettingsConfiguration);
+  }
+
+  private IdentityService CreateSut() {
+    var domain = CreateIdentityDomainService();
+    var query = new IdentityQueryServiceLinq2Db(NullLogger<IdentityQueryServiceLinq2Db>.Instance, pg.ConnectionFactory);
+    var scopeQuery = new UserEntityScopeQueryServiceLinq2Db(
+      NullLogger<UserEntityScopeQueryServiceLinq2Db>.Instance,
+      pg.ConnectionFactory);
+    return new IdentityService(
+      NullLogger<IdentityService>.Instance,
+      pg.Config.AppOptions,
+      query,
+      scopeQuery,
+      domain,
+      new UserToResponseMapper());
+  }
+
+  private void ClearIdentityTables() {
+    using var db = (DataConnection)pg.ConnectionFactory.Create();
+    db.Execute("DELETE FROM jwt_tokens");
+    db.Execute("DELETE FROM two_factor_recovery_codes");
+    db.Execute("DELETE FROM users");
   }
 
   [Fact]
   public async Task LoginAsync_WhenUserMissing_ReturnsNotFound() {
-    using var fx = new WebApiTestFixture();
-    var store = new InMemoryUserStore();
-    var idCfg = BuildIdentityConfig(fx);
-    var domainService = new IdentityDomainService(NullLogger<IdentityDomainService>.Instance, store, idCfg, idCfg, idCfg);
-    var sut = new IdentityService(NullLogger<IdentityService>.Instance, fx.AppOptions, domainService, (IUserQueryService)store, new UserToResponseMapper(), idCfg);
+    ClearIdentityTables();
+    var sut = CreateSut();
 
     var result = await sut.LoginAsync(new LoginRequest { Username = "nobody", Password = "x" });
 
@@ -41,15 +78,12 @@ public class IdentityServiceTests {
 
   [Fact]
   public async Task LoginAsync_WithValidAdminCredentials_ReturnsTokens() {
-    using var fx = new WebApiTestFixture();
-    var store = new InMemoryUserStore();
-    await store.EnsureDefaultAdminAsync(
-      fx.AppOptions.Value.CertsUIEngineConfiguration.JwtSettingsConfiguration.PasswordPepper,
-      fx.AppOptions.Value.CertsUIEngineConfiguration.Admin.Username,
-      fx.AppOptions.Value.CertsUIEngineConfiguration.Admin.Password);
-    var idCfg = BuildIdentityConfig(fx);
-    var domainService = new IdentityDomainService(NullLogger<IdentityDomainService>.Instance, store, idCfg, idCfg, idCfg);
-    var sut = new IdentityService(NullLogger<IdentityService>.Instance, fx.AppOptions, domainService, (IUserQueryService)store, new UserToResponseMapper(), idCfg);
+    ClearIdentityTables();
+    var domain = CreateIdentityDomainService();
+    var seeded = await domain.InitializeAdminAsync();
+    Assert.True(seeded.IsSuccess);
+
+    var sut = CreateSut();
 
     var result = await sut.LoginAsync(new LoginRequest { Username = "admin", Password = "password" });
 
@@ -61,15 +95,11 @@ public class IdentityServiceTests {
 
   [Fact]
   public async Task RefreshTokenAsync_WhenTokenInvalid_ReturnsUnauthorized() {
-    using var fx = new WebApiTestFixture();
-    var store = new InMemoryUserStore();
-    await store.EnsureDefaultAdminAsync(
-      fx.AppOptions.Value.CertsUIEngineConfiguration.JwtSettingsConfiguration.PasswordPepper,
-      fx.AppOptions.Value.CertsUIEngineConfiguration.Admin.Username,
-      fx.AppOptions.Value.CertsUIEngineConfiguration.Admin.Password);
-    var idCfg = BuildIdentityConfig(fx);
-    var domainService = new IdentityDomainService(NullLogger<IdentityDomainService>.Instance, store, idCfg, idCfg, idCfg);
-    var sut = new IdentityService(NullLogger<IdentityService>.Instance, fx.AppOptions, domainService, (IUserQueryService)store, new UserToResponseMapper(), idCfg);
+    ClearIdentityTables();
+    var domain = CreateIdentityDomainService();
+    Assert.True((await domain.InitializeAdminAsync()).IsSuccess);
+
+    var sut = CreateSut();
 
     var result = await sut.RefreshTokenAsync(new RefreshTokenRequest { RefreshToken = "not-a-real-token" });
 
@@ -78,15 +108,11 @@ public class IdentityServiceTests {
 
   [Fact]
   public async Task RefreshTokenAsync_WhenTokenValid_ReturnsSameAccessUntilExpiry() {
-    using var fx = new WebApiTestFixture();
-    var store = new InMemoryUserStore();
-    await store.EnsureDefaultAdminAsync(
-      fx.AppOptions.Value.CertsUIEngineConfiguration.JwtSettingsConfiguration.PasswordPepper,
-      fx.AppOptions.Value.CertsUIEngineConfiguration.Admin.Username,
-      fx.AppOptions.Value.CertsUIEngineConfiguration.Admin.Password);
-    var idCfg = BuildIdentityConfig(fx);
-    var domainService = new IdentityDomainService(NullLogger<IdentityDomainService>.Instance, store, idCfg, idCfg, idCfg);
-    var sut = new IdentityService(NullLogger<IdentityService>.Instance, fx.AppOptions, domainService, (IUserQueryService)store, new UserToResponseMapper(), idCfg);
+    ClearIdentityTables();
+    var domain = CreateIdentityDomainService();
+    Assert.True((await domain.InitializeAdminAsync()).IsSuccess);
+
+    var sut = CreateSut();
     var login = await sut.LoginAsync(new LoginRequest { Username = "admin", Password = "password" });
     Assert.True(login.IsSuccess);
 
@@ -98,27 +124,26 @@ public class IdentityServiceTests {
 
   [Fact]
   public async Task Logout_removes_matching_access_token() {
-    using var fx = new WebApiTestFixture();
-    var store = new InMemoryUserStore();
-    await store.EnsureDefaultAdminAsync(
-      fx.AppOptions.Value.CertsUIEngineConfiguration.JwtSettingsConfiguration.PasswordPepper,
-      fx.AppOptions.Value.CertsUIEngineConfiguration.Admin.Username,
-      fx.AppOptions.Value.CertsUIEngineConfiguration.Admin.Password);
-    var idCfg = BuildIdentityConfig(fx);
-    var domainService = new IdentityDomainService(NullLogger<IdentityDomainService>.Instance, store, idCfg, idCfg, idCfg);
-    var sut = new IdentityService(NullLogger<IdentityService>.Instance, fx.AppOptions, domainService, (IUserQueryService)store, new UserToResponseMapper(), idCfg);
+    ClearIdentityTables();
+    var seedDomain = CreateIdentityDomainService();
+    Assert.True((await seedDomain.InitializeAdminAsync()).IsSuccess);
+
+    var sut = CreateSut();
     var login = await sut.LoginAsync(new LoginRequest { Username = "admin", Password = "password" });
     Assert.True(login.IsSuccess);
-    var adminUser = (await store.GetByNameAsync("admin")).Value!;
+    var adminRead = seedDomain.ReadUserByUsername("admin");
+    Assert.True(adminRead.IsSuccess);
+    var adminUser = adminRead.Value!;
 
     var jwt = new JwtTokenData {
       UserId = adminUser.Id,
       Username = "admin",
       Token = login.Value!.Token,
+      ClaimRoles = [],
       IssuedAt = DateTime.UtcNow,
       ExpiresAt = DateTime.UtcNow.AddMinutes(5)
     };
-    await sut.Logout(jwt, new LogoutRequest { Token = login.Value.Token, LogoutFromAllDevices = false });
+    await sut.Logout(jwt, new LogoutRequest { LogoutFromAllDevices = false });
 
     var second = await sut.LoginAsync(new LoginRequest { Username = "admin", Password = "password" });
     Assert.True(second.IsSuccess);
@@ -127,21 +152,19 @@ public class IdentityServiceTests {
 
   [Fact]
   public async Task PatchUserAsync_SetPassword_allows_login_with_new_password() {
-    using var fx = new WebApiTestFixture();
-    var store = new InMemoryUserStore();
-    await store.EnsureDefaultAdminAsync(
-      fx.AppOptions.Value.CertsUIEngineConfiguration.JwtSettingsConfiguration.PasswordPepper,
-      fx.AppOptions.Value.CertsUIEngineConfiguration.Admin.Username,
-      fx.AppOptions.Value.CertsUIEngineConfiguration.Admin.Password);
-    var admin = (await store.GetByNameAsync("admin")).Value!;
+    ClearIdentityTables();
+    var seedDomain = CreateIdentityDomainService();
+    Assert.True((await seedDomain.InitializeAdminAsync()).IsSuccess);
+    var adminRead = seedDomain.ReadUserByUsername("admin");
+    Assert.True(adminRead.IsSuccess);
+    var admin = adminRead.Value!;
 
-    var idCfg = BuildIdentityConfig(fx);
-    var domainService = new IdentityDomainService(NullLogger<IdentityDomainService>.Instance, store, idCfg, idCfg, idCfg);
-    var sut = new IdentityService(NullLogger<IdentityService>.Instance, fx.AppOptions, domainService, (IUserQueryService)store, new UserToResponseMapper(), idCfg);
+    var sut = CreateSut();
     var jwt = new JwtTokenData {
       UserId = admin.Id,
       Username = admin.Username,
       Token = "unused-for-patch",
+      ClaimRoles = [],
       IssuedAt = DateTime.UtcNow,
       ExpiresAt = DateTime.UtcNow.AddMinutes(5)
     };

@@ -1,6 +1,6 @@
 # PATCH Delta Handling – Backend & Frontend Reference
 
-This document is the **single reference** for how PATCH payloads (deltas) are structured and interpreted so backend (BE) and frontend (FE) stay consistent. It is **aligned** with the same contract as **MaksIT-Vault** [`assets/docs/PATCH_DELTA_REFERENCE.md`](../../maksit-vault/assets/docs/PATCH_DELTA_REFERENCE.md) (Core rules, collection-item key, and `deepDelta` behavior) when both repos sit side by side under the same parent folder; otherwise open that path in your Vault clone. Vault adds RBAC-specific collections (`entityScopes`, `versions`); **MaksIT-CertsUI** uses the same **MaksIT.Core** patch model with a **hostnames** collection on account PATCH.
+This document is the **single reference** for how PATCH payloads (deltas) are structured and interpreted so backend (BE) and frontend (FE) stay consistent. It follows the **MaksIT.Core** patch contract (same rules as shared **`deepDelta`** helpers). **MaksIT-CertsUI** uses that model with a **hostnames** collection on account PATCH.
 
 **Audience:** Backend (C# / ASP.NET) and Frontend (TypeScript / React) developers.
 
@@ -102,7 +102,7 @@ For the backend to interpret add/remove/update correctly, each collection **item
 
 ### 3.3 Shared array policies (this repository)
 
-Unlike MaksIT-Vault, **MaksIT-CertsUI** does **not** ship `patchCollectionPolicies.ts`. The **Edit Account** form passes an **inline** policy for the `hostnames` collection:
+**MaksIT-CertsUI** does **not** ship a shared `patchCollectionPolicies.ts`; the **Edit Account** form passes an **inline** policy for the `hostnames` collection:
 
 | Collection | Policy (inline) | Used in |
 |------------|-----------------|---------|
@@ -120,8 +120,6 @@ deepDelta(fromFormState, fromBackupState, {
   },
 })
 ```
-
-For **Vault**-style shared policies (`ENTITY_SCOPES_ARRAY_POLICY`, `VERSIONS_ARRAY_POLICY`), see the Vault repo and forms that edit `entityScopes` / `versions`.
 
 ### 3.4 Consistency checklist (FE)
 
@@ -222,7 +220,6 @@ Item exists; fields change; no `collectionItemOperation` on the item (or only ne
 ## 6. Related docs
 
 - **MaksIT.Core:** `PatchOperation`, `PatchRequestModelBase` (README / XML).
-- **Aligned reference (RBAC / Vault collections):** [MaksIT-Vault `PATCH_DELTA_REFERENCE.md`](../../maksit-vault/assets/docs/PATCH_DELTA_REFERENCE.md) — same Core rules; extra sections for `entityScopes` and `versions`.
 
 ---
 
@@ -235,7 +232,7 @@ Item exists; fields change; no `collectionItemOperation` on the item (or only ne
 - **Safe:** Hostname rows use `identityKey` / `idFieldKey` so itemized deltas include `AddToCollection` / `RemoveFromCollection` where appropriate.
 - **Consistent:** Same `PatchOperation` values and collection-item key string as Core.
 
-**FE summary:** Follows the shared reference; scope is **account + hostnames** (no Vault RBAC collections in this product).
+**FE summary:** Follows the shared reference; account PATCH covers **account fields and hostnames**.
 
 ### 7.2 Backend (BE)
 
@@ -245,7 +242,7 @@ Item exists; fields change; no `collectionItemOperation` on the item (or only ne
 
 | Topic | Status | Note |
 |-------|--------|------|
-| Shared policies file | N/A in Certs | Inline policy in `EditAccount.tsx`; Vault uses `patchCollectionPolicies.ts` for RBAC collections. |
+| Shared policies file | N/A in Certs | Inline policy in `EditAccount.tsx` for `hostnames`. |
 | New forms with patchable collections | **Ongoing** | When adding a form that patches a collection, pass the correct `arrays: { key: policy }` to `deepDelta`. |
 
 ---

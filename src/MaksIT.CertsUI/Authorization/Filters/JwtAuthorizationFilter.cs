@@ -1,25 +1,25 @@
-using MaksIT.CertsUI;
-using MaksIT.Core.Security.JWT;
-using MaksIT.CertsUI.Engine.DomainServices;
-using MaksIT.Results;
-using MaksIT.CertsUI.Abstractions.Authorization.Filters;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.Options;
-using System.Threading.Tasks;
+using MaksIT.Results;
+using MaksIT.CertsUI.Engine.DomainServices;
+using MaksIT.Core.Security.JWT;
+using MaksIT.CertsUI.Abstractions.Authorization.Filters;
+
 
 namespace MaksIT.CertsUI.Authorization.Filters;
 
 public class JwtAuthorizationFilter : BaseAsyncAuthorizationFilter {
-  protected const string BearerTokenHeaderName = "Authorization";
+  private const string BearerTokenHeaderName = "Authorization"; // JWT header
+
   private readonly JwtSettingsConfiguration _jwtSettingsConfiguration;
   private readonly IIdentityDomainService _identityDomainService;
 
   public JwtAuthorizationFilter(
-  ILogger<JwtAuthorizationFilter> logger,
-  IOptions<Configuration> appSettings,
-  IIdentityDomainService identityDomainService
+      ILogger<JwtAuthorizationFilter> logger,
+      IOptions<Configuration> configuration,
+      IIdentityDomainService identityDomainService
   ) : base(logger) {
-    _jwtSettingsConfiguration = appSettings.Value.CertsUIEngineConfiguration.JwtSettingsConfiguration;
+    _jwtSettingsConfiguration = configuration.Value.CertsEngineConfiguration.JwtSettingsConfiguration;
     _identityDomainService = identityDomainService;
   }
 
@@ -31,54 +31,64 @@ public class JwtAuthorizationFilter : BaseAsyncAuthorizationFilter {
     }
 
     var token = authorization.FirstOrDefault()?.Split(' ').Last();
-    var validationResult = await ValidateJwtTokenAsync(token, context.HttpContext.RequestAborted);
+    var validationResult = await ValidateJwtTokenAsync(token);
     if (!validationResult.IsSuccess) {
       context.Result = validationResult.ToActionResult();
       return;
     }
 
-    var tokenData = validationResult.Value;
-
-    context.HttpContext.Items[HttpContextValue.JwtTokenData] = tokenData;
+    var jwtTokenData = validationResult.Value;
+    context.HttpContext.Items[HttpContextValue.JwtTokenData] = jwtTokenData;
   }
 
-  protected async Task<Result<JwtTokenData?>> ValidateJwtTokenAsync(string? token, CancellationToken cancellationToken = default) {
+  protected Task<Result<JwtTokenData?>> ValidateJwtTokenAsync(string? token) {
     if (string.IsNullOrWhiteSpace(token))
-      return Result<JwtTokenData?>.Forbidden(null, "Token is missing");
+      return Task.FromResult(Result<JwtTokenData?>.Forbidden(null, "Token is missing"));
 
     if (!JwtGenerator.TryValidateToken(
-      _jwtSettingsConfiguration.JwtSecret,
-      _jwtSettingsConfiguration.Issuer,
-      _jwtSettingsConfiguration.Audience,
-      token,
-      out var jwtTokenClaims,
-      out string? errorMessage
-    )) {
-      return Result<JwtTokenData?>.InternalServerError(null, errorMessage);
+            _jwtSettingsConfiguration.JwtSecret,
+            _jwtSettingsConfiguration.Issuer,
+            _jwtSettingsConfiguration.Audience,
+            token,
+            out var jwtTokenClaims,
+            out string? errorMessage)) {
+      return Task.FromResult(Result<JwtTokenData?>.InternalServerError(null, errorMessage));
     }
 
     if (jwtTokenClaims == null ||
-      jwtTokenClaims.Username == null ||
-      jwtTokenClaims.Roles == null ||
-      jwtTokenClaims.IssuedAt == null ||
-      jwtTokenClaims.ExpiresAt == null
-    ) {
-      return Result<JwtTokenData?>.Forbidden(null, "Invalid JWT token or claims");
+        jwtTokenClaims.Username == null ||
+        jwtTokenClaims.Roles == null ||
+        jwtTokenClaims.IssuedAt == null ||
+        jwtTokenClaims.ExpiresAt == null) {
+      return Task.FromResult(Result<JwtTokenData?>.Forbidden(null, "Invalid JWT token or claims"));
     }
 
-    var userResult = await _identityDomainService.ReadUserByUsernameAsync(jwtTokenClaims.Username, cancellationToken);
+    var userResult = _identityDomainService.ReadUserByUsername(jwtTokenClaims.Username);
     if (!userResult.IsSuccess || userResult.Value == null) {
-      return Result<JwtTokenData?>.Forbidden(null, "User not found");
+      return Task.FromResult(Result<JwtTokenData?>.Forbidden(null, "User not found"));
     }
 
     var user = userResult.Value;
+    var authResult = _identityDomainService.ReadUserAuthorization(user.Id);
+    var authorization = authResult.IsSuccess ? authResult.Value : null;
+
     var jwtTokenData = new JwtTokenData {
-      Token = token,
+      Token = token!,
       Username = jwtTokenClaims.Username,
+      ClaimRoles = jwtTokenClaims.Roles,
       IssuedAt = jwtTokenClaims.IssuedAt.Value,
       ExpiresAt = jwtTokenClaims.ExpiresAt.Value,
+
       UserId = user.Id,
+      IsGlobalAdmin = authorization?.IsGlobalAdmin ?? false,
+      EntityScopes = authorization?.EntityScopes == null
+        ? []
+        : [.. authorization.EntityScopes.Select(s => new IdentityScopeData {
+          EntityId = s.EntityId,
+          EntityType = s.EntityType,
+          Scope = s.Scope
+        })],
     };
-    return Result<JwtTokenData?>.Ok(jwtTokenData);
+    return Task.FromResult(Result<JwtTokenData?>.Ok(jwtTokenData));
   }
 }

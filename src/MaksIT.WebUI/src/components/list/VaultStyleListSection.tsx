@@ -1,6 +1,6 @@
 import { FC, ReactNode } from 'react'
 
-/** Wraps filter toolbar + table + footer in one Vault-style card (single bordered panel). */
+/** Wraps filter toolbar + table + footer in one bordered panel (dense admin list layout). */
 interface VaultStyleListSectionProps {
   title?: string
   description?: string

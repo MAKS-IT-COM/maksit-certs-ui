@@ -1,7 +1,7 @@
 import { FC, useCallback, useEffect, useState } from 'react'
 import { FormContainer, FormContent, FormFooter, FormHeader } from '../components/FormLayout'
 import { ButtonComponent, CheckBoxComponent, RadioGroupComponent, SelectBoxComponent } from '../components/editors'
-import { GetAccountResponse } from '../models/letsEncryptServer/account/responses/GetAccountResponse'
+import { GetAccountResponse } from '../models/certsUI/account/responses/GetAccountResponse'
 import { deleteData, getData, postData } from '../axiosConfig'
 import { ApiRoutes, GetApiRoute } from '../AppMap'
 import { enumToArr, formatISODateString } from '../functions'

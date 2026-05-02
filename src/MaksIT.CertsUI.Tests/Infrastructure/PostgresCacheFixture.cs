@@ -1,3 +1,4 @@
+using MaksIT.CertsUI;
 using MaksIT.CertsUI.Engine;
 using MaksIT.CertsUI.Engine.DomainServices;
 using MaksIT.CertsUI.Engine.Extensions;
@@ -10,14 +11,14 @@ using Xunit;
 namespace MaksIT.CertsUI.Tests.Infrastructure;
 
 /// <summary>
-/// One PostgreSQL container per test collection; runs FluentMigrator (Linq2DB stack, Vault parity).
+/// One PostgreSQL container per test collection; runs FluentMigrator (Linq2DB stack).
 /// </summary>
 public class PostgresCacheFixture : IAsyncLifetime, IDisposable {
 
   PostgreSqlContainer? _container;
   ServiceProvider? _provider;
 
-  public ICertsDataConnectionFactory ConnectionFactory { get; private set; } = null!;
+  public ICertsUIDataConnectionFactory ConnectionFactory { get; private set; } = null!;
   public WebApiTestFixture Config { get; private set; } = null!;
 
   public async Task InitializeAsync() {
@@ -29,28 +30,36 @@ public class PostgresCacheFixture : IAsyncLifetime, IDisposable {
 
     var services = new ServiceCollection();
     services.AddLogging(b => b.AddConsole());
-    var testIdentity = new TestIdentityDomainConfiguration(
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-      "tests",
-      "tests",
-      60,
-      7,
-      "test-pepper");
-    services.AddSingleton<IIdentityDomainConfiguration>(testIdentity);
-    services.AddSingleton<ITwoFactorSettingsConfiguration>(testIdentity);
-    services.AddSingleton<IDefaultAdminBootstrapConfiguration>(testIdentity);
     services.AddCertsEngine(new CertsEngineConfiguration {
       ConnectionString = cs,
-      LetsEncryptProduction = "https://acme-v02.api.letsencrypt.org/directory",
-      LetsEncryptStaging = "https://acme-staging-v02.api.letsencrypt.org/directory",
+      AutoSyncSchema = true,
+      Admin = new AdminUser { Username = "pg-test", Password = "pg-test" },
+      JwtSettingsConfiguration = new JwtSettingsConfiguration {
+        JwtSecret = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        Issuer = "tests",
+        Audience = "tests",
+        ExpiresIn = 60,
+        RefreshTokenExpiresIn = 7,
+        PasswordPepper = "test-pepper"
+      },
+      TwoFactorSettingsConfiguration = new TwoFactorSettingsConfiguration {
+        Label = "CertsUI",
+        Issuer = "MaksIT.CertsUI",
+        TimeTolerance = 1
+      },
+      Agent = new Agent {
+        AgentHostname = "127.0.0.1",
+        AgentPort = 1,
+        AgentKey = "k",
+        ServiceToReload = "nginx"
+      },
+      Production = "https://acme-v02.api.letsencrypt.org/directory",
+      Staging = "https://acme-staging-v02.api.letsencrypt.org/directory",
     });
     _provider = services.BuildServiceProvider();
-    await using (var scope = _provider.CreateAsyncScope()) {
-      var run = scope.ServiceProvider.GetRequiredService<IRunMigrationsService>();
-      await run.RunAsync();
-    }
+    await _provider.EnsureCertsEngineMigratedAsync();
 
-    ConnectionFactory = _provider.GetRequiredService<ICertsDataConnectionFactory>();
+    ConnectionFactory = _provider.GetRequiredService<ICertsUIDataConnectionFactory>();
     Config = new WebApiTestFixture();
   }
 

@@ -1,26 +1,29 @@
 import { FC, useCallback, useEffect, useState } from 'react'
 import { FormContainer, FormContent, FormHeader } from '../../components/FormLayout'
-import { PagedResponse } from '../../models/letsEncryptServer/common/PagedResponse'
+import { useAppSelector } from '../../redux/hooks'
+import { PagedResponse } from '../../models/certsUI/common/PagedResponse'
+import { UserResponse } from '../../models/identity/user/UserResponse'
+import { deleteData, postData } from '../../axiosConfig'
+import { ApiRoutes, GetApiRoute } from '../../AppMap'
+import { createColumns, DataTable, DataTableFilter, DataTableLabel } from '../../components/DataTable'
 import { SearchUserRequest } from '../../models/identity/user/search/SearchUserRequest'
 import { SearchUserResponse } from '../../models/identity/user/search/SearchUserResponse'
-import { UserResponse } from '../../models/identity/user/UserResponse'
-import { deleteData, postDataWithoutLoader } from '../../axiosConfig'
-import { ApiRoutes, GetApiRoute } from '../../AppMap'
-import { createColumn, createColumns, DataTable, DataTableFilter, DataTableLabel } from '../../components/DataTable'
+import { CreateUser } from './CreateUser'
 import { Offcanvas } from '../../components/Offcanvas'
 import { EditUser } from './EditUser'
-import { CreateUser } from './CreateUser'
-import { extractPropFilter } from '../../functions/dataTableFilters'
-
-const defaultPage: SearchUserRequest = { pageNumber: 1, pageSize: 20 }
+import { hasFlag } from '../../functions'
+import { createColumn } from '../../components/DataTable'
+import { ScopeEntityType, ScopePermission } from '../../models/engine/scopeEnums'
 
 const SearchUser: FC = () => {
 
-  const [pagedRequest, setPagedRequest] = useState<SearchUserRequest>(defaultPage)
+  const { identity } = useAppSelector(state => state.identity)
+
+  const [pagedRequest, setPagedRequest] = useState<SearchUserRequest>({})
   const [rawd, setRawd] = useState<PagedResponse<SearchUserResponse> | undefined>(undefined)
 
   const [userId, setUserId] = useState<string | undefined>(undefined)
-  const [creating, setCreating] = useState(false)
+  const [creating, setCreating] = useState<boolean>(false)
 
   const columns = createColumns([
     createColumn<SearchUserResponse, 'id'>({
@@ -56,25 +59,58 @@ const SearchUser: FC = () => {
       cell: (props) => {
         const { value } = props
         return <DataTableLabel type={'normal'} value={value} />
-      }
+      },
+    }),
+    createColumn<SearchUserResponse, 'email'>({
+      id: 'email',
+      accessorKey: 'email',
+      header: 'Email',
+      filter: (props, onFilterChange) => (
+        <DataTableFilter
+          type={'normal'}
+          columnId={props.columnId}
+          accessorKey={'email'}
+          onFilterChange={onFilterChange}
+        />
+      ),
+      cell: (props) => {
+        const { value } = props
+        return <DataTableLabel type={'normal'} value={value ?? ''} />
+      },
+    }),
+    createColumn<SearchUserResponse, 'mobileNumber'>({
+      id: 'mobileNumber',
+      accessorKey: 'mobileNumber',
+      header: 'Mobile Number',
+      filter: (props, onFilterChange) => (
+        <DataTableFilter
+          type={'normal'}
+          columnId={props.columnId}
+          accessorKey={'mobileNumber'}
+          onFilterChange={onFilterChange}
+        />
+      ),
+      cell: (props) => {
+        const { value } = props
+        return <DataTableLabel type={'normal'} value={value ?? ''} />
+      },
     }),
     createColumn<SearchUserResponse, 'isActive'>({
       id: 'isActive',
       accessorKey: 'isActive',
-      header: 'Active',
+      header: 'Is Active',
       filter: (props, onFilterChange) => (
         <DataTableFilter
           type={'normal'}
           columnId={props.columnId}
           accessorKey={'isActive'}
           onFilterChange={onFilterChange}
-          disabled={true}
         />
       ),
       cell: (props) => {
         const { value } = props
-        return <DataTableLabel type={'normal'} value={value === true ? 'Yes' : value === false ? 'No' : '—'} />
-      }
+        return <DataTableLabel type={'normal'} value={value ? 'Yes' : 'No'} />
+      },
     }),
     createColumn<SearchUserResponse, 'twoFactorEnabled'>({
       id: 'twoFactorEnabled',
@@ -86,41 +122,90 @@ const SearchUser: FC = () => {
           columnId={props.columnId}
           accessorKey={'twoFactorEnabled'}
           onFilterChange={onFilterChange}
-          disabled={true}
         />
       ),
       cell: (props) => {
         const { value } = props
-        return <DataTableLabel type={'normal'} value={value === true ? 'On' : value === false ? 'Off' : '—'} />
-      }
+        return <DataTableLabel type={'normal'} value={value ? 'Yes' : 'No'} />
+      },
+    }),
+    createColumn<SearchUserResponse, 'recoveryCodesLeft'>({
+      id: 'recoveryCodesLeft',
+      accessorKey: 'recoveryCodesLeft',
+      header: '2FA Recovery Left',
+      filter: (props, onFilterChange) => (
+        <DataTableFilter
+          type={'normal'}
+          columnId={props.columnId}
+          accessorKey={'recoveryCodesLeft'}
+          onFilterChange={onFilterChange}
+        />
+      ),
+      cell: (props) => {
+        const { value } = props
+        return <DataTableLabel type={'normal'} value={`${value ?? ''}`} />
+      },
+    }),
+    createColumn<SearchUserResponse, 'createdAt'>({
+      id: 'createdAt',
+      accessorKey: 'createdAt',
+      header: 'Created At',
+      filter: (props, onFilterChange) => (
+        <DataTableFilter
+          type={'normal'}
+          columnId={props.columnId}
+          accessorKey={'createdAt'}
+          onFilterChange={onFilterChange}
+        />
+      ),
+      cell: (props) => {
+        const { value } = props
+        return <DataTableLabel type={'normal'} value={value} dataType={'date'} />
+      },
     }),
     createColumn<SearchUserResponse, 'lastLogin'>({
       id: 'lastLogin',
       accessorKey: 'lastLogin',
-      header: 'Last login',
+      header: 'Last Login',
       filter: (props, onFilterChange) => (
         <DataTableFilter
           type={'normal'}
           columnId={props.columnId}
           accessorKey={'lastLogin'}
           onFilterChange={onFilterChange}
-          disabled={true}
         />
       ),
       cell: (props) => {
         const { value } = props
         return <DataTableLabel type={'normal'} value={value ?? ''} dataType={'date'} />
-      }
+      },
+    }),
+    createColumn<SearchUserResponse, 'isGlobalAdmin'>({
+      id: 'isGlobalAdmin',
+      accessorKey: 'isGlobalAdmin',
+      header: 'Global Admin',
+      filter: (props, onFilterChange) => (
+        <DataTableFilter
+          type={'normal'}
+          columnId={props.columnId}
+          accessorKey={'isGlobalAdmin'}
+          onFilterChange={onFilterChange}
+          disabled={true}
+        />
+      ),
+      cell: (props) => {
+        const { value } = props
+        return <DataTableLabel type={'normal'} value={value ? 'Yes' : 'No'} />
+      },
     }),
   ])
 
   const loadData = useCallback(() => {
-    postDataWithoutLoader<SearchUserRequest, PagedResponse<SearchUserResponse>>(
-      GetApiRoute(ApiRoutes.identitySearch).route,
-      pagedRequest
-    ).then((response) => {
-      setRawd(response.payload ?? undefined)
-    }).finally(() => {})
+    postData<SearchUserRequest, PagedResponse<SearchUserResponse>>(GetApiRoute(ApiRoutes.identitySearch).route, pagedRequest)
+      .then((response) => {
+        setRawd(response.payload ?? undefined)
+      })
+      .finally(() => {})
   }, [pagedRequest])
 
   useEffect(() => loadData(), [loadData])
@@ -129,54 +214,86 @@ const SearchUser: FC = () => {
     setCreating(true)
   }
 
-  const handleEditRow = (ids: Record<string, string>) => {
+  const handleEditRow = (ids: { [key: string]: string }) => {
     setUserId(ids.id)
   }
 
-  const handleDeleteRow = (ids: Record<string, string>) => {
-    deleteData(GetApiRoute(ApiRoutes.identityDelete).route.replace('{userId}', ids.id))
-      .then((response) => {
-        if (!response.ok) return
+  const handleDeleteRow = (ids: { [key: string]: string }) => {
+    deleteData(GetApiRoute(ApiRoutes.identityDelete).route
+      .replace('{userId}', ids.id)
+    ).then((response) => {
+      if (response.ok)
         loadData()
-      })
+    })
   }
 
   const handleEditCancel = () => {
     setUserId(undefined)
   }
 
-  const handleFilterChange = (filters: Record<string, string>) => {
-    const combined = filters.filters ?? ''
-    const usernameFilter = extractPropFilter(combined, 'Username')
-    setPagedRequest(prev => ({
-      ...prev,
-      pageNumber: 1,
-      usernameFilter: usernameFilter?.trim() || undefined,
-    }))
+  const handleFilterChange = (filters: { [filterId: string]: string }) => {
+    setPagedRequest({
+      ...pagedRequest,
+      ...filters
+    })
   }
 
   const handlePageChange = (pageNumber: number) => {
-    setPagedRequest(prev => ({
-      ...prev,
+    setPagedRequest({
+      ...pagedRequest,
       pageNumber
-    }))
+    })
   }
 
   const handleOnSubmitted = (_item?: UserResponse) => {
     setUserId(undefined)
+
     setCreating(false)
-    setPagedRequest(prev => ({
-      ...prev,
-      pageNumber: 1,
-    }))
+
     loadData()
+  }
+
+  if (!identity) return <></>
+
+  const handleAllowAddRow = () => {
+    if (identity.isGlobalAdmin)
+      return true
+    const hasCreateIdentity = identity.acls?.some(acl =>
+      acl.entityType === ScopeEntityType.Identity && hasFlag(acl.scope, ScopePermission.Create))
+    return !!hasCreateIdentity
+  }
+
+  const handleAllowEditRow = (ids: Record<string, string>) => {
+    if (identity.isGlobalAdmin)
+      return true
+
+    const organizationId = ids.organizationId
+    const canEditIdentity = identity.acls
+      ?.find(acl => acl.entityId == organizationId
+        && acl.entityType === ScopeEntityType.Identity
+        && hasFlag(acl.scope, ScopePermission.Write))
+
+    return !!canEditIdentity
+  }
+
+  const handleAllowDeleteRow = (ids: Record<string, string>) => {
+    if (identity.isGlobalAdmin)
+      return true
+
+    const organizationId = ids.organizationId
+    const canDeleteIdentity = identity.acls
+      ?.find(acl => acl.entityId == organizationId
+        && acl.entityType === ScopeEntityType.Identity
+        && hasFlag(acl.scope, ScopePermission.Delete))
+
+    return !!canDeleteIdentity
   }
 
   return <>
     <FormContainer>
       <FormHeader>Users</FormHeader>
       <FormContent>
-        <div className={'grid grid-cols-12 gap-4 w-full h-full min-h-[28rem]'}>
+        <div className={'grid grid-cols-12 gap-4 w-full h-full'}>
           <DataTable
             colspan={12}
             rawd={rawd}
@@ -184,12 +301,11 @@ const SearchUser: FC = () => {
             storageKey={'SearchUser'}
             idFields={['id']}
 
-            allowAddRow={() => true}
+            allowAddRow={handleAllowAddRow}
             onAddRow={handleAddRow}
-
-            allowEditRow={() => true}
+            allowEditRow={handleAllowEditRow}
             onEditRow={handleEditRow}
-            allowDeleteRow={() => true}
+            allowDeleteRow={handleAllowDeleteRow}
             onDeleteRow={handleDeleteRow}
 
             onFilterChange={handleFilterChange}
@@ -202,7 +318,6 @@ const SearchUser: FC = () => {
 
     <Offcanvas isOpen={userId !== undefined}>
       {userId && <EditUser
-        key={userId}
         userId={userId}
         cancelEnabled={true}
         onSubmitted={handleOnSubmitted}

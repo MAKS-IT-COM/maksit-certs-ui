@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { AutoSizer, MultiGrid, GridCellProps } from 'react-virtualized'
 
-import { PagedResponse } from '../../models/letsEncryptServer/common/PagedResponse'
+import { PagedResponse } from '../../models/certsUI/common/PagedResponse'
 import { DataTablePageView, mapCertsPagedToDataTable } from '../../functions/dataTablePaged'
 import { Plus, Trash2, Edit } from 'lucide-react'
 import { debounce } from 'lodash'

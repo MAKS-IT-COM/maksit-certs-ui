@@ -14,7 +14,7 @@ namespace MaksIT.CertsUI.Engine.Domain.Certs;
 /// <b>Used by:</b>
 /// <list type="bullet">
 ///   <item><see cref="MaksIT.CertsUI.Engine.Services.ILetsEncryptService"/> — session state and cert issuance</item>
-///   <item><see cref="MaksIT.CertsUI.Engine.Persistance.Services.IRegistrationCachePersistanceService"/> — JSON payload in PostgreSQL</item>
+///   <item><see cref="MaksIT.CertsUI.Engine.Persistence.Services.IRegistrationCachePersistenceService"/> — JSON payload in PostgreSQL</item>
 ///   <item><see cref="MaksIT.CertsUI.Engine.DomainServices.ICertsFlowDomainService"/> — full ACME flows</item>
 /// </list>
 /// </para>

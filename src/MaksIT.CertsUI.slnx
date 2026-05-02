@@ -15,7 +15,6 @@
   </Project>
   <Project Path="MaksIT.CertsUI.Engine.Tests/MaksIT.CertsUI.Engine.Tests.csproj" />
   <Project Path="MaksIT.CertsUI.Engine/MaksIT.CertsUI.Engine.csproj" />
-  <Project Path="MaksIT.Models/MaksIT.Models.csproj" />
   <Project Path="MaksIT.CertsUI.Tests/MaksIT.CertsUI.Tests.csproj" />
   <Project Path="MaksIT.CertsUI/MaksIT.CertsUI.csproj" />
   <Project Path="ReverseProxy/ReverseProxy.csproj" />

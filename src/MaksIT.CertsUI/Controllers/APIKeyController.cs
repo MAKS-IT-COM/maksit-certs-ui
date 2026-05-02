@@ -1,6 +1,6 @@
-using MaksIT.Models.LetsEncryptServer.ApiKeys;
-using MaksIT.Models.LetsEncryptServer.ApiKeys.Search;
-using MaksIT.Models.LetsEncryptServer.Common;
+using MaksIT.Core.Webapi.Models;
+using MaksIT.CertsUI.Models.APIKeys;
+using MaksIT.CertsUI.Models.APIKeys.Search;
 using MaksIT.CertsUI.Authorization.Extensions;
 using MaksIT.CertsUI.Authorization.Filters;
 using MaksIT.CertsUI.Services;
@@ -20,44 +20,45 @@ public class APIKeyController(
   [ServiceFilter(typeof(JwtAuthorizationFilter))]
   [HttpPost("search")]
   [ProducesResponseType(typeof(PagedResponse<SearchAPIKeyResponse>), StatusCodes.Status200OK)]
-  public async Task<IActionResult> GetAPIKeys([FromBody] SearchAPIKeyRequest requestData) {
+  public IActionResult GetAPIKeys([FromBody] SearchAPIKeyRequest requestData) {
     var jwtTokenDataResult = HttpContext.GetJwtTokenData();
     if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
       return jwtTokenDataResult.ToActionResult();
 
     var jwtTokenData = jwtTokenDataResult.Value;
 
-    var result = await _apiKeyService.SearchApiKeysAsync(jwtTokenData, requestData);
+    var result = _apiKeyService.SearchApiKeys(jwtTokenData, requestData);
     return result.ToActionResult();
   }
 
   [ServiceFilter(typeof(JwtAuthorizationFilter))]
-  [HttpPost("scopes/search")]
+  [HttpPost("search/entity-scopes")]
   [ProducesResponseType(typeof(PagedResponse<SearchApiKeyEntityScopeResponse>), StatusCodes.Status200OK)]
-  public async Task<IActionResult> GetApiKeyEntityScopes([FromBody] SearchApiKeyEntityScopeRequest requestData) {
+  public IActionResult SearchApiKeyEntityScopes([FromBody] SearchApiKeyEntityScopeRequest requestData) {
     var jwtTokenDataResult = HttpContext.GetJwtTokenData();
     if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
       return jwtTokenDataResult.ToActionResult();
 
     var jwtTokenData = jwtTokenDataResult.Value;
 
-    var result = await _apiKeyService.SearchApiKeyEntityScopesAsync(jwtTokenData, requestData);
+    var result = _apiKeyService.SearchApiKeyEntityScopes(jwtTokenData, requestData);
     return result.ToActionResult();
   }
+
   #endregion
 
   #region Read
   [ServiceFilter(typeof(JwtAuthorizationFilter))]
   [HttpGet("{apiKeyId:guid}")]
   [ProducesResponseType(typeof(ApiKeyResponse), StatusCodes.Status200OK)]
-  public async Task<IActionResult> ReadAPIKey([FromRoute] Guid apiKeyId) {
+  public IActionResult ReadAPIKey([FromRoute] Guid apiKeyId) {
     var jwtTokenDataResult = HttpContext.GetJwtTokenData();
     if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
       return jwtTokenDataResult.ToActionResult();
 
     var jwtTokenData = jwtTokenDataResult.Value;
 
-    var result = await _apiKeyService.ReadAPIKeyAsync(jwtTokenData, apiKeyId);
+    var result = _apiKeyService.ReadAPIKey(jwtTokenData, apiKeyId);
     return result.ToActionResult();
   }
   #endregion

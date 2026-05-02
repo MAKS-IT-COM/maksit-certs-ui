@@ -9,20 +9,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Breaking
 
 - **Engine query ports (Vault-style):** **`IUserQueryService`**, **`IApiKeyQueryService`**, and **`IApiKeyEntityScopeQueryService`** no longer expose async paged **`Search…Async`** with string filters. They now use synchronous **`Search`** / **`Count`** with optional **`Expression<Func<TDto, bool>>?`** predicates (Linq2Db-translatable), **`skip` / `limit`**, and **`Result`** types—matching the thin-search wiring in **`IdentityService`** / **`ApiKeyService`**. Custom Engine hosts must update call sites and registrations.
-- **ACME session persistence:** **`IAcmeSessionStore`**, **`AcmePostgresSessionStore`**, **`AcmeSessionSnapshot`**, and **`AcmeSessionJsonSerializer`** are removed. **`ILetsEncryptService`** now depends on **`IAcmeSessionPersistanceService`** (**`AcmeSessionPersistanceServiceLinq2Db`**) for **`acme_sessions`** JSON load/save.
-- **`ICertsFlowDomainService`:** Constructor takes **`IRegistrationCacheDomainService`** instead of **`IRegistrationCachePersistanceService`** (registration cache orchestration moved behind **`RegistrationCacheDomainService`**).
+- **ACME session persistence:** **`IAcmeSessionStore`**, **`AcmePostgresSessionStore`**, **`AcmeSessionSnapshot`**, and **`AcmeSessionJsonSerializer`** are removed. **`ILetsEncryptService`** now depends on **`IAcmeSessionPersistenceService`** (**`AcmeSessionPersistenceServiceLinq2Db`**) for **`acme_sessions`** JSON load/save.
+- **`ICertsFlowDomainService`:** Constructor takes **`IRegistrationCacheDomainService`** instead of **`IRegistrationCachePersistenceService`** (registration cache orchestration moved behind **`RegistrationCacheDomainService`**).
 
 ### Added
 
 - **`ExpressionCompose`** (`QueryServices/ExpressionCompose.cs`) for composing nested Linq2Db predicates (Vault parity).
-- **`IRegistrationCacheDomainService`** / **`RegistrationCacheDomainService`**, **`RegistrationCachePayloadDocument`**, and **`RegistrationCachePayloadJsonTests`** (Engine unit tests) for registration-cache JSON handling; **`RegistrationCacheDto`** now extends **`DtoDocumentBase<Guid>`** with **`AccountId`** as an alias of **`Id`**; persistence and mapping updates in **`RegistrationCachePersistanceServiceLinq2Db`** / **`CertsLinq2DbMapping`**.
-- **`IAcmeSessionPersistanceService`**, **`AcmeSessionPersistanceServiceLinq2Db`**, and **`AcmeSessionPayloadMapper`** for PostgreSQL-backed ACME **`State`** persistence.
+- **`IRegistrationCacheDomainService`** / **`RegistrationCacheDomainService`**, **`RegistrationCachePayloadDocument`**, and **`RegistrationCachePayloadJsonTests`** (Engine unit tests) for registration-cache JSON handling; **`RegistrationCacheDto`** now extends **`DtoDocumentBase<Guid>`** with **`AccountId`** as an alias of **`Id`**; persistence and mapping updates in **`RegistrationCachePersistenceServiceLinq2Db`** / **`CertsLinq2DbMapping`**.
+- **`IAcmeSessionPersistenceService`**, **`AcmeSessionPersistenceServiceLinq2Db`**, and **`AcmeSessionPayloadMapper`** for PostgreSQL-backed ACME **`State`** persistence.
 - **`ApiKeyEntityScopeDto`** and **`ApiKeyEntityScopeQueryServiceStub`** adjustments for entity-scope search parity.
 - **Docs:** **`assets/docs/ARCHITECTURE_LAYERING.md`** (layering, spine flows, Pattern A/B); **[CONTRIBUTING.md](CONTRIBUTING.md)** links to it and documents **`dotnet test`** for **`MaksIT.CertsUI.Engine.Tests`** / **`MaksIT.CertsUI.Tests`**.
 
 ### Changed
 
-- **`LetsEncryptService`:** Uses **`IAcmeSessionPersistanceService`**; helper updates in **`LetsEncryptService.Helpers.cs`**.
+- **`LetsEncryptService`:** Uses **`IAcmeSessionPersistenceService`**; helper updates in **`LetsEncryptService.Helpers.cs`**.
 - **`CertsFlowDomainService`:** **`PurgeStaleHttpChallengesAsync`** (HTTP-01 cleanup); **`AutoRenewal`** calls it before renewal work.
 - **`CacheService`:** Thin façade over **`IRegistrationCacheDomainService`** (host API unchanged for callers).
 - **`IdentityService`** / **`ApiKeyService`:** Build predicates and call **`Count`** + **`Search`** on **`IUserQueryService`** / **`IApiKeyQueryService`** / **`IApiKeyEntityScopeQueryService`**.
@@ -160,7 +160,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - **Database:** FluentMigrator `RestoreUsersJwtTokensJsonIfDropped` (`20260426120000`) initially re-added `users.JwtTokensJson` with `ADD COLUMN IF NOT EXISTS` for databases that had dropped it under an older `JwtTokensTableMigrateFromJson` revision. **Superseded in 3.3.14:** that revision is a no-op and `DropUsersJwtTokensJson` drops the column; tokens stay in `jwt_tokens` only.
-- **Helm / config:** `certsServerConfig.configuration.certsUIEngineConfiguration.autoSyncSchema` (default `true`) is rendered into server `appsettings.json` so add-only schema sync runs on every startup unless explicitly disabled.
+- **Helm / config:** `certsServerConfig.configuration.certsEngineConfiguration.autoSyncSchema` (default `true`) is rendered into server `appsettings.json` so add-only schema sync runs on every startup unless explicitly disabled.
 
 ### Changed
 
@@ -198,7 +198,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **HA runtime coordination:** Added DB-backed HTTP-01 challenge persistence and runtime lease infrastructure (`acme_http_challenges`, `app_runtime_leases`) plus coordinated startup/renewal execution.
 - **Kubernetes readiness model:** Added per-component Helm `replicaCount` + PodDisruptionBudget support and health endpoints (`/health/live`, `/health/ready`) for probes.
 - **New backend host:** Added `MaksIT.CertsUI` WebAPI host with controllers, authorization filters (JWT and JWT-or-API-key), hosted services, and mapping/configuration abstractions.
-- **Engine platform expansion:** Added a domain-oriented `MaksIT.CertsUI.Engine` structure (`Domain`, `Dto`, `DomainServices`, `Persistance`, `QueryServices`, `Infrastructure`, `FluentMigrations`) with linq2db mappings and migration services.
+- **Engine platform expansion:** Added a domain-oriented `MaksIT.CertsUI.Engine` structure (`Domain`, `Dto`, `DomainServices`, `Persistence`, `QueryServices`, `Infrastructure`, `FluentMigrations`) with linq2db mappings and migration services.
 - **Frontend identity/api-key UX:** Added Users/API Keys pages and forms (`CreateUser`, `EditUser`, `SearchUser`, `CreateApiKey`) with reusable list/filter/paging components.
 - **Test suite:** Added `MaksIT.CertsUI.Tests` with service and integration coverage plus shared Postgres/WebAPI fixtures.
 

@@ -6,7 +6,7 @@ namespace MaksIT.CertsUI.Engine.Tests;
 
 /// <summary>
 /// Same JSON contract as <c>registration_caches.PayloadJson</c> (load/save in
-/// <see cref="MaksIT.CertsUI.Engine.Persistance.Services.Linq2Db.RegistrationCachePersistanceServiceLinq2Db"/>)
+/// <see cref="MaksIT.CertsUI.Engine.Persistence.Services.Linq2Db.RegistrationCachePersistenceServiceLinq2Db"/>)
 /// and as written into zip entries via <c>RegistrationCache.ToJson()</c> (MaksIT.Core STJ helpers).
 /// </summary>
 public class RegistrationCachePayloadJsonTests {

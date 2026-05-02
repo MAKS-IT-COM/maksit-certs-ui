@@ -10,7 +10,9 @@ import { UtilitiesPage } from './pages/UtilitiesPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { LetsEncryptTermsOfServicePage } from './pages/LetsEncryptTermsOfServicePage'
 import { Users } from './pages/Users'
+import { UserScopes } from './pages/UserScopes'
 import { ApiKeys } from './pages/ApiKeys'
+import { ApiKeyScopes } from './pages/ApiKeyScopes'
 
 
 declare global {
@@ -121,6 +123,12 @@ const AppMap: AppMapType[] = [
     linkArea: [LinkArea.SideMenu],
   },
   {
+    title: 'User scopes',
+    routes: ['/users/scopes'],
+    page: UserScopes,
+    linkArea: [LinkArea.SideMenu],
+  },
+  {
     title: 'User',
     routes: ['/user/:userId'],
     page: Users,
@@ -129,6 +137,12 @@ const AppMap: AppMapType[] = [
     title: 'API keys',
     routes: ['/apikeys'],
     page: ApiKeys,
+    linkArea: [LinkArea.SideMenu],
+  },
+  {
+    title: 'API key scopes',
+    routes: ['/apikeys/scopes'],
+    page: ApiKeyScopes,
     linkArea: [LinkArea.SideMenu],
   },
   {
@@ -182,6 +196,7 @@ enum ApiRoutes {
 
   // Identity
   identitySearch = 'POST|/identity/search',
+  identitySearchUserScopes = 'POST|/identity/scopes/search',
   identityGet = 'GET|/identity/user/{userId}',
   identityPost = 'POST|/identity/user',
   identityPatch = 'PATCH|/identity/user/{userId}',
@@ -193,6 +208,7 @@ enum ApiRoutes {
 
   // API keys
   apikeySearch = 'POST|/apikey/search',
+  apikeySearchEntityScopes = 'POST|/apikey/search/entity-scopes',
   apikeyPost = 'POST|/apikey',
   apikeyGet = 'GET|/apikey/{apiKeyId}',
   apikeyPatch = 'PATCH|/apikey/{apiKeyId}',

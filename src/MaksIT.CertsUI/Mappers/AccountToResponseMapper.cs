@@ -1,5 +1,5 @@
 using MaksIT.CertsUI.Engine.Domain.Certs;
-using MaksIT.Models.LetsEncryptServer.Account.Responses;
+using MaksIT.CertsUI.Models.CertsUI.Account.Responses;
 
 namespace MaksIT.CertsUI.Mappers;
 

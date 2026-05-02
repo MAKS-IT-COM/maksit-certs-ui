@@ -4,8 +4,8 @@ using Npgsql;
 namespace MaksIT.CertsUI.Engine.Infrastructure;
 
 /// <summary>
-/// Add-only schema sync on startup (after FluentMigrator): missing columns from the configured desired-schema map get
-/// <c>ALTER TABLE … ADD COLUMN IF NOT EXISTS</c>. No DROP, TRUNCATE, or column rename destructive DDL — legacy columns stay until you clean them as an ops task.
+/// Syncs the database schema to match DTOs: add missing tables and columns only (no DROP).
+/// Runs after FluentMigrator so baseline tables exist; this adds any missing columns (and optionally missing tables).
 /// </summary>
 public class SchemaSyncService(ICertsEngineConfiguration config, ILogger<SchemaSyncService> logger) : ISchemaSyncService {
   private readonly ICertsEngineConfiguration _config = config;
@@ -19,7 +19,7 @@ public class SchemaSyncService(ICertsEngineConfiguration config, ILogger<SchemaS
 
     var desired = GetDesiredSchema();
 
-    var current = await GetCurrentSchemaAsync(cancellationToken).ConfigureAwait(false);
+    var current = await GetCurrentSchemaAsync(cancellationToken);
 
     var ddl = BuildAddOnlyDdl(desired, current);
     if (ddl.Count == 0) {
@@ -29,27 +29,27 @@ public class SchemaSyncService(ICertsEngineConfiguration config, ILogger<SchemaS
 
     await using var conn = new NpgsqlConnection(_config.ConnectionString);
 
-    await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
+    await conn.OpenAsync(cancellationToken);
 
-    await using var tx = await conn.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+    await using var tx = await conn.BeginTransactionAsync(cancellationToken);
 
     try {
       foreach (var sql in ddl) {
         await using var cmd = new NpgsqlCommand(sql, conn, tx);
-        await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
         _logger.LogDebug("Executed: {Sql}", sql);
       }
 
-      await tx.CommitAsync(cancellationToken).ConfigureAwait(false);
+      await tx.CommitAsync(cancellationToken);
       _logger.LogInformation("Schema sync completed. Applied {Count} DDL statement(s).", ddl.Count);
     }
     catch {
-      await tx.RollbackAsync(cancellationToken).ConfigureAwait(false);
+      await tx.RollbackAsync(cancellationToken);
       throw;
     }
   }
 
-  /// <summary>Desired schema: table → (column name, pg type). Matches FluentMigrator baseline + jwt_tokens migration (lowercase/snake table names).</summary>
+  /// <summary>Desired schema: table → list of (column name, pg type). Matches FluentMigrator baseline (lowercase/snake_case).</summary>
   private static Dictionary<string, List<(string Column, string PgType)>> GetDesiredSchema() {
     return new Dictionary<string, List<(string, string)>>(StringComparer.OrdinalIgnoreCase) {
       ["registration_caches"] = [
@@ -74,34 +74,60 @@ public class SchemaSyncService(ICertsEngineConfiguration config, ILogger<SchemaS
         ("payload_json", "text"),
         ("updated_at_utc", "timestamp with time zone"),
         ("expires_at_utc", "timestamp with time zone"),
+        ("account_scope_id", "uuid"),
       ],
       ["api_keys"] = [
-        ("Id", "uuid"),
-        ("Description", "text"),
-        ("KeySalt", "text"),
-        ("KeyHashHex", "text"),
-        ("CreatedAtUtc", "timestamp with time zone"),
-        ("RevokedAtUtc", "timestamp with time zone"),
-        ("ExpiresAtUtc", "timestamp with time zone"),
+        ("id", "uuid"),
+        ("description", "text"),
+        ("created_at", "timestamp with time zone"),
+        ("revoked_at", "timestamp with time zone"),
+        ("expires_at", "timestamp with time zone"),
+        ("api_key", "text"),
+        ("is_global_admin", "boolean"),
       ],
       ["users"] = [
-        ("Id", "uuid"),
-        ("Name", "text"),
-        ("Salt", "text"),
-        ("Hash", "text"),
-        ("LastLoginUtc", "timestamp with time zone"),
-        ("IsActive", "boolean"),
-        ("TwoFactorSharedKey", "text"),
+        ("id", "uuid"),
+        ("username", "text"),
+        ("email", "text"),
+        ("mobile_number", "text"),
+        ("is_active", "boolean"),
+        ("is_global_admin", "boolean"),
+        ("password_salt", "text"),
+        ("password_hash", "text"),
+        ("two_factor_shared_key", "text"),
+        ("created_at", "timestamp with time zone"),
+        ("last_login", "timestamp with time zone"),
       ],
       ["jwt_tokens"] = [
-        ("Id", "uuid"),
-        ("UserId", "uuid"),
-        ("Token", "text"),
-        ("RefreshToken", "text"),
-        ("IssuedAt", "timestamp with time zone"),
-        ("ExpiresAt", "timestamp with time zone"),
-        ("RefreshTokenExpiresAt", "timestamp with time zone"),
-        ("IsRevoked", "boolean"),
+        ("id", "uuid"),
+        ("user_id", "uuid"),
+        ("token", "text"),
+        ("refresh_token", "text"),
+        ("issued_at", "timestamp with time zone"),
+        ("expires_at", "timestamp with time zone"),
+        ("refresh_token_expires_at", "timestamp with time zone"),
+        ("is_revoked", "boolean"),
+      ],
+      ["two_factor_recovery_codes"] = [
+        ("id", "uuid"),
+        ("user_id", "uuid"),
+        ("salt", "text"),
+        ("hash", "text"),
+        ("is_used", "boolean"),
+      ],
+      ["user_entity_scopes"] = [
+        ("id", "uuid"),
+        ("user_id", "uuid"),
+        ("entity_id", "uuid"),
+        ("entity_type", "smallint"),
+        ("scope", "smallint"),
+      ],
+      ["api_key_entity_scopes"] = [
+        ("id", "uuid"),
+        ("api_key_id", "uuid"),
+        ("entity_id", "uuid"),
+        ("entity_type", "smallint"),
+        ("scope", "smallint"),
       ],
     };
   }
@@ -111,7 +137,7 @@ public class SchemaSyncService(ICertsEngineConfiguration config, ILogger<SchemaS
 
     await using var conn = new NpgsqlConnection(_config.ConnectionString);
 
-    await conn.OpenAsync(ct).ConfigureAwait(false);
+    await conn.OpenAsync(ct);
 
     await using var cmd = new NpgsqlCommand("""
       SELECT table_name, column_name
@@ -120,9 +146,9 @@ public class SchemaSyncService(ICertsEngineConfiguration config, ILogger<SchemaS
       ORDER BY table_name, ordinal_position
       """, conn);
 
-    await using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+    await using var reader = await cmd.ExecuteReaderAsync(ct);
 
-    while (await reader.ReadAsync(ct).ConfigureAwait(false)) {
+    while (await reader.ReadAsync(ct)) {
       var table = reader.GetString(0);
       var column = reader.GetString(1);
 
@@ -155,29 +181,24 @@ public class SchemaSyncService(ICertsEngineConfiguration config, ILogger<SchemaS
           continue;
         }
 
-        var notNullSuffix = ShouldAddNotNull(table, column) ? " NOT NULL" : "";
-        ddl.Add($"ALTER TABLE {Quote(table)} ADD COLUMN IF NOT EXISTS {Quote(column)} {pgType}{notNullSuffix}");
+        var nullable = (pgType == "text"
+          || column == "expires_at"
+          || column == "last_login"
+          || column == "description"
+          || column == "two_factor_shared_key"
+          || column == "email"
+          || column == "mobile_number"
+          || column == "revoked_at"
+          || column == "api_key"
+          || column == "account_scope_id"
+          || column == "payload_json") ? "" : " NOT NULL";
+
+        ddl.Add($"ALTER TABLE {Quote(table)} ADD COLUMN IF NOT EXISTS {Quote(column)} {pgType}{nullable}");
       }
     }
 
     return ddl;
   }
 
-  /// <summary>Nullable columns only (matches FluentMigrator nullability for optional fields).</summary>
-  private static bool ShouldAddNotNull(string table, string column) {
-    if (table.Equals("api_keys", StringComparison.OrdinalIgnoreCase)) {
-      if (column.Equals("Description", StringComparison.OrdinalIgnoreCase)) return false;
-      if (column.Equals("RevokedAtUtc", StringComparison.OrdinalIgnoreCase)) return false;
-      if (column.Equals("ExpiresAtUtc", StringComparison.OrdinalIgnoreCase)) return false;
-    }
-
-    if (table.Equals("users", StringComparison.OrdinalIgnoreCase)) {
-      if (column.Equals("TwoFactorSharedKey", StringComparison.OrdinalIgnoreCase)) return false;
-    }
-
-    return true;
-  }
-
-  private static string Quote(string name) => $"\"{name.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
-
+  private static string Quote(string name) => $"\"{name.Replace("\"", "\"\"")}\"";
 }

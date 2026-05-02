@@ -3,21 +3,57 @@ using Microsoft.Extensions.Logging;
 using MaksIT.Core.Extensions;
 using MaksIT.CertsUI.Engine.Domain.Certs;
 using MaksIT.CertsUI.Engine.Dto.Certs;
-using MaksIT.CertsUI.Engine.Persistance.Services;
+using MaksIT.CertsUI.Engine.Persistence.Services;
 using MaksIT.Results;
 
 namespace MaksIT.CertsUI.Engine.DomainServices;
+
+/// <summary>
+/// Registration cache use cases (load/save, zip import/export). Orchestrates <see cref="Persistence.Services.IRegistrationCachePersistenceService"/> only from the engine layer.
+/// </summary>
+public interface IRegistrationCacheDomainService {
+
+  #region Read
+
+  Task<Result<RegistrationCache[]?>> LoadAllAsync(CancellationToken cancellationToken = default);
+
+  Task<Result<RegistrationCache?>> LoadAsync(Guid accountId, CancellationToken cancellationToken = default);
+
+  #endregion
+
+  #region Write
+
+  Task<Result> SaveAsync(Guid accountId, RegistrationCache cache, CancellationToken cancellationToken = default);
+
+  Task<Result> DeleteAllAsync(CancellationToken cancellationToken = default);
+
+  Task<Result> DeleteAsync(Guid accountId, CancellationToken cancellationToken = default);
+
+  #endregion
+
+  #region Zip import/export
+
+  Task<Result<byte[]?>> DownloadCacheZipAsync(CancellationToken cancellationToken = default);
+
+  Task<Result<byte[]?>> DownloadAccountCacheZipAsync(Guid accountId, CancellationToken cancellationToken = default);
+
+  Task<Result> UploadCacheZipAsync(byte[] zipBytes, CancellationToken cancellationToken = default);
+
+  Task<Result> UploadAccountCacheZipAsync(Guid accountId, byte[] zipBytes, CancellationToken cancellationToken = default);
+
+  #endregion
+}
 
 /// <summary>
 /// Domain-level registration cache operations (zip + row persistence). Host <see cref="MaksIT.CertsUI.Services.CacheService"/> delegates here.
 /// </summary>
 public sealed class RegistrationCacheDomainService(
   ILogger<RegistrationCacheDomainService> logger,
-  IRegistrationCachePersistanceService registrationCachePersistence
+  IRegistrationCachePersistenceService registrationCachePersistence
 ) : IRegistrationCacheDomainService {
 
   private readonly ILogger<RegistrationCacheDomainService> _logger = logger;
-  private readonly IRegistrationCachePersistanceService _persistence = registrationCachePersistence;
+  private readonly IRegistrationCachePersistenceService _persistence = registrationCachePersistence;
 
   public Task<Result<RegistrationCache[]?>> LoadAllAsync(CancellationToken cancellationToken = default) =>
     _persistence.LoadAllAsync(cancellationToken);
@@ -34,17 +70,17 @@ public sealed class RegistrationCacheDomainService(
   public Task<Result> DeleteAsync(Guid accountId, CancellationToken cancellationToken = default) =>
     _persistence.DeleteAsync(accountId, cancellationToken);
 
-  public async Task<Result<byte[]>> DownloadCacheZipAsync(CancellationToken cancellationToken = default) {
+  public async Task<Result<byte[]?>> DownloadCacheZipAsync(CancellationToken cancellationToken = default) {
     try {
       var allResult = await _persistence.LoadAllAsync(cancellationToken).ConfigureAwait(false);
       if (!allResult.IsSuccess || allResult.Value == null)
-        return Result<byte[]>.InternalServerError(null, allResult.Messages?.ToArray() ?? ["Could not load registration caches."]);
+        return Result<byte[]?>.InternalServerError(null, allResult.Messages?.ToArray() ?? ["Could not load registration caches."]);
 
       var rows = allResult.Value;
       using var ms = new MemoryStream();
       if (rows.Length == 0) {
         using (new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true)) { }
-        return Result<byte[]>.Ok(ms.ToArray());
+        return Result<byte[]?>.Ok(ms.ToArray());
       }
       using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true)) {
         foreach (var row in rows) {
@@ -56,12 +92,12 @@ public sealed class RegistrationCacheDomainService(
       }
       var zipBytes = ms.ToArray();
       _logger.LogInformation("Exported {Count} registration caches to zip.", rows.Length);
-      return Result<byte[]>.Ok(zipBytes);
+      return Result<byte[]?>.Ok(zipBytes);
     }
     catch (Exception ex) {
       var message = "Error creating registration cache zip.";
       _logger.LogError(ex, message);
-      return Result<byte[]>.InternalServerError(null, [message, .. ex.ExtractMessages()]);
+      return Result<byte[]?>.InternalServerError(null, [message, .. ex.ExtractMessages()]);
     }
   }
 
@@ -152,8 +188,8 @@ public sealed class RegistrationCacheDomainService(
       }
 
       var cache = new RegistrationCache {
-        Id = payload.Id,
-        AccountId = payload.Id,
+        Id = payload.Id?.ToNullableGuid() ?? payload.AccountId,
+        AccountId = payload.AccountId,
         Description = payload.Description ?? "",
         Contacts = payload.Contacts ?? [],
         IsStaging = payload.IsStaging,

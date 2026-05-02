@@ -1,17 +1,26 @@
 import { ResponseModelBase } from '../../ResponseModelBase'
+import { ScopeEntityType, ScopePermission } from '../../engine/scopeEnums'
 
-/** Certs API user payload (LetsEncryptServer UserResponse). */
+/** Matches <c>MaksIT.CertsUI.Models.Identity.User.UserResponse</c> (camelCase JSON). */
 export interface UserResponse extends ResponseModelBase {
-
-  /** Master */
   id: string
-  username?: string
-  isActive?: boolean
-  lastLogin?: string
+  username: string
+  email?: string | null
+  mobileNumber?: string | null
+  isActive: boolean
 
-  /** Two-factor */
   twoFactorEnabled?: boolean
   twoFactorRecoveryCodes?: string[]
   qrCodeUrl?: string
   recoveryCodesLeft?: number
+
+  isGlobalAdmin?: boolean
+  entityScopes?: UserEntityScopeResponse[]
+}
+
+export interface UserEntityScopeResponse {
+  id: string
+  entityId: string
+  entityType: ScopeEntityType
+  scope: ScopePermission
 }

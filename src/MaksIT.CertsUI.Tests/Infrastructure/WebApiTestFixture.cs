@@ -14,7 +14,7 @@ public sealed class WebApiTestFixture : IDisposable
     {
         var configuration = new Configuration
         {
-            CertsUIEngineConfiguration = new CertsUIEngineConfiguration
+            CertsEngineConfiguration = new CertsEngineConfiguration
             {
                 Admin = new AdminUser
                 {

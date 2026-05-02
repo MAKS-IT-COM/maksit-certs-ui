@@ -1,24 +1,25 @@
 using MaksIT.Core.Webapi.Models;
-using MaksIT.Models.LetsEncryptServer.Account.Requests;
-using MaksIT.Models.LetsEncryptServer.Account.Responses;
+using MaksIT.CertsUI.Authorization;
+using MaksIT.CertsUI.Models.CertsUI.Account.Requests;
+using MaksIT.CertsUI.Models.CertsUI.Account.Responses;
 using MaksIT.Results;
 using MaksIT.CertsUI.Abstractions.Services;
 using MaksIT.CertsUI.Mappers;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-
 
 namespace MaksIT.CertsUI.Services;
 
 public interface IAccountService {
-  Task<Result<GetAccountResponse[]?>> GetAccountsAsync();
-  Task<Result<GetAccountResponse?>> GetAccountAsync(Guid accountId);
-  Task<Result<GetAccountResponse?>> PostAccountAsync(PostAccountRequest requestData);
-  Task<Result<GetAccountResponse?>> PatchAccountAsync(Guid accountId, PatchAccountRequest requestData);
-  Task<Result> DeleteAccountAsync(Guid accountId);
+  Task<Result<GetAccountResponse[]?>> GetAccountsAsync(CertsUIAuthorizationData certsAuthorizationData);
+  Task<Result<GetAccountResponse?>> GetAccountAsync(CertsUIAuthorizationData certsAuthorizationData, Guid accountId);
+  Task<Result<GetAccountResponse?>> PostAccountAsync(CertsUIAuthorizationData certsAuthorizationData, PostAccountRequest requestData);
+  Task<Result<GetAccountResponse?>> PatchAccountAsync(CertsUIAuthorizationData certsAuthorizationData, Guid accountId, PatchAccountRequest requestData);
+  Task<Result> DeleteAccountAsync(CertsUIAuthorizationData certsAuthorizationData, Guid accountId);
 }
 
 public class AccountService(
-  ILogger<CacheService> logger,
+  ILogger<AccountService> logger,
   IOptions<Configuration> appSettings,
   ICacheService cacheService,
   ICertsFlowService certsFlowService,
@@ -28,13 +29,18 @@ public class AccountService(
   appSettings
 ), IAccountService {
 
+  private readonly ICacheService _cacheService = cacheService;
+  private readonly ICertsFlowService _certsFlowService = certsFlowService;
   private readonly AccountToResponseMapper _accountToResponseMapper = accountToResponseMapper;
 
   #region Accounts
 
-  public async Task<Result<GetAccountResponse[]?>> GetAccountsAsync() {
+  public async Task<Result<GetAccountResponse[]?>> GetAccountsAsync(CertsUIAuthorizationData certsAuthorizationData) {
+    var rbac = RBACWrapper(certsAuthorizationData, _ => Result.Ok(), _ => Result.Ok());
+    if (!rbac.IsSuccess)
+      return rbac.ToResultOfType<GetAccountResponse[]?>(null);
 
-    var accountsFromCacheResult = await cacheService.LoadAccountsFromCacheAsync();
+    var accountsFromCacheResult = await _cacheService.LoadAccountsFromCacheAsync();
     if (!accountsFromCacheResult.IsSuccess || accountsFromCacheResult.Value == null) {
       return accountsFromCacheResult
         .ToResultOfType<GetAccountResponse[]?>(_ => null);
@@ -47,8 +53,12 @@ public class AccountService(
     return Result<GetAccountResponse[]?>.Ok(accounts);
   }
 
-  public async Task<Result<GetAccountResponse?>> GetAccountAsync(Guid accountId) {
-    var loadFromCacheResult = await cacheService.LoadAccountFromCacheAsync(accountId);
+  public async Task<Result<GetAccountResponse?>> GetAccountAsync(CertsUIAuthorizationData certsAuthorizationData, Guid accountId) {
+    var rbac = RBACWrapper(certsAuthorizationData, _ => Result.Ok(), _ => Result.Ok());
+    if (!rbac.IsSuccess)
+      return rbac.ToResultOfType<GetAccountResponse?>(null);
+
+    var loadFromCacheResult = await _cacheService.LoadAccountFromCacheAsync(accountId);
     if (!loadFromCacheResult.IsSuccess || loadFromCacheResult.Value == null) {
       return loadFromCacheResult.ToResultOfType<GetAccountResponse?>(_ => null);
     }
@@ -58,9 +68,12 @@ public class AccountService(
     return Result<GetAccountResponse?>.Ok(_accountToResponseMapper.MapToResponse(accountId, cache));
   }
 
-  public async Task<Result<GetAccountResponse?>> PostAccountAsync(PostAccountRequest requestData) {
+  public async Task<Result<GetAccountResponse?>> PostAccountAsync(CertsUIAuthorizationData certsAuthorizationData, PostAccountRequest requestData) {
+    var rbac = RBACWrapper(certsAuthorizationData, _ => Result.Ok(), _ => Result.Ok());
+    if (!rbac.IsSuccess)
+      return rbac.ToResultOfType<GetAccountResponse?>(null);
 
-    var fullFlowResult = await certsFlowService.FullFlow(
+    var fullFlowResult = await _certsFlowService.FullFlow(
           requestData.IsStaging,
           null,
           requestData.Description,
@@ -74,7 +87,7 @@ public class AccountService(
 
     var accountId = fullFlowResult.Value.Value;
 
-    var loadAccountFromCacheResult = await cacheService.LoadAccountFromCacheAsync(accountId);
+    var loadAccountFromCacheResult = await _cacheService.LoadAccountFromCacheAsync(accountId);
     if (!loadAccountFromCacheResult.IsSuccess || loadAccountFromCacheResult.Value == null) {
       return loadAccountFromCacheResult.ToResultOfType<GetAccountResponse?>(_ => null);
     }
@@ -84,8 +97,12 @@ public class AccountService(
     return Result<GetAccountResponse?>.Ok(_accountToResponseMapper.MapToResponse(accountId, cache));
   }
 
-  public async Task<Result<GetAccountResponse?>> PatchAccountAsync(Guid accountId, PatchAccountRequest requestData) {
-    var loadAccountResult = await cacheService.LoadAccountFromCacheAsync(accountId);
+  public async Task<Result<GetAccountResponse?>> PatchAccountAsync(CertsUIAuthorizationData certsAuthorizationData, Guid accountId, PatchAccountRequest requestData) {
+    var rbac = RBACWrapper(certsAuthorizationData, _ => Result.Ok(), _ => Result.Ok());
+    if (!rbac.IsSuccess)
+      return rbac.ToResultOfType<GetAccountResponse?>(null);
+
+    var loadAccountResult = await _cacheService.LoadAccountFromCacheAsync(accountId);
     if (!loadAccountResult.IsSuccess || loadAccountResult.Value == null) {
       return loadAccountResult.ToResultOfType<GetAccountResponse?>(_ => null);
     }
@@ -150,13 +167,13 @@ public class AccountService(
       }
     }
 
-    var saveResult = await cacheService.SaveToCacheAsync(accountId, cache);
+    var saveResult = await _cacheService.SaveToCacheAsync(accountId, cache);
     if (!saveResult.IsSuccess) {
       return saveResult.ToResultOfType<GetAccountResponse?>(default);
     }
 
     if (hostnamesToAdd.Count > 0) {
-      var fullFlowResult = await certsFlowService.FullFlow(
+      var fullFlowResult = await _certsFlowService.FullFlow(
         cache.IsStaging,
         cache.AccountId,
         cache.Description,
@@ -170,7 +187,7 @@ public class AccountService(
     }
 
     if (hostnamesToRemove.Count > 0) {
-      var revokeResult = await certsFlowService.FullRevocationFlow(
+      var revokeResult = await _certsFlowService.FullRevocationFlow(
         cache.IsStaging,
         cache.AccountId,
         cache.Description,
@@ -183,7 +200,7 @@ public class AccountService(
     }
     #endregion
 
-    loadAccountResult = await cacheService.LoadAccountFromCacheAsync(accountId);
+    loadAccountResult = await _cacheService.LoadAccountFromCacheAsync(accountId);
     if (!loadAccountResult.IsSuccess || loadAccountResult.Value == null) {
       return loadAccountResult.ToResultOfType<GetAccountResponse?>(_ => null);
     }
@@ -191,11 +208,15 @@ public class AccountService(
     return Result<GetAccountResponse?>.Ok(_accountToResponseMapper.MapToResponse(accountId, loadAccountResult.Value));
   }
 
-  public async Task<Result> DeleteAccountAsync(Guid accountId) {
+  public async Task<Result> DeleteAccountAsync(CertsUIAuthorizationData certsAuthorizationData, Guid accountId) {
+    var rbac = RBACWrapper(certsAuthorizationData, _ => Result.Ok(), _ => Result.Ok());
+    if (!rbac.IsSuccess)
+      return rbac;
+
     // TODO: Revoke all certificates
 
     // Remove from cache
-    return await cacheService.DeleteAccountCacheAsync(accountId);
+    return await _cacheService.DeleteAccountCacheAsync(accountId);
   }
   #endregion
 

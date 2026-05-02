@@ -1,14 +1,16 @@
 using FluentMigrator.Runner;
 using Microsoft.Extensions.DependencyInjection;
+using MaksIT.CertsUI.Engine;
 using MaksIT.CertsUI.Engine.DomainServices;
 using MaksIT.CertsUI.Engine.FluentMigrations;
 using MaksIT.CertsUI.Engine.Infrastructure;
-using MaksIT.CertsUI.Engine.Persistance.Mappers;
-using MaksIT.CertsUI.Engine.Persistance.Services;
-using MaksIT.CertsUI.Engine.Persistance.Services.Linq2Db;
+using MaksIT.CertsUI.Engine.Persistence.Mappers;
+using MaksIT.CertsUI.Engine.Persistence.Services;
+using Microsoft.Extensions.Logging;
 using MaksIT.CertsUI.Engine.QueryServices.Identity;
 using MaksIT.CertsUI.Engine.QueryServices.Linq2Db.Identity;
 using MaksIT.CertsUI.Engine.Services;
+using MaksIT.CertsUI.Engine.Persistence.Services.Linq2Db;
 
 
 namespace MaksIT.CertsUI.Engine.Extensions;
@@ -20,7 +22,7 @@ namespace MaksIT.CertsUI.Engine.Extensions;
 public static class ServiceCollectionExtensions {
   public static void AddCertsEngine(this IServiceCollection services, ICertsEngineConfiguration certsEngineConfiguration) {
 
-    services.AddSingleton(certsEngineConfiguration);
+    services.AddSingleton<ICertsEngineConfiguration>(certsEngineConfiguration);
 
     if (string.IsNullOrWhiteSpace(certsEngineConfiguration.ConnectionString))
       throw new ArgumentException("Certs engine connection string is required for FluentMigrator (empty string uses connectionless/preview mode and will not create tables).", nameof(certsEngineConfiguration));
@@ -37,32 +39,53 @@ public static class ServiceCollectionExtensions {
     services.AddScoped<ISchemaSyncService, SchemaSyncService>();
 
     // Linq2Db data connection for query services (and future repositories)
-    services.AddScoped<ICertsDataConnectionFactory, CertsDataConnectionFactory>();
+    services.AddScoped<ICertsUIDataConnectionFactory, CertsUIDataConnectionFactory>();
 
     #region Mappers
-    services.AddScoped<UserMapper>();
+    services.AddScoped<UserMapper>(sp => new UserMapper(sp.GetRequiredService<ICertsEngineConfiguration>().JwtSettingsConfiguration.PasswordPepper));
     #endregion
 
+
     #region APIKey
-    services.AddScoped<IAPIKeyPersistanceService, ApiKeyPersistanceServiceLinq2Db>();
+    services.AddScoped<IApiKeyPersistenceService, ApiKeyPersistenceServiceLinq2Db>();
+    services.AddScoped<IApiKeyAuthorizationPersistenceService, ApiKeyAuthorizationPersistenceServiceLinq2Db>();
     services.AddScoped<IApiKeyQueryService, ApiKeyQueryServiceLinq2Db>();
-    services.AddScoped<IApiKeyEntityScopeQueryService, ApiKeyEntityScopeQueryServiceStub>();
+    services.AddScoped<IApiKeyEntityScopeQueryService, ApiKeyEntityScopeQueryServiceLinq2Db>();
     services.AddScoped<IApiKeyDomainService, ApiKeyDomainService>();
     #endregion
 
     #region Registration cache
-    services.AddScoped<IRegistrationCachePersistanceService, RegistrationCachePersistanceServiceLinq2Db>();
+    services.AddScoped<IRegistrationCachePersistenceService, RegistrationCachePersistenceServiceLinq2Db>();
     services.AddScoped<IRegistrationCacheDomainService, RegistrationCacheDomainService>();
-    services.AddScoped<IAcmeSessionPersistanceService, AcmeSessionPersistanceServiceLinq2Db>();
+    services.AddScoped<IAcmeSessionPersistenceService, AcmeSessionPersistenceServiceLinq2Db>();
     services.AddScoped<IAcmeHttpChallengePersistenceService, AcmeHttpChallengePersistenceServiceLinq2Db>();
     services.AddScoped<ITermsOfServiceCachePersistenceService, TermsOfServiceCachePersistenceServiceLinq2Db>();
     services.AddSingleton<IRuntimeLeaseService, RuntimeLeaseServiceNpgsql>();
     #endregion
 
     #region Identity
-    services.AddScoped<IIdentityPersistanceService, IdentityPersistanceServiceLinq2Db>();
-    services.AddScoped<IUserQueryService, UserQueryServiceLinq2Db>();
-    services.AddScoped<IIdentityDomainService, IdentityDomainService>();
+    services.AddScoped<IIdentityPersistenceService, IdentityPersistenceServiceLinq2Db>();
+    services.AddScoped<IUserAuthorizationPersistenceService, UserAuthorizationPersistenceServiceLinq2Db>();
+    services.AddScoped<IIdentityQueryService, IdentityQueryServiceLinq2Db>();
+    services.AddScoped<IUserEntityScopeQueryService, UserEntityScopeQueryServiceLinq2Db>();
+    services.AddScoped<IIdentityDomainService>(sp => {
+      var logger = sp.GetRequiredService<ILogger<IdentityDomainService>>();
+      var identityPersistenceService = sp.GetRequiredService<IIdentityPersistenceService>();
+      var userAuthorizationPersistenceService = sp.GetRequiredService<IUserAuthorizationPersistenceService>();
+      var vaultEngineConfiguration = sp.GetRequiredService<ICertsEngineConfiguration>();
+      var adminUser = vaultEngineConfiguration.Admin;
+      var jwtSettingsConfiguration = vaultEngineConfiguration.JwtSettingsConfiguration;
+      var twoFactorSettingsConfiguration = vaultEngineConfiguration.TwoFactorSettingsConfiguration;
+
+      return new IdentityDomainService(
+        logger,
+        identityPersistenceService,
+        userAuthorizationPersistenceService,
+        vaultEngineConfiguration,
+        adminUser,
+        jwtSettingsConfiguration,
+        twoFactorSettingsConfiguration);
+    });
     #endregion
 
     #region ACME / Let's Encrypt

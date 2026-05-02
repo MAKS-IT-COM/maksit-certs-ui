@@ -4,7 +4,7 @@ namespace MaksIT.CertsUI.Engine.QueryServices;
 
 /// <summary>
 /// Composes a predicate on a related entity into a predicate on the outer entity via a navigation expression.
-/// Uses parameter replacement so the result is Linq2Db/IQueryable translatable to SQL (same pattern as MaksIT.Vault.Engine.QueryServices.ExpressionCompose).
+/// Uses parameter replacement so the result is Linq2Db/IQueryable translatable to SQL.
 /// </summary>
 public static class ExpressionCompose {
   /// <summary>

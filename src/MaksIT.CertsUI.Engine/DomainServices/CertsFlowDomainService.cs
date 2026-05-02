@@ -1,7 +1,8 @@
+using MaksIT.CertsUI.Engine;
 using MaksIT.CertsUI.Engine.Domain.Certs;
 using MaksIT.CertsUI.Engine.Dto.Certs;
 using MaksIT.CertsUI.Engine.Infrastructure;
-using MaksIT.CertsUI.Engine.Persistance.Services;
+using MaksIT.CertsUI.Engine.Persistence.Services;
 using MaksIT.CertsUI.Engine.RuntimeCoordination;
 using MaksIT.CertsUI.Engine.Services;
 using MaksIT.Results;
@@ -13,10 +14,21 @@ using System.Text;
 
 namespace MaksIT.CertsUI.Engine.DomainServices;
 
+
+/// <summary>
+/// Deploys issued PEM certificates to a host agent and triggers a service reload. Implemented in the host (e.g. Web API calling an agent over HTTP).
+/// </summary>
+public interface IAgentDeploymentService {
+  Task<Result> UploadCerts(Dictionary<string, string> certs);
+  Task<Result> ReloadService(string serviceName);
+}
+
+
 /// <summary>
 /// ACME / Let's Encrypt certificate flows (domain layer). Engine returns <see cref="MaksIT.Results.Result"/> / <see cref="MaksIT.Results.Result{T}"/>; the Web API materializes them to HTTP.
 /// </summary>
-public interface ICertsFlowDomainService {
+public interface ICertsFlowDomainService
+{
 
   #region Terms of service
   Task<Result<string?>> GetTermsOfServiceAsync(Guid sessionId);
@@ -48,11 +60,14 @@ public interface ICertsFlowDomainService {
   #region Maintenance
   /// <summary>Deletes HTTP-01 challenge rows older than <paramref name="maxAge"/> (used by renewal sweep).</summary>
   Task<Result<int>> PurgeStaleHttpChallengesAsync(TimeSpan maxAge, CancellationToken cancellationToken = default);
+
+  /// <summary>Deletes <c>acme_sessions</c> rows whose <c>expires_at_utc</c> is in the past (used by renewal sweep).</summary>
+  Task<Result<int>> PurgeExpiredAcmeSessionsAsync(CancellationToken cancellationToken = default);
   #endregion
 }
 
 /// <summary>
-/// Certs-only domain service for ACME flows (no 2FA or entity scopes; same layering as <see cref="ApiKeyDomainService"/> / <see cref="IdentityDomainService"/>).
+/// Certs-only domain service for ACME flows (same layering as <see cref="ApiKeyDomainService"/> / <see cref="IdentityDomainService"/>).
 /// </summary>
 public class CertsFlowDomainService : ICertsFlowDomainService {
 
@@ -63,9 +78,10 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
   private readonly ILetsEncryptService _letsEncryptService;
   private readonly IRegistrationCacheDomainService _registrationCache;
   private readonly IAgentDeploymentService _agentDeployment;
-  private readonly ICertsFlowEngineConfiguration _config;
+  private readonly ICertsEngineConfiguration _config;
   private readonly ITermsOfServiceCachePersistenceService _termsOfServiceCache;
   private readonly IAcmeHttpChallengePersistenceService _httpChallenges;
+  private readonly IAcmeSessionPersistenceService _acmeSessions;
   private readonly IRuntimeLeaseService _runtimeLease;
   private readonly IRuntimeInstanceId _runtimeInstance;
 
@@ -75,9 +91,10 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
     ILetsEncryptService letsEncryptService,
     IRegistrationCacheDomainService registrationCache,
     IAgentDeploymentService agentDeployment,
-    ICertsFlowEngineConfiguration config,
+    ICertsEngineConfiguration config,
     ITermsOfServiceCachePersistenceService termsOfServiceCache,
     IAcmeHttpChallengePersistenceService httpChallenges,
+    IAcmeSessionPersistenceService acmeSessions,
     IRuntimeLeaseService runtimeLease,
     IRuntimeInstanceId runtimeInstance) {
     _logger = logger;
@@ -88,6 +105,7 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
     _config = config;
     _termsOfServiceCache = termsOfServiceCache;
     _httpChallenges = httpChallenges;
+    _acmeSessions = acmeSessions;
     _runtimeLease = runtimeLease;
     _runtimeInstance = runtimeInstance;
   }
@@ -393,6 +411,9 @@ public class CertsFlowDomainService : ICertsFlowDomainService {
 
   public Task<Result<int>> PurgeStaleHttpChallengesAsync(TimeSpan maxAge, CancellationToken cancellationToken = default) =>
     _httpChallenges.DeleteOlderThanAsync(maxAge, cancellationToken);
+
+  public Task<Result<int>> PurgeExpiredAcmeSessionsAsync(CancellationToken cancellationToken = default) =>
+    _acmeSessions.DeleteExpiredAsync(cancellationToken);
 
   #endregion
 

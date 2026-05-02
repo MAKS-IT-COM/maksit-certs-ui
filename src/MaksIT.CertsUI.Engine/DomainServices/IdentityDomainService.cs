@@ -1,181 +1,172 @@
+using MaksIT.Results;
 using MaksIT.Core.Security;
 using MaksIT.Core.Security.JWT;
 using MaksIT.CertsUI.Engine.Domain.Identity;
-using MaksIT.CertsUI.Engine.Persistance.Services;
-using MaksIT.Results;
 using Microsoft.Extensions.Logging;
+using MaksIT.CertsUI.Engine.Persistence.Services;
+
 
 namespace MaksIT.CertsUI.Engine.DomainServices;
-
-public interface IIdentityDomainConfiguration {
-  string Secret { get; }
-  string Issuer { get; }
-  string Audience { get; }
-  int ExpirationMinutes { get; }
-  int RefreshExpirationDays { get; }
-  string Pepper { get; }
-}
-
-/// <summary>TOTP / otpauth label settings (Vault: <c>ITwoFactorSettingsConfiguration</c>).</summary>
-public interface ITwoFactorSettingsConfiguration {
-  string Label { get; }
-  string Issuer { get; }
-  string? Algorithm { get; }
-  int? Digits { get; }
-  int? Period { get; }
-  int TimeTolerance { get; }
-}
-
-public class LoginDomainResult {
-  public required string TokenType { get; set; }
-  public required string Token { get; set; }
-  public required DateTime ExpiresAt { get; set; }
-  public required string RefreshToken { get; set; }
-  public required DateTime RefreshTokenExpiresAt { get; set; }
-  public required string Username { get; set; }
-}
 
 public interface IIdentityDomainService {
 
   #region Read
-  Task<Result<int>> CountUsersAsync(CancellationToken cancellationToken = default);
-  Task<Result<User?>> ReadUserByIdAsync(Guid userId, CancellationToken cancellationToken = default);
-  Task<Result<User?>> ReadUserByUsernameAsync(string username, CancellationToken cancellationToken = default);
-  Task<Result<User?>> ReadUserByAccessTokenAsync(string accessToken, CancellationToken cancellationToken = default);
-  #endregion
-
-  #region Write
-  /// <summary>Persists the user aggregate (tokens and credentials) as provided.</summary>
-  Task<Result<User?>> WriteUserAsync(User user, CancellationToken cancellationToken = default);
-  Task<Result<User?>> CreateUserAsync(string username, string password, CancellationToken cancellationToken = default);
-  Task<Result<User?>> ChangePasswordAsync(Guid userId, string newPassword, CancellationToken cancellationToken = default);
-  #endregion
-
-  #region Delete
-  Task<Result> DeleteUserAsync(Guid userId, CancellationToken cancellationToken = default);
+  Result<User?> ReadUserById(Guid userId);
+  Result<User?> ReadUserByUsername(string usenrame);
+  Result<UserAuthorization?> ReadUserAuthorization(Guid userId);
   #endregion
 
   #region First boot Initialize
-  Task<Result> EnsureDefaultAdminAsync(CancellationToken cancellationToken = default);
+  Task<Result<User?>> InitializeAdminAsync();
+  #endregion
+
+  #region Write
+  Task<Result<User?>> WriteUserAsync(User user);
+  /// <summary>Persists user with the given authorization. When null, current authorization is preserved.</summary>
+  Task<Result<User?>> WriteUserAsync(User user, UserAuthorization? authorization);
+  Task<Result> WriteUserAuthorizationAsync(UserAuthorization authorization);
+  #endregion
+
+  #region Delete
+  Task<Result> DeleteUserAsync(Guid userId);
   #endregion
 
   #region Login/Refresh/Logout
-  Task<Result<LoginDomainResult?>> LoginAsync(string username, string password, string? twoFactorCode = null, string? twoFactorRecoveryCode = null, CancellationToken cancellationToken = default);
-  Task<Result<LoginDomainResult?>> RefreshTokenAsync(string refreshToken, bool? force = false, CancellationToken cancellationToken = default);
-  Task<Result> LogoutAsync(string accessToken, bool logoutFromAllDevices, CancellationToken cancellationToken = default);
+  Task<Result<JwtToken?>> LoginAsync(string username, string password, string? twoFactorCode = null, string? twoFactorRecoveryCode = null);
+  Task<Result<JwtToken?>> RefreshTokenAsync(string refreshToken, bool? force = false);
+  Task<Result> LogoutAsync(Guid userId, string accessToken, bool allDevices = false);
   #endregion
 
-  #region Two-factor authentication
-  /// <summary>Generates TOTP secret and recovery codes; mutates <paramref name="user"/>.</summary>
+  /// <summary>
+  /// Enables two-factor authentication for the user: generates shared key and recovery codes, mutates the user.
+  /// </summary>
+  /// <returns>Plain recovery codes to show the user once; caller must persist the user after.</returns>
   Result<List<string>?> EnableTwoFactorAuthForUser(User user);
-  #endregion
 }
 
 public class IdentityDomainService(
   ILogger<IdentityDomainService> logger,
-  IIdentityPersistanceService userPersistence,
-  IIdentityDomainConfiguration config,
-  ITwoFactorSettingsConfiguration twoFactorSettings,
-  IDefaultAdminBootstrapConfiguration defaultAdminBootstrap
+  IIdentityPersistenceService identityPersistenceService,
+  IUserAuthorizationPersistenceService userAuthorizationPersistenceService,
+  ICertsEngineConfiguration vaultEngineConfiguration,
+  IAdminUser adminUser,
+  IJwtSettingsConfiguration jwtSettingsConfiguration,
+  ITwoFactorSettingsConfiguration twoFactorSettingsConfiguration
 ) : IIdentityDomainService {
 
   private readonly ILogger<IdentityDomainService> _logger = logger;
-  private readonly IIdentityPersistanceService _userPersistence = userPersistence;
-  private readonly IIdentityDomainConfiguration _config = config;
-  private readonly ITwoFactorSettingsConfiguration _twoFactorSettings = twoFactorSettings;
-  private readonly IDefaultAdminBootstrapConfiguration _defaultAdminBootstrap = defaultAdminBootstrap;
-
-  private const int TwoFactorRecoveryCodeCount = 5;
+  private readonly IIdentityPersistenceService _identityPersistenceService = identityPersistenceService;
+  private readonly IUserAuthorizationPersistenceService _userAuthorizationPersistenceService = userAuthorizationPersistenceService;
+  private readonly ICertsEngineConfiguration _vaultEngineConfiguration = vaultEngineConfiguration;
+  private readonly IAdminUser _adminUser = adminUser;
+  private readonly IJwtSettingsConfiguration _jwtSettingsConfiguration = jwtSettingsConfiguration;
+  private readonly ITwoFactorSettingsConfiguration _twoFactorSettingsConfiguration = twoFactorSettingsConfiguration;
 
   #region Read
-  public async Task<Result<int>> CountUsersAsync(CancellationToken cancellationToken = default) =>
-    Result<int>.Ok(await _userPersistence.CountAsync(cancellationToken));
+  public Result<User?> ReadUserById(Guid userId) =>
+  _identityPersistenceService.ReadById(userId);
 
-  public Task<Result<User?>> ReadUserByIdAsync(Guid userId, CancellationToken cancellationToken = default) =>
-    _userPersistence.GetByIdAsync(userId, cancellationToken);
+  public Result<User?> ReadUserByUsername(string usenrame) =>
+    _identityPersistenceService.ReadByUsername(usenrame);
 
-  public Task<Result<User?>> ReadUserByUsernameAsync(string username, CancellationToken cancellationToken = default) =>
-    _userPersistence.GetByNameAsync(username, cancellationToken);
-
-  public Task<Result<User?>> ReadUserByAccessTokenAsync(string accessToken, CancellationToken cancellationToken = default) =>
-    _userPersistence.GetByAccessTokenAsync(accessToken, cancellationToken);
-  #endregion
-
-  #region Write
-  public async Task<Result<User?>> WriteUserAsync(User user, CancellationToken cancellationToken = default) {
-    var upsert = await _userPersistence.UpsertUserAsync(user, cancellationToken);
-    return upsert.IsSuccess
-      ? Result<User?>.Ok(user)
-      : upsert.ToResultOfType<User?>(null);
-  }
-
-  public Task<Result<User?>> CreateUserAsync(string username, string password, CancellationToken cancellationToken = default) =>
-    _userPersistence.CreateUserWithPasswordAsync(username, password, _config.Pepper, cancellationToken);
-
-  public async Task<Result<User?>> ChangePasswordAsync(Guid userId, string newPassword, CancellationToken cancellationToken = default) {
-    var userResult = await _userPersistence.GetByIdAsync(userId, cancellationToken);
-    if (!userResult.IsSuccess || userResult.Value == null)
-      return userResult;
-
-    var user = userResult.Value;
-    var setPasswordResult = user.SetPassword(newPassword, _config.Pepper);
-    if (!setPasswordResult.IsSuccess || setPasswordResult.Value == null)
-      return setPasswordResult;
-
-    var save = await _userPersistence.UpsertUserAsync(setPasswordResult.Value, cancellationToken);
-    if (!save.IsSuccess)
-      return save.ToResultOfType<User?>(null);
-
-    return Result<User?>.Ok(setPasswordResult.Value);
-  }
-  #endregion
-
-  #region Delete
-  public Task<Result> DeleteUserAsync(Guid userId, CancellationToken cancellationToken = default) =>
-    _userPersistence.DeleteUserAsync(userId, cancellationToken);
+  public Result<UserAuthorization?> ReadUserAuthorization(Guid userId) =>
+    _userAuthorizationPersistenceService.ReadByUserId(userId);
   #endregion
 
   #region First boot Initialize
-  public Task<Result> EnsureDefaultAdminAsync(CancellationToken cancellationToken = default) {
-    if (string.IsNullOrWhiteSpace(_defaultAdminBootstrap.Username) || string.IsNullOrWhiteSpace(_defaultAdminBootstrap.Password))
-      return Task.FromResult(Result.BadRequest("Configure default admin: Configuration:CertsUIEngineConfiguration:Admin:Username and Admin:Password must be non-empty when bootstrapping the first user."));
-    return _userPersistence.EnsureDefaultAdminAsync(_config.Pepper, _defaultAdminBootstrap.Username.Trim(), _defaultAdminBootstrap.Password, cancellationToken);
+  public async Task<Result<User?>> InitializeAdminAsync() {
+    var adminUserIdsResult = _userAuthorizationPersistenceService.ReadGlobalAdminUserIds();
+    if (adminUserIdsResult.IsSuccess && adminUserIdsResult.Value != null && adminUserIdsResult.Value.Count > 0) {
+      var firstId = adminUserIdsResult.Value[0];
+      var existing = _identityPersistenceService.ReadById(firstId);
+      if (existing.IsSuccess && existing.Value != null)
+        return existing;
+      return Result<User?>.BadRequest(null, "Global admin is referenced but the user record is missing.");
+    }
+
+    // Use the same pepper as login so hashed password matches validation; require it to be set (e.g. from appsecrets.json).
+    var pepper = _vaultEngineConfiguration.JwtSettingsConfiguration?.PasswordPepper;
+    if (string.IsNullOrWhiteSpace(pepper)) {
+      return Result<User?>.BadRequest(null, "PasswordPepper is not set. Set Configuration:VaultEngineConfiguration:JwtSettingsConfiguration:PasswordPepper in appsecrets.json (or config) so bootstrap and login use the same pepper.");
+    }
+
+    var usernameTrimmed = (_adminUser.Username ?? "").Trim();
+    var passwordTrimmed = (_adminUser.Password ?? "").Trim();
+    if (string.IsNullOrWhiteSpace(usernameTrimmed) || string.IsNullOrWhiteSpace(passwordTrimmed)) {
+      return Result<User?>.BadRequest(null, "Admin Username and Password must be set in configuration.");
+    }
+
+    var user = new User(usernameTrimmed, passwordTrimmed, pepper!)
+      .SetIsActive(true);
+
+    var authorization = new UserAuthorization(user.Id).SetIsGlobalAdmin(true);
+    var upsertResult = _identityPersistenceService.Write(user, authorization);
+    if (!upsertResult.IsSuccess || upsertResult.Value == null)
+      return upsertResult.ToResultOfType<User?>(_ => null);
+
+    return upsertResult;
   }
   #endregion
 
+  #region Write
+  /// <summary>Persists user; loads current authorization from DB so auth is not overwritten.</summary>
+  public Task<Result<User?>> WriteUserAsync(User user) =>
+    WriteUserAsync(user, null);
+
+  /// <summary>Persists user and optional authorization. When authorization is null, loads current authorization from DB so auth is not overwritten.</summary>
+  public Task<Result<User?>> WriteUserAsync(User user, UserAuthorization? authorization) {
+    var authToApply = authorization;
+    if (authToApply == null) {
+      var authResult = _userAuthorizationPersistenceService.ReadByUserId(user.Id);
+      authToApply = authResult.IsSuccess ? authResult.Value : null;
+    }
+    return Task.FromResult(_identityPersistenceService.Write(user, authToApply));
+  }
+
+  public Task<Result> WriteUserAuthorizationAsync(UserAuthorization authorization) =>
+    Task.FromResult(_userAuthorizationPersistenceService.Write(authorization));
+  #endregion
+
+  #region Delete
+  public Task<Result> DeleteUserAsync(Guid userId) =>
+    Task.FromResult(_identityPersistenceService.DeleteById(userId));
+  #endregion
+
   #region Login/Refresh/Logout
-  public async Task<Result<LoginDomainResult?>> LoginAsync(string username, string password, string? twoFactorCode = null, string? twoFactorRecoveryCode = null, CancellationToken cancellationToken = default) {
+  public async Task<Result<JwtToken?>> LoginAsync(string username, string password, string? twoFactorCode = null, string? twoFactorRecoveryCode = null) {
     var usernameTrimmed = username?.Trim() ?? "";
     var passwordTrimmed = password?.Trim() ?? "";
 
-    var userResult = await _userPersistence.GetByNameAsync(usernameTrimmed, cancellationToken);
+    var userResult = _identityPersistenceService.ReadByUsername(usernameTrimmed);
 
-    if (!userResult.IsSuccess || userResult.Value == null) {
+    if(!userResult.IsSuccess || userResult.Value == null) {
       _logger.LogWarning("Login failed: user not found for username '{Username}' (trimmed: '{Trimmed}')", username ?? "(null)", usernameTrimmed);
-      return Result<LoginDomainResult?>.Unauthorized(null, "Invalid username or password.");
+      return Result<JwtToken?>.Unauthorized(null, "Invalid username or password.");
     }
 
     var user = userResult.Value.RemoveRevokedTokens();
 
-    if (!user.IsActive) {
+    if(!user.IsActive) {
       _logger.LogWarning("Login failed: user '{Username}' is not active", user.Username);
-      return Result<LoginDomainResult?>.Unauthorized(null, "User is not active.");
+      return Result<JwtToken?>.Unauthorized(null, "User is not active.");
     }
 
-    if (string.IsNullOrWhiteSpace(_config.Pepper)) {
-      _logger.LogWarning("Login failed: password pepper is not set (user '{Username}')", user.Username);
-      return Result<LoginDomainResult?>.Unauthorized(null, "Invalid username or password.");
+    var pepper = _vaultEngineConfiguration.JwtSettingsConfiguration?.PasswordPepper;
+    if (string.IsNullOrWhiteSpace(pepper)) {
+      _logger.LogWarning("Login failed: PasswordPepper is not set (user '{Username}')", user.Username);
+      return Result<JwtToken?>.Unauthorized(null, "Invalid username or password.");
     }
 
-    var validateHashResult = user.ValidatePassword(passwordTrimmed, _config.Pepper);
+    var validateHashResult = user.ValidatePassword(passwordTrimmed, pepper);
+
     if (!validateHashResult.IsSuccess) {
-      _logger.LogWarning("Login failed: password validation failed for user '{Username}' (pepper length: {PepperLen}, password length: {PasswordLen})", user.Username, _config.Pepper?.Length ?? 0, passwordTrimmed.Length);
-      return validateHashResult.ToResultOfType<LoginDomainResult?>(default);
+      _logger.LogWarning("Login failed: password validation failed for user '{Username}' (pepper length: {PepperLen}, password length: {PasswordLen})", user.Username, pepper?.Length ?? 0, passwordTrimmed.Length);
+      return Result<JwtToken?>.Unauthorized(null, "Invalid username or password.");
     }
 
     if (user.TwoFactorEnabled) {
       if (string.IsNullOrWhiteSpace(twoFactorCode) && string.IsNullOrWhiteSpace(twoFactorRecoveryCode))
-        return Result<LoginDomainResult?>.Unauthorized(null, "Two-factor authentication required.");
+        return Result<JwtToken?>.Unauthorized(null, "Two-factor authentication required.");
 
       Result validateResult = Result.Ok();
 
@@ -185,89 +176,112 @@ public class IdentityDomainService(
         validateResult = user.ValidateRecoveryCode(twoFactorRecoveryCode);
 
       if (!validateResult.IsSuccess)
-        return validateResult.ToResultOfType<LoginDomainResult?>(default);
+        return validateResult.ToResultOfType<JwtToken?>((JwtToken?)null);
     }
 
     user.SetLastLogin();
 
-    var jwtResult = IssueJwtLoginDomainResult(user, replaceExisting: null);
-    if (!jwtResult.IsSuccess || jwtResult.Value == null)
-      return jwtResult;
+    var authResult = _userAuthorizationPersistenceService.ReadByUserId(user.Id);
+    var aclEntries = authResult.IsSuccess && authResult.Value != null
+      ? authResult.Value.GetAclEntries()
+      : [];
 
-    var saveResult = await _userPersistence.UpsertUserAsync(user, cancellationToken);
-    if (!saveResult.IsSuccess)
-      return saveResult.ToResultOfType<LoginDomainResult?>(default);
+    var jwtTokenResult = IssueJwtForUser(user, aclEntries);
+    if (!jwtTokenResult.IsSuccess || jwtTokenResult.Value == null)
+      return jwtTokenResult;
 
-    return jwtResult;
+    var writeUserResult = _identityPersistenceService.Write(user, authResult.IsSuccess ? authResult.Value : null);
+    if (!writeUserResult.IsSuccess || writeUserResult.Value == null)
+      return writeUserResult.ToResultOfType<JwtToken?>(_ => null);
+
+    return jwtTokenResult;
   }
 
-  public async Task<Result<LoginDomainResult?>> RefreshTokenAsync(string refreshToken, bool? force = false, CancellationToken cancellationToken = default) {
-    var userResult = await _userPersistence.GetByRefreshTokenAsync(refreshToken, cancellationToken);
+  public async Task<Result<JwtToken?>> RefreshTokenAsync(string refreshToken, bool? force = false) {
+    var userResult = _identityPersistenceService.ReadByRefreshToken(refreshToken);
     if (!userResult.IsSuccess || userResult.Value == null)
-      return Result<LoginDomainResult?>.Unauthorized(null, "Invalid refresh token.");
+      return Result<JwtToken?>.Unauthorized(null, "Invalid refresh token.");
 
     var user = userResult.Value.RemoveRevokedTokens();
 
-    var tokenDomain = user.Tokens.SingleOrDefault(t => t.RefreshToken == refreshToken);
+    var token = user.Tokens.SingleOrDefault(token => token.RefreshToken == refreshToken);
 
-    if (tokenDomain == null)
-      return Result<LoginDomainResult?>.Unauthorized(null, "Invalid refresh token.");
+    if (token == null)
+      return Result<JwtToken?>.Unauthorized(null, "Invalid refresh token.");
 
-    if (tokenDomain.IsRevoked)
-      return Result<LoginDomainResult?>.Unauthorized(null, "Token has been revoked.");
+    if (token.IsRevoked)
+      return Result<JwtToken?>.Unauthorized(null, "Token has been revoked.");
 
-    if (DateTime.UtcNow <= tokenDomain.ExpiresAt && force != true) {
+    Result<User?>? writeResult = default;
+
+    // If refresh token is still valid and force is not set, do nothing, just return the same token
+    if (DateTime.UtcNow <= token.ExpiresAt && force != true) {
       user.SetLastLogin();
-      var saveRefresh = await _userPersistence.UpsertUserAsync(user, cancellationToken);
-      if (!saveRefresh.IsSuccess)
-        return saveRefresh.ToResultOfType<LoginDomainResult?>(default);
 
-      return Result<LoginDomainResult?>.Ok(ToLoginResult(user, tokenDomain));
+      // Update the user status in the database
+      var authForRefresh = _userAuthorizationPersistenceService.ReadByUserId(user.Id);
+      writeResult = _identityPersistenceService.Write(user, authForRefresh.IsSuccess ? authForRefresh.Value : null);
+      if (!writeResult.IsSuccess || writeResult.Value == null)
+        return writeResult.ToResultOfType<JwtToken?>(_ => null);
+
+      return Result<JwtToken?>.Ok(token);
     }
 
-    if (DateTime.UtcNow > tokenDomain.RefreshTokenExpiresAt) {
-      user.RemoveToken(tokenDomain.Id);
-      await _userPersistence.UpsertUserAsync(user, cancellationToken);
-      return Result<LoginDomainResult?>.Unauthorized(null, "Refresh token has expired.");
+    // If refresh token is expired, it cannot be used to get a new token; remove it and persist.
+    if (DateTime.UtcNow > token.RefreshTokenExpiresAt) {
+      user.RemoveToken(token.Id);
+      var authForRemove = _userAuthorizationPersistenceService.ReadByUserId(user.Id);
+      _identityPersistenceService.Write(user, authForRemove.IsSuccess ? authForRemove.Value : null);
+      return Result<JwtToken?>.Unauthorized(null, "Refresh token has expired.");
     }
 
     user.SetLastLogin();
 
-    var jwtResult = IssueJwtLoginDomainResult(user, tokenDomain);
-    if (!jwtResult.IsSuccess || jwtResult.Value == null)
-      return jwtResult;
+    var authResult = _userAuthorizationPersistenceService.ReadByUserId(user.Id);
+    var aclEntries = authResult.IsSuccess && authResult.Value != null
+      ? authResult.Value.GetAclEntries()
+      : [];
 
-    var saveRotated = await _userPersistence.UpsertUserAsync(user, cancellationToken);
-    if (!saveRotated.IsSuccess)
-      return saveRotated.ToResultOfType<LoginDomainResult?>(default);
+    var jwtTokenResult = IssueJwtForUser(user, aclEntries);
+    if (!jwtTokenResult.IsSuccess || jwtTokenResult.Value == null)
+      return jwtTokenResult;
 
-    return jwtResult;
+    // Update the user status in the database
+    writeResult = _identityPersistenceService.Write(user, authResult.IsSuccess ? authResult.Value : null);
+    if (!writeResult.IsSuccess || writeResult.Value == null)
+      return writeResult.ToResultOfType<JwtToken?>(_ => null);
+
+    return jwtTokenResult;
   }
 
-  /// <summary>Logs out by access token; removes the session or all sessions.</summary>
-  public async Task<Result> LogoutAsync(string accessToken, bool logoutFromAllDevices, CancellationToken cancellationToken = default) {
-    var userResult = await _userPersistence.GetByAccessTokenAsync(accessToken, cancellationToken);
-    if (userResult.IsSuccess && userResult.Value != null) {
-      var user = userResult.Value;
+  /// <summary>Logs out by user id and access token from the JWT payload; removes the session or all sessions.</summary>
+  public async Task<Result> LogoutAsync(Guid userId, string accessToken, bool allDevices = false) {
+    var userResult = _identityPersistenceService.ReadById(userId);
+    if (!userResult.IsSuccess || userResult.Value == null)
+      return Result.Ok();
 
-      if (logoutFromAllDevices)
-        user.RemoveAllTokens();
-      else
-        user.RemoveToken(accessToken);
+    var user = userResult.Value;
 
-      await _userPersistence.UpsertUserAsync(user, cancellationToken);
-    }
+    if (allDevices)
+      user.RemoveAllTokens();
+    else
+      user.RemoveToken(accessToken);
 
+    var authResult = _userAuthorizationPersistenceService.ReadByUserId(user.Id);
+    _identityPersistenceService.Write(user, authResult.IsSuccess ? authResult.Value : null);
     return Result.Ok();
   }
   #endregion
 
-  #region Two-factor authentication
+  #region Two-factor and JWT orchestration
+  private const int TwoFactorRecoveryCodeCount = 5;
+
   public Result<List<string>?> EnableTwoFactorAuthForUser(User user) {
     if (user.TwoFactorEnabled)
       return Result<List<string>?>.BadRequest(null, "Two-factor authentication is already enabled.");
 
-    if (string.IsNullOrWhiteSpace(_config.Pepper))
+    var pepper = _vaultEngineConfiguration.JwtSettingsConfiguration.PasswordPepper;
+    if (string.IsNullOrWhiteSpace(pepper))
       return Result<List<string>?>.InternalServerError(null, "Password pepper is not configured.");
 
     if (!TotpGenerator.TryGenerateSecret(out string? secret, out string? errorMessage))
@@ -285,11 +299,11 @@ public class IdentityDomainService(
     }
 
     foreach (var code in clearRecoveryCodes) {
-      if (!PasswordHasher.TryCreateSaltedHash(code, _config.Pepper, out (string Salt, string Hash)? saltedHash, out string? hashError))
+      if (!PasswordHasher.TryCreateSaltedHash(code, pepper, out (string Salt, string Hash)? saltedHash, out string? hashError))
         return Result<List<string>?>.InternalServerError(null, hashError);
 
       var (salt, hash) = saltedHash.Value;
-      recoveryCodeEntities.Add(new TwoFactorRecoveryCode(salt, _config.Pepper, hash));
+      recoveryCodeEntities.Add(new TwoFactorRecoveryCode(salt, pepper, hash));
     }
 
     user.SetTwoFactorRecoveryCodes(recoveryCodeEntities);
@@ -303,48 +317,40 @@ public class IdentityDomainService(
     if (!user.TwoFactorEnabled || string.IsNullOrEmpty(user.TwoFactorSharedKey))
       return Result.BadRequest("Two-factor authentication is not enabled.");
 
-    if (!TotpGenerator.TryValidate(code, user.TwoFactorSharedKey!, _twoFactorSettings.TimeTolerance, out bool isValid, out string? errorMessage))
+    if (!TotpGenerator.TryValidate(code, user.TwoFactorSharedKey!, _twoFactorSettingsConfiguration.TimeTolerance, out bool isValid, out string? errorMessage))
       return Result.InternalServerError(errorMessage);
 
     return isValid ? Result.Ok() : Result.Unauthorized("Invalid two-factor code.");
   }
-  #endregion
 
-  #region JWT orchestration
-  private Result<LoginDomainResult?> IssueJwtLoginDomainResult(User user, JwtToken? replaceExisting) {
+  private Result<JwtToken?> IssueJwtForUser(User user, IReadOnlyList<string> aclEntries) {
     if (!JwtGenerator.TryGenerateToken(new JWTTokenGenerateRequest {
-      Secret = _config.Secret,
-      Issuer = _config.Issuer,
-      Audience = _config.Audience,
-      Expiration = _config.ExpirationMinutes,
+      Secret = _jwtSettingsConfiguration.JwtSecret,
+      Issuer = _jwtSettingsConfiguration.Issuer,
+      Audience = _jwtSettingsConfiguration.Audience,
+      Expiration = _jwtSettingsConfiguration.ExpiresIn,
       UserId = user.Id.ToString(),
       Username = user.Username,
+      AclEntries = aclEntries?.ToList() ?? []
     }, out (string token, JWTTokenClaims claims)? tokenData, out string? errorMessage)) {
-      return Result<LoginDomainResult?>.InternalServerError(null, errorMessage);
+      return Result<JwtToken?>.InternalServerError(null, errorMessage);
     }
 
     var (tokenString, claims) = tokenData.Value;
     if (claims.IssuedAt == null || claims.ExpiresAt == null)
-      return Result<LoginDomainResult?>.InternalServerError(null, "Invalid token claims: IssuedAt or ExpiresAt is null.");
+      return Result<JwtToken?>.InternalServerError(null, "Invalid token claims: IssuedAt or ExpiresAt is null.");
 
     string refreshToken = JwtGenerator.GenerateRefreshToken();
-    var refreshExpiresAt = claims.IssuedAt.Value.AddDays(_config.RefreshExpirationDays);
-
-    JwtToken jwtToken = replaceExisting != null
-      ? new JwtToken(replaceExisting.Id, tokenString, claims.IssuedAt.Value, claims.ExpiresAt.Value, refreshToken, refreshExpiresAt)
-      : new JwtToken(tokenString, claims.IssuedAt.Value, claims.ExpiresAt.Value, refreshToken, refreshExpiresAt);
+    var jwtToken = new JwtToken(
+      tokenString,
+      claims.IssuedAt.Value,
+      claims.ExpiresAt.Value,
+      refreshToken,
+      claims.IssuedAt.Value.AddDays(_jwtSettingsConfiguration.RefreshTokenExpiresIn)
+    );
 
     user.RecordIssuedToken(jwtToken);
-    return Result<LoginDomainResult?>.Ok(ToLoginResult(user, jwtToken));
+    return Result<JwtToken?>.Ok(jwtToken);
   }
-
-  private static LoginDomainResult ToLoginResult(User user, JwtToken tokenDomain) => new() {
-    TokenType = tokenDomain.TokenType,
-    Token = tokenDomain.Token,
-    ExpiresAt = tokenDomain.ExpiresAt,
-    RefreshToken = tokenDomain.RefreshToken,
-    RefreshTokenExpiresAt = tokenDomain.RefreshTokenExpiresAt,
-    Username = user.Username,
-  };
   #endregion
 }

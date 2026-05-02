@@ -1,6 +1,7 @@
+using MaksIT.Results;
 using MaksIT.Core.Abstractions.Domain;
 using MaksIT.CertsUI.Engine.Facades;
-using MaksIT.Results;
+
 
 namespace MaksIT.CertsUI.Engine.Domain.Identity;
 
@@ -80,6 +81,8 @@ public class JwtToken(
   /// <summary>
   /// Sets the token type for this JwtToken instance.
   /// </summary>
+  /// <param name="tokenType"></param>
+  /// <returns></returns>
   public JwtToken SetTokenType(string tokenType) {
     TokenType = tokenType;
     return this;
@@ -88,6 +91,8 @@ public class JwtToken(
   /// <summary>
   /// Sets the actual JWT token string for this JwtToken instance.
   /// </summary>
+  /// <param name="token"></param>
+  /// <returns></returns>
   public JwtToken SetToken(string token) {
     Token = token;
     return this;
@@ -96,6 +101,8 @@ public class JwtToken(
   /// <summary>
   /// Sets the date and time when the JWT was issued.
   /// </summary>
+  /// <param name="issuedAt"></param>
+  /// <returns></returns>
   public JwtToken SetIssuedAt(DateTime issuedAt) {
     IssuedAt = issuedAt;
     return this;
@@ -104,6 +111,8 @@ public class JwtToken(
   /// <summary>
   /// Sets the date and time when the JWT will expire.
   /// </summary>
+  /// <param name="expiresAt"></param>
+  /// <returns></returns>
   public JwtToken SetExpiresAt(DateTime expiresAt) {
     ExpiresAt = expiresAt;
     return this;
@@ -112,6 +121,8 @@ public class JwtToken(
   /// <summary>
   /// Sets whether the JWT has been revoked.
   /// </summary>
+  /// <param name="isRevoked"></param>
+  /// <returns></returns>
   public JwtToken SetIsRevoked(bool isRevoked) {
     IsRevoked = isRevoked;
     return this;
@@ -120,6 +131,8 @@ public class JwtToken(
   /// <summary>
   /// Sets the refresh token for this JwtToken instance.
   /// </summary>
+  /// <param name="refreshToken"></param>
+  /// <returns></returns>
   public JwtToken SetRefreshToken(string refreshToken) {
     RefreshToken = refreshToken;
     return this;
@@ -128,6 +141,8 @@ public class JwtToken(
   /// <summary>
   /// Sets the date and time when the refresh token will expire.
   /// </summary>
+  /// <param name="refreshTokenExpiresAt"></param>
+  /// <returns></returns>
   public JwtToken SetRefreshTokenExpiresAt(DateTime refreshTokenExpiresAt) {
     RefreshTokenExpiresAt = refreshTokenExpiresAt;
     return this;
@@ -137,6 +152,7 @@ public class JwtToken(
   /// <summary>
   /// Revokes the JWT token, marking it as no longer valid.
   /// </summary>
+  /// <returns></returns>
   public Result RevokeToken() {
     if (IsRevoked)
       return Result.Conflict("Token is already revoked.");
@@ -147,6 +163,7 @@ public class JwtToken(
   /// <summary>
   /// Checks if the JWT token is valid based on its expiration and revocation status.
   /// </summary>
+  /// <returns></returns>
   public bool IsValid() {
     return !IsRevoked && DateTime.UtcNow < ExpiresAt;
   }
@@ -154,7 +171,9 @@ public class JwtToken(
   /// <summary>
   /// Checks if the refresh token is valid based on its expiration and revocation status.
   /// </summary>
+  /// <returns></returns>
   public bool IsRefreshTokenValid() {
     return !IsRevoked && DateTime.UtcNow < RefreshTokenExpiresAt;
   }
 }
+

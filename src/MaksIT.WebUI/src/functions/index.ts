@@ -7,6 +7,7 @@ import {
   deepCopy,
   deepDelta,
   deltaHasOperations,
+  ENTITY_SCOPES_ARRAY_POLICY,
   deepEqual,
   deepMerge,
   deepPatternMatch
@@ -28,7 +29,7 @@ import {
 
 import {
   parseAclEntry,
-  parseAclEntries
+  parseAclEntries,
 } from './acl'
 
 import {
@@ -48,6 +49,7 @@ export {
   deepCopy,
   deepDelta,
   deltaHasOperations,
+  ENTITY_SCOPES_ARRAY_POLICY,
   deepEqual,
   deepMerge,
   deepPatternMatch,
@@ -74,3 +76,5 @@ export {
   // headers
   extractFilenameFromHeaders
 }
+
+export type { AclEntry } from './acl/parseAclEntry'

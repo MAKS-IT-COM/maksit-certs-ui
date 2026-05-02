@@ -1,19 +1,19 @@
-using MaksIT.CertsUI.Engine.DomainServices;
+using MaksIT.CertsUI.Engine;
 
 namespace MaksIT.CertsUI;
 
 public class Configuration {
-  public required CertsUIEngineConfiguration CertsUIEngineConfiguration { get; set; }
+  public required CertsEngineConfiguration CertsEngineConfiguration { get; set; }
 }
 
-public class AdminUser : IDefaultAdminBootstrapConfiguration {
+public class AdminUser : IAdminUser {
 
   public required string Username { get; set; }
 
   public required string Password { get; set; }
 }
 
-public class JwtSettingsConfiguration : IIdentityDomainConfiguration {
+public class JwtSettingsConfiguration : IJwtSettingsConfiguration {
 
   public required string JwtSecret { get; set; }
 
@@ -27,18 +27,6 @@ public class JwtSettingsConfiguration : IIdentityDomainConfiguration {
 
   /// <summary>Pepper for password/2FA hashing. If not set, defaults to empty (set in appsecrets for production).</summary>
   public string PasswordPepper { get; set; } = "";
-
-  string IIdentityDomainConfiguration.Secret => JwtSecret;
-
-  string IIdentityDomainConfiguration.Issuer => Issuer;
-
-  string IIdentityDomainConfiguration.Audience => Audience;
-
-  int IIdentityDomainConfiguration.ExpirationMinutes => ExpiresIn;
-
-  int IIdentityDomainConfiguration.RefreshExpirationDays => RefreshTokenExpiresIn;
-
-  string IIdentityDomainConfiguration.Pepper => PasswordPepper;
 }
 
 public class TwoFactorSettingsConfiguration : ITwoFactorSettingsConfiguration {
@@ -66,10 +54,10 @@ public class Agent {
   public required string ServiceToReload { get; set; }
 }
 
-public class CertsUIEngineConfiguration : ICertsFlowEngineConfiguration {
+public class CertsEngineConfiguration : ICertsEngineConfiguration {
 
-  /// <summary>Npgsql connection string; optional when using legacy <c>ConnectionStrings:Certs</c>.</summary>
-  public string? ConnectionString { get; set; }
+  /// <summary>Npgsql connection string; optional when using legacy <c>ConnectionStrings:Certs</c> (resolved in <c>Program.cs</c>).</summary>
+  public string ConnectionString { get; set; } = "";
 
   /// <summary>When true, add-only schema sync after FluentMigrator (ADD COLUMN only, never DROP legacy/renamed columns). Set explicitly in appsettings/Helm (deserialization defaults missing bools to false).</summary>
   public bool AutoSyncSchema { get; set; }
@@ -82,9 +70,39 @@ public class CertsUIEngineConfiguration : ICertsFlowEngineConfiguration {
 
   public required Agent Agent { get; set; }
 
+  /// <summary>Let's Encrypt production ACME directory URL (JSON: <c>production</c>).</summary>
   public required string Production { get; set; }
 
+  /// <summary>Let's Encrypt staging ACME directory URL (JSON: <c>staging</c>).</summary>
   public required string Staging { get; set; }
 
-  string ICertsFlowEngineConfiguration.AgentServiceToReload => Agent.ServiceToReload;
+  IAdminUser ICertsEngineConfiguration.Admin {
+    get => Admin;
+    set => Admin = (AdminUser)value;
+  }
+
+  IJwtSettingsConfiguration ICertsEngineConfiguration.JwtSettingsConfiguration {
+    get => JwtSettingsConfiguration;
+    set => JwtSettingsConfiguration = (JwtSettingsConfiguration)value;
+  }
+
+  ITwoFactorSettingsConfiguration ICertsEngineConfiguration.TwoFactorSettingsConfiguration {
+    get => TwoFactorSettingsConfiguration;
+    set => TwoFactorSettingsConfiguration = (TwoFactorSettingsConfiguration)value;
+  }
+
+  string ICertsEngineConfiguration.LetsEncryptProduction {
+    get => Production;
+    set => Production = value;
+  }
+
+  string ICertsEngineConfiguration.LetsEncryptStaging {
+    get => Staging;
+    set => Staging = value;
+  }
+
+  string ICertsEngineConfiguration.AgentServiceToReload {
+    get => Agent.ServiceToReload;
+    set => Agent.ServiceToReload = value;
+  }
 }
