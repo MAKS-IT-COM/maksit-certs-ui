@@ -57,12 +57,12 @@ This is implemented as an optimistic single-statement `INSERT ... ON CONFLICT ..
 - `src/MaksIT.CertsUI.Engine/RuntimeCoordination/IRuntimeInstanceId.cs`
 - `src/MaksIT.CertsUI.Engine/RuntimeCoordination/RuntimeLeaseNames.cs`
 - `src/MaksIT.CertsUI.Engine/Infrastructure/IRuntimeLeaseService.cs`
-- `src/MaksIT.CertsUI.Engine/Persistance/Services/IAcmeHttpChallengePersistenceService.cs`
+- `src/MaksIT.CertsUI.Engine/Persistence/Services/IAcmeHttpChallengePersistenceService.cs`
 
 ### PostgreSQL implementation
 
 - `src/MaksIT.CertsUI.Engine/Infrastructure/RuntimeLeaseServiceNpgsql.cs`
-- `src/MaksIT.CertsUI.Engine/Persistance/Services/Linq2Db/AcmeHttpChallengePersistenceServiceLinq2Db.cs`
+- `src/MaksIT.CertsUI.Engine/Persistence/Services/Linq2Db/AcmeHttpChallengePersistenceServiceLinq2Db.cs`
 - `src/MaksIT.CertsUI.Engine/Data/CertsLinq2DbMapping.cs`
 - `src/MaksIT.CertsUI.Engine/FluentMigrations/20260425130000_AcmeChallengesAndRuntimeLeases.cs`
 - `src/MaksIT.CertsUI.Engine/Infrastructure/SchemaSyncService.cs`

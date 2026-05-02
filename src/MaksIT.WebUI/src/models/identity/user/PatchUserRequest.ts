@@ -1,8 +1,10 @@
-import { object, RefinementCtx, ZodType, z } from 'zod'
+import { array, object, RefinementCtx, ZodType, z } from 'zod'
 import { PatchRequestModelBase, PatchRequestModelBaseSchema } from '../../PatchRequestModelBase'
+import { guidStringSchemaOptionalNullable } from '../../guidString'
+import { PatchUserEntityScopeRequest } from './PatchUserEntityScopeRequest'
 
-/** Enable/disable 2FA (sent without other patch fields; Vault parity). */
-export interface PatchUserEnabeleTwoFactorRequest extends PatchRequestModelBase {
+/** Enable/disable 2FA (backend reads <c>twoFactorEnabled</c> directly). */
+export interface PatchUserEnableTwoFactorRequest extends PatchRequestModelBase {
   twoFactorEnabled: boolean
 }
 
@@ -63,15 +65,32 @@ export const PatchUserChangePasswordRequestSchema: ZodType<PatchUserChangePasswo
   })
 ).superRefine(PatchUserChangePasswordRequestSchemaRefine)
 
-/** User patch (Certs API: active flag and 2FA toggle use operations where applicable). */
+/** Mirrors <c>MaksIT.CertsUI.Models.Identity.User.PatchUserRequest</c>. */
 export interface PatchUserRequest extends PatchRequestModelBase {
-  isActive?: boolean
-  twoFactorEnabled?: boolean
+  username?: string | null
+  email?: string | null
+  mobileNumber?: string | null
+  isActive?: boolean | null
+  password?: string | null
+  twoFactorEnabled?: boolean | null
+  isGlobalAdmin?: boolean | null
+  entityScopes?: PatchUserEntityScopeRequest[] | null
 }
 
 export const PatchUserRequestSchema: z.Schema<PatchUserRequest> = PatchRequestModelBaseSchema.and(
   object({
-    isActive: z.boolean().optional(),
-    twoFactorEnabled: z.boolean().optional(),
+    username: z.string().optional().nullable(),
+    email: z.string().optional().nullable(),
+    mobileNumber: z.string().optional().nullable(),
+    isActive: z.boolean().optional().nullable(),
+    password: z.string().optional().nullable(),
+    twoFactorEnabled: z.boolean().optional().nullable(),
+    isGlobalAdmin: z.boolean().optional().nullable(),
+    entityScopes: array(object({
+      id: guidStringSchemaOptionalNullable,
+      entityId: guidStringSchemaOptionalNullable,
+      entityType: z.number().optional().nullable(),
+      scope: z.number().optional().nullable(),
+    }).passthrough()).optional().nullable(),
   })
 )

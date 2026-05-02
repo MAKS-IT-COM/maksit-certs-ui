@@ -4,7 +4,7 @@ This document describes how authentication (login), token refresh, and logout wo
 
 **Audience:** Backend (C# / ASP.NET) and Frontend (TypeScript / React) developers.
 
-**Related:** This repo’s WebUI identity layer is **aligned** with **MaksIT-Vault** [`LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md`](../../maksit-vault/assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md) when both projects sit side by side under the same parent folder; otherwise open that path in your Vault clone. Vault documents **2FA**, **API-key RBAC**, and a **database-backed** user store. **MaksIT.CertsUI** persists users and refresh tokens in **PostgreSQL** via **`IUserStore`**, **no 2FA** on the backend (optional `LoginRequest` fields exist for shared models but are ignored; the WebUI 2FA inputs are commented out), and **no Vault-style ACL product surface**—JWT may still carry role/ACL claims for shared **MaksIT.Core** JWT helpers, but Certs is not an ACL administration app.
+**MaksIT.CertsUI** persists users and refresh tokens in **PostgreSQL**. Shared **MaksIT.Models** types may include optional **2FA** fields; behavior follows this WebAPI and WebUI implementation.
 
 ---
 
@@ -74,7 +74,7 @@ There is **no** `Username` field on this model; the WebUI derives display name f
 3. **Optional 2FA fields** on `LoginRequest` are **not** validated by Certs—ignored if sent.
 4. **Generate** access JWT via `JwtGenerator.TryGenerateToken` (secret, issuer, audience, expiration from config).
 5. **Generate** opaque refresh token and build a domain `JwtToken` with access + refresh expiry (`RefreshExpiration` from config).
-6. **Upsert** token on user, **SetLastLogin**, **`IUserStore.UpsertUserAsync`**.
+6. **Upsert** token on user, **SetLastLogin**, **`IIdentityPersistenceService.WriteAsync`**.
 7. Return `LoginResponse` (no username field; client uses JWT claims).
 
 **Request body (`LoginRequest`):** `username`, `password`, optional unused `twoFactorCode` / `twoFactorRecoveryCode` (shared model shape only).
@@ -90,7 +90,7 @@ There is **no** `Username` field on this model; the WebUI derives display name f
 2. **Remove** revoked JWT rows (`RemoveRevokedJwtTokens`).
 3. **Find** the token where `RefreshToken` matches.
 4. **Unauthorized** if not found → e.g. “Invalid refresh token.”
-5. **If the access token is still valid** (`UtcNow <= token.ExpiresAt`): update last login, **`UpsertUserAsync`**, return the **same** `LoginResponse` (no new JWT). There is **no** server-side `force` refresh path like Vault.
+5. **If the access token is still valid** (`UtcNow <= token.ExpiresAt`): update last login, **`WriteAsync`**, return the **same** `LoginResponse` (no new JWT). This API does not implement a server-side `force` refresh path.
 6. **If access expired** but refresh is still valid (`UtcNow <= RefreshTokenExpiresAt`): issue a **new** access JWT + new refresh token, upsert token, save, return new `LoginResponse`.
 7. **If refresh is expired**: remove that token record, return **401** “Refresh token has expired.”
 
@@ -101,10 +101,10 @@ There is **no** `Username` field on this model; the WebUI derives display name f
 
 1. **Resolve user** by **access JWT** from the validated Bearer token (`GetByAccessTokenAsync` / token string from JWT context).
 2. If found: **`LogoutFromAllDevices`** → `RevokeAllJwtTokens()`; else → `RemoveJwtToken(accessToken)` for the current session.
-3. **`UpsertUserAsync`** if the user was updated.
+3. **`WriteAsync`** if the user was updated.
 4. Return success (implementation may still return OK if the token was unknown—clients should clear local state regardless).
 
-**Request body (`LogoutRequest`):** `token` (access JWT, for shared model parity), `logoutFromAllDevices` — the server uses the **Bearer** access token for lookup; keep body aligned with Vault clients if needed.
+**Request body (`LogoutRequest`):** `token` (access JWT, for shared model parity), `logoutFromAllDevices` — the server uses the **Bearer** access token for lookup.
 
 ---
 
@@ -182,7 +182,7 @@ Base route: `api/identity` (`IdentityController`, `AppMap`).
 
 **Logout:** POST `/api/identity/logout` with `Authorization: Bearer` and body `{ token, logoutFromAllDevices }` → server removes token(s) from the user row → client clears storage.
 
-Replace illustrative “organizations” examples in Vault with Certs resources (e.g. **accounts**, **certificate flows**)—the **mechanism** is the same: no protected API should run after refresh has failed without clearing identity.
+Use Certs resources in examples (e.g. **accounts**, **certificate flows**): no protected API should run after refresh has failed without clearing identity.
 
 ---
 

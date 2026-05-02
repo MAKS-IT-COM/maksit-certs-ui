@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc.Filters;
-using System.Threading.Tasks;
+
 
 namespace MaksIT.CertsUI.Abstractions.Authorization.Filters;
 

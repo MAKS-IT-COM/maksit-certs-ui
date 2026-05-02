@@ -4,15 +4,15 @@ The **`ReverseProxy`** project ([`src/ReverseProxy`](../../src/ReverseProxy)) is
 
 **Config:** [`src/ReverseProxy/appsettings.json`](../../src/ReverseProxy/appsettings.json)
 
-**Related:** The same topic in **MaksIT-Vault** is documented at [`REVERSE_PROXY_ROUTING.md`](../../maksit-vault/assets/docs/REVERSE_PROXY_ROUTING.md) when both repos sit side by side; otherwise open that path in your Vault clone. Vault’s table does **not** include an **ACME HTTP-01** path—Certs adds **`/.well-known/acme-challenge/`** so challenges hit the WebAPI on the **same public host** as the UI.
+**Certs routing:** **`/.well-known/acme-challenge/`** is matched **before** the SPA catch-all so HTTP-01 challenges reach the WebAPI on the **same public host** as the UI.
 
 ---
 
 ## Route table
 
-Routes use explicit **`Order`** (lower = matched first), matching **MaksIT-Vault**, so the SPA catch-all never wins over `/api`, `/swagger`, or `/.well-known/` when JSON key order varies.
+Routes use explicit **`Order`** (lower = matched first) so the SPA catch-all never wins over `/api`, `/swagger`, or `/.well-known/` when JSON key order varies.
 
-Compose service names are **`server`** (WebAPI) and **`client`** (Vite/WebUI). Cluster IDs **`webapiCluster`** / **`webuiCluster`** match Vault for a parallel mental model.
+Compose service names are **`server`** (WebAPI) and **`client`** (Vite/WebUI). Cluster IDs **`webapiCluster`** / **`webuiCluster`** reference those upstreams.
 
 | Order | Path match | Cluster | Upstream (Compose) |
 |------|------------|---------|---------------------|

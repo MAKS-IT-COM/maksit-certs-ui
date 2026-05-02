@@ -1,34 +1,42 @@
 import { FC, useMemo } from 'react'
-import { object, string, ZodType } from 'zod'
-import { ApiKeyResponse } from '../../models/letsEncryptServer/apiKeys/ApiKeyResponse'
+import { array, boolean, object, string, ZodType } from 'zod'
+import { ApiKeyResponse } from '../../models/certsUI/apiKeys/ApiKeyResponse'
 import { useFormState } from '../../hooks/useFormState'
 import { addToast } from '../../components/Toast/addToast'
 import { postData } from '../../axiosConfig'
 import { ApiRoutes, GetApiRoute } from '../../AppMap'
 import { Offcanvas } from '../../components/Offcanvas'
 import { FormContainer, FormContent, FormFooter, FormHeader } from '../../components/FormLayout'
-import { ButtonComponent, DateTimePickerComponent, TextBoxComponent } from '../../components/editors'
-import { CreateApiKeyRequest, CreateApiKeyRequestSchema } from '../../models/letsEncryptServer/apiKeys/CreateApiKeyRequest'
+import { ButtonComponent, CheckBoxComponent, DateTimePickerComponent, TextBoxComponent } from '../../components/editors'
+import { CreateApiKeyRequest, CreateApiKeyRequestSchema } from '../../models/certsUI/apiKeys/CreateApiKeyRequest'
+import { EditUserScopes, EntityScopeFormProps, EntityScopeFormPropsSchema } from '../shared/EditScopes'
+import { deepCopy, hasFlag } from '../../functions'
 import { useAppSelector } from '../../redux/hooks'
+import { ScopeEntityType, ScopePermission } from '../../models/engine/scopeEnums'
 
 
 // Form state interface and validation
-
 interface CreateApiKeyFormProps {
-  [key: string]: string | undefined
+  [key: string]: string | boolean | EntityScopeFormProps[] | undefined
 
   description: string
   expiresAt?: string
+  isGlobalAdmin?: boolean
+  entityScopes: EntityScopeFormProps []
 }
 
 const createApiKeyFormPropsProto = (): CreateApiKeyFormProps => ({
   description: '',
   expiresAt: undefined,
+  isGlobalAdmin: false,
+  entityScopes: []
 })
 
 const CreateApiKeyFormPropsSchema: ZodType<CreateApiKeyFormProps> = object({
   description: string().min(1),
   expiresAt: string().optional(),
+  isGlobalAdmin: boolean().optional(),
+  entityScopes: array(EntityScopeFormPropsSchema)
 })
 
 interface CreateApiKeyProps {
@@ -52,6 +60,7 @@ const CreateApiKey: FC<CreateApiKeyProps> = (props) => {
     errors,
     formIsValid,
     handleInputChange,
+    setInitialState
   } = useFormState<CreateApiKeyFormProps>({
     initialState: initialFormState,
     validationSchema,
@@ -63,6 +72,12 @@ const CreateApiKey: FC<CreateApiKeyProps> = (props) => {
     const requestData: CreateApiKeyRequest = {
       description: formState.description,
       expiresAt: formState.expiresAt,
+      isGlobalAdmin: formState.isGlobalAdmin,
+      entityScopes: formState.entityScopes?.map(entityScope => ({
+        entityId: entityScope.entityId,
+        entityType: entityScope.entityType,
+        scope: entityScope.scope
+      }))
     }
 
     const request = CreateApiKeyRequestSchema.safeParse(requestData)
@@ -108,6 +123,51 @@ const CreateApiKey: FC<CreateApiKeyProps> = (props) => {
             errorText={errors.expiresAt}
             onChange={(dateTime) => handleInputChange('expiresAt', dateTime)}
           />
+          {identity.isGlobalAdmin && (
+            <CheckBoxComponent
+              colspan={12}
+              label={'Is Global Admin'}
+              value={formState.isGlobalAdmin ?? false}
+              onChange={(e) => handleInputChange('isGlobalAdmin', e.target.checked)}
+            />
+          )}
+          {!formState.isGlobalAdmin && <EditUserScopes
+            allowIdentityAndApiKeyScopes={false}
+            colspan={12}
+            entityScopes={formState.entityScopes}
+            emptyStateMessage={'At least one scope is required for non-global admin API keys.'}
+            onChange={(entityScopes) => {
+
+              if (!identity.isGlobalAdmin) {
+                const allowedOrganizationIds = identity.acls
+                  ?.filter(acl => acl.entityType === ScopeEntityType.ApiKey
+                  && hasFlag(acl.scope, ScopePermission.Create))
+                  .map(acl => acl.entityId) ?? []
+
+                const selectedOrganizationIds = entityScopes
+                  ?.map(scope => scope.entityId) ?? []
+
+                if (selectedOrganizationIds.length > 0) {
+                  const hasPermissionForAnySelected = selectedOrganizationIds
+                    .some(id => allowedOrganizationIds.includes(id))
+
+                  if (!hasPermissionForAnySelected) {
+                    addToast(
+                      'You do not have permission to create API keys with the selected scope.',
+                      'error'
+                    )
+
+                    return
+                  }
+                }
+              }
+
+              const newState = deepCopy(formState)
+              newState.entityScopes = entityScopes
+
+              setInitialState(newState)
+            }}
+          />}
         </div>
       </FormContent>
       <FormFooter
@@ -123,5 +183,5 @@ const CreateApiKey: FC<CreateApiKeyProps> = (props) => {
 }
 
 export {
-  CreateApiKey,
+  CreateApiKey
 }

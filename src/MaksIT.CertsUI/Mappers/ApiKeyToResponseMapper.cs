@@ -1,28 +1,32 @@
 using MaksIT.CertsUI.Engine.Domain.Identity;
 using MaksIT.CertsUI.Engine.Query.Identity;
-using MaksIT.Models.LetsEncryptServer.ApiKeys;
-using MaksIT.Models.LetsEncryptServer.ApiKeys.Search;
+using MaksIT.CertsUI.Engine;
+using MaksIT.CertsUI.Models.APIKeys;
+using MaksIT.CertsUI.Models.APIKeys.Search;
 
 namespace MaksIT.CertsUI.Mappers;
 
 /// <summary>
-/// Maps ApiKey and ApiKeyQueryResult / ApiKeyEntityScopeQueryResult to API response models.
+/// Maps ApiKey / ApiKeyAuthorization and ApiKeyQueryResult to API response models.
 /// Used by ApiKeyService.
 /// </summary>
 public class ApiKeyToResponseMapper {
 
-  /// <summary>Maps domain aggregate to wire model; <see cref="ApiKeyResponse.ApiKey"/> is populated only when creating.</summary>
-  /// <param name="includePlainKey">True only for the create response (Vault always maps <c>domain.Value</c>; Certs supplies the wire from engine once).</param>
-  /// <param name="plainKeyWhenCreated">Format <c>{guid:N}|{secret}</c> from engine; omitted on read/patch.</param>
-  public ApiKeyResponse MapToResponse(ApiKey apiKey, bool includePlainKey, string? plainKeyWhenCreated = null) {
-    ArgumentNullException.ThrowIfNull(apiKey);
+  public ApiKeyResponse MapToResponse(ApiKey domain, ApiKeyAuthorization? authorization) {
+    ArgumentNullException.ThrowIfNull(domain);
     return new ApiKeyResponse {
-      Id = apiKey.Id,
-      ApiKey = includePlainKey && plainKeyWhenCreated != null ? plainKeyWhenCreated : string.Empty,
-      CreatedAt = apiKey.CreatedAt,
-      Description = apiKey.Description,
-      ExpiresAt = apiKey.ExpiresAt,
-      RevokedAt = apiKey.RevokedAtUtc
+      Id = domain.Id,
+      ApiKey = domain.Value,
+      IsGlobalAdmin = authorization?.IsGlobalAdmin ?? false,
+      EntityScopes = [.. (authorization?.EntityScopes ?? []).Select(sc => new ApiKeyEntityScopeRsponse {
+        Id = sc.Id,
+        EntityId = sc.EntityId,
+        EntityType = sc.EntityType,
+        Scope = sc.Scope
+      })],
+      CreatedAt = domain.CreatedAt,
+      Description = domain.Description,
+      ExpiresAt = domain.ExpiresAt
     };
   }
 
@@ -33,7 +37,7 @@ public class ApiKeyToResponseMapper {
       CreatedAt = queryResult.CreatedAt,
       Description = queryResult.Description,
       ExpiresAt = queryResult.ExpiresAt,
-      RevokedAt = queryResult.RevokedAt
+      IsGlobalAdmin = queryResult.IsGlobalAdmin
     };
   }
 

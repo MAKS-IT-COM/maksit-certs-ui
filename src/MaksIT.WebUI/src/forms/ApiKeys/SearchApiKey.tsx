@@ -5,13 +5,14 @@ import { CreateApiKey } from './CreateApiKey'
 import { useAppSelector } from '../../redux/hooks'
 import { deleteData, postData } from '../../axiosConfig'
 import { ApiRoutes, GetApiRoute } from '../../AppMap'
-import { PagedResponse } from '../../models/letsEncryptServer/common/PagedResponse'
-import { SearchAPIKeyRequest } from '../../models/letsEncryptServer/apiKeys/search/SearchAPIKeyRequest'
-import { SearchAPIKeyResponse } from '../../models/letsEncryptServer/apiKeys/search/SearchAPIKeyResponse'
-import { ApiKeyResponse } from '../../models/letsEncryptServer/apiKeys/ApiKeyResponse'
+import { PagedResponse } from '../../models/certsUI/common/PagedResponse'
+import { SearchAPIKeyRequest } from '../../models/certsUI/apiKeys/search/SearchAPIKeyRequest'
+import { SearchAPIKeyResponse } from '../../models/certsUI/apiKeys/search/SearchAPIKeyResponse'
+import { ApiKeyResponse } from '../../models/certsUI/apiKeys/ApiKeyResponse'
 import { createColumn, createColumns, DataTable, DataTableFilter, DataTableLabel } from '../../components/DataTable'
 import { EditApiKey } from './EditApiKey'
-import { extractPropFilter } from '../../functions/dataTableFilters'
+import { hasFlag } from '../../functions'
+import { ScopeEntityType, ScopePermission } from '../../models/engine/scopeEnums'
 
 
 const SearchApiKey: FC = () => {
@@ -41,7 +42,7 @@ const SearchApiKey: FC = () => {
       cell: (props) => {
         const { value } = props
         return <DataTableLabel type={'normal'} value={value} />
-      },
+      }
     }),
     createColumn<SearchAPIKeyResponse, 'description'>({
       id: 'description',
@@ -91,6 +92,24 @@ const SearchApiKey: FC = () => {
         <DataTableLabel type={'normal'} value={props.value ?? ''} />
       ),
     }),
+    createColumn<SearchAPIKeyResponse, 'isGlobalAdmin'>({
+      id: 'isGlobalAdmin',
+      accessorKey: 'isGlobalAdmin',
+      header: 'Global Admin',
+      filter: (props, onFilterChange) => (
+        <DataTableFilter
+          type={'normal'}
+          columnId={props.columnId}
+          accessorKey={'isGlobalAdmin'}
+          onFilterChange={onFilterChange}
+          disabled={true}
+        />
+      ),
+      cell: (props) => {
+        const { value } = props
+        return <DataTableLabel type={'normal'} value={value ? 'Yes' : 'No'} />
+      },
+    }),
   ])
 
   const loadData = useCallback(() => {
@@ -124,11 +143,9 @@ const SearchApiKey: FC = () => {
   }
 
   const handleFilterChange = (filters: { [filterId: string]: string }) => {
-    const combined = filters.normal ?? ''
-    const descriptionFilter = extractPropFilter(combined, 'Description')
     setPagedRequest({
       ...pagedRequest,
-      descriptionFilter: descriptionFilter?.trim() || undefined,
+      ...filters
     })
   }
 
@@ -149,11 +166,49 @@ const SearchApiKey: FC = () => {
 
   if (!identity) return <></>
 
-  const handleAllowAddRow = () => true
+  const handleAllowAddRow = () => {
+    if (identity.isGlobalAdmin)
+      return true
+    const hasCreateApiKey = identity.acls?.some(acl =>
+      acl.entityType === ScopeEntityType.ApiKey && hasFlag(acl.scope, ScopePermission.Create))
+    return !!hasCreateApiKey
+  }
 
-  const handleAllowEditRow = (_ids: Record<string, string>) => true
+  const handleAllowEditRow = (ids: Record<string, string>) => {
+    if (identity.isGlobalAdmin)
+      return true
 
-  const handleAllowDeleteRow = (_ids: Record<string, string>) => true
+    const organizationId = ids.organizationId
+    if (!organizationId) {
+      return identity.acls?.some(acl =>
+        acl.entityType === ScopeEntityType.ApiKey && hasFlag(acl.scope, ScopePermission.Write)) ?? false
+    }
+
+    const canEditApiKey = identity.acls
+      ?.find(acl => acl.entityId == organizationId
+        && acl.entityType === ScopeEntityType.ApiKey
+        && hasFlag(acl.scope, ScopePermission.Write))
+
+    return !!canEditApiKey
+  }
+
+  const handleAllowDeleteRow = (ids: Record<string, string>) => {
+    if (identity.isGlobalAdmin)
+      return true
+
+    const organizationId = ids.organizationId
+    if (!organizationId) {
+      return identity.acls?.some(acl =>
+        acl.entityType === ScopeEntityType.ApiKey && hasFlag(acl.scope, ScopePermission.Delete)) ?? false
+    }
+
+    const canDeleteApiKey = identity.acls
+      ?.find(acl => acl.entityId == organizationId
+        && acl.entityType === ScopeEntityType.ApiKey
+        && hasFlag(acl.scope, ScopePermission.Delete))
+
+    return !!canDeleteApiKey
+  }
 
   return <>
     <FormContainer>
@@ -205,5 +260,5 @@ const SearchApiKey: FC = () => {
 }
 
 export {
-  SearchApiKey,
+  SearchApiKey
 }

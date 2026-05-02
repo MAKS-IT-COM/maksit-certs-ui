@@ -1,12 +1,13 @@
-using MaksIT.Models.LetsEncryptServer.Common;
-using MaksIT.Models.LetsEncryptServer.Identity.Login;
-using MaksIT.Models.LetsEncryptServer.Identity.Logout;
-using MaksIT.Models.LetsEncryptServer.Identity.User;
-using MaksIT.Models.LetsEncryptServer.Identity.User.Search;
+using Microsoft.AspNetCore.Mvc;
+using MaksIT.Core.Webapi.Models;
+using MaksIT.CertsUI.Models.Identity.Login;
+using MaksIT.CertsUI.Models.Identity.Logout;
+using MaksIT.CertsUI.Models.Identity.User;
+using MaksIT.CertsUI.Services;
 using MaksIT.CertsUI.Authorization.Extensions;
 using MaksIT.CertsUI.Authorization.Filters;
-using MaksIT.CertsUI.Services;
-using Microsoft.AspNetCore.Mvc;
+using MaksIT.CertsUI.Models.Identity.User.Search;
+
 
 namespace MaksIT.CertsUI.Controllers;
 
@@ -21,15 +22,29 @@ public class IdentityController(
   #region Search
   [ServiceFilter(typeof(JwtAuthorizationFilter))]
   [HttpPost("search")]
-  [ProducesResponseType(typeof(PagedResponse<SearchUserResponse>), StatusCodes.Status200OK)]
-  public async Task<IActionResult> GetUsers([FromBody] SearchUserRequest requestData) {
+  [ProducesResponseType(typeof(PagedResponse<UserResponse>), StatusCodes.Status200OK)]
+  public IActionResult GetUsers([FromBody] SearchUserRequest requestData) {
     var jwtTokenDataResult = HttpContext.GetJwtTokenData();
     if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
       return jwtTokenDataResult.ToActionResult();
 
     var jwtTokenData = jwtTokenDataResult.Value;
 
-    var result = await _identityService.SearchUsersAsync(jwtTokenData, requestData);
+    var result = _identityService.SearchUsers(jwtTokenData, requestData);
+    return result.ToActionResult();
+  }
+
+  [ServiceFilter(typeof(JwtAuthorizationFilter))]
+  [HttpPost("scopes/search")]
+  [ProducesResponseType(typeof(PagedResponse<SearchUserEntityScopeResponse>), StatusCodes.Status200OK)]
+  public IActionResult GetUserEntityScopes([FromBody] SearchUserEntityScopeRequest requestData) {
+    var jwtTokenDataResult = HttpContext.GetJwtTokenData();
+    if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
+      return jwtTokenDataResult.ToActionResult();
+
+    var jwtTokenData = jwtTokenDataResult.Value;
+
+    var result = _identityService.SearchUserEntityScopes(jwtTokenData, requestData);
     return result.ToActionResult();
   }
   #endregion
@@ -38,14 +53,14 @@ public class IdentityController(
   [ServiceFilter(typeof(JwtAuthorizationFilter))]
   [HttpGet("user/{id:guid}")]
   [ProducesResponseType(typeof(UserResponse), StatusCodes.Status200OK)]
-  public async Task<IActionResult> GetUser(Guid id) {
+  public IActionResult GetUser(Guid id) {
     var jwtTokenDataResult = HttpContext.GetJwtTokenData();
     if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
       return jwtTokenDataResult.ToActionResult();
 
     var jwtTokenData = jwtTokenDataResult.Value;
 
-    var result = await _identityService.ReadUserAsync(jwtTokenData, id);
+    var result = _identityService.ReadUser(jwtTokenData, id);
     return result.ToActionResult();
   }
   #endregion
@@ -67,6 +82,12 @@ public class IdentityController(
   #endregion
 
   #region Patch
+  /// <summary>
+  /// Patch user data.
+  /// </summary>
+  /// <param name="id">Nullable Id as user can patch his own data</param>
+  /// <param name="requestData"></param>
+  /// <returns></returns>
   [ServiceFilter(typeof(JwtAuthorizationFilter))]
   [HttpPatch("user/{id:guid}")]
   [ProducesResponseType(typeof(UserResponse), StatusCodes.Status200OK)]
@@ -116,12 +137,14 @@ public class IdentityController(
   [ServiceFilter(typeof(JwtAuthorizationFilter))]
   [HttpPost("logout")]
   [ProducesResponseType(StatusCodes.Status200OK)]
-  public async Task<IActionResult> Logout([FromBody] LogoutRequest requestData) {
+  public async Task<IActionResult> Logout([FromBody] LogoutRequest requetData) {
     var jwtTokenDataResult = HttpContext.GetJwtTokenData();
     if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
       return jwtTokenDataResult.ToActionResult();
 
-    var result = await _identityService.Logout(jwtTokenDataResult.Value, requestData);
+    var jwtTokenData = jwtTokenDataResult.Value;
+
+    var result = await _identityService.Logout(jwtTokenData, requetData);
     return result.ToActionResult();
   }
   #endregion

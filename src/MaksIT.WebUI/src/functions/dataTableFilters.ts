@@ -1,6 +1,6 @@
 /**
  * Reads the first `Prop.Contains|StartsWith|EndsWith("…")` value from the combined
- * LINQ-style string produced by DataTable filters (Certs search APIs use dedicated fields instead).
+ * LINQ-style string produced by DataTable filters (Certs sends the extracted substring as `PagedRequest.filters`).
  */
 export function extractPropFilter(combined: string | undefined, propName: string): string | undefined {
   if (!combined?.trim()) return undefined

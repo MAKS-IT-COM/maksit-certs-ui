@@ -1,27 +1,28 @@
 import { FC, useCallback, useEffect, useState } from 'react'
-import { object, string } from 'zod'
-import { ApiKeyResponse } from '../../models/letsEncryptServer/apiKeys/ApiKeyResponse'
+import { array, boolean, object, string } from 'zod'
+import { ApiKeyResponse } from '../../models/certsUI/apiKeys/ApiKeyResponse'
 import { useFormState } from '../../hooks/useFormState'
 import { getData, patchData } from '../../axiosConfig'
 import { ApiRoutes, GetApiRoute } from '../../AppMap'
-import { PatchApiKeyRequest, PatchApiKeyRequestSchema } from '../../models/letsEncryptServer/apiKeys/PatchApiKeyRequest'
-import { deepCopy, deepDelta, deltaHasOperations } from '../../functions'
-import type { Delta } from '../../functions/deep/deepDelta'
+import { PatchApiKeyRequest, PatchApiKeyRequestSchema } from '../../models/certsUI/apiKeys/PatchApiKeyRequest'
+import { deepCopy, deepDelta, deltaHasOperations, ENTITY_SCOPES_ARRAY_POLICY } from '../../functions'
 import { addToast } from '../../components/Toast/addToast'
 import { FormContainer, FormContent, FormFooter, FormHeader } from '../../components/FormLayout'
-import { ButtonComponent, DateTimePickerComponent, SecretComponent, TextBoxComponent } from '../../components/editors'
-import { PatchOperation } from '../../models/PatchOperation'
+import { ButtonComponent, CheckBoxComponent, DateTimePickerComponent, SecretComponent, TextBoxComponent } from '../../components/editors'
+import { EditUserScopes, EntityScopeFormProps, EntityScopeFormPropsSchema } from '../shared/EditScopes'
+import { useAppSelector } from '../../redux/hooks'
 
 
 // Form state interface and validation
-
 interface EditApiKeyFormProps {
-  [key: string]: string | undefined
+  [key: string]: string | boolean | EntityScopeFormProps[] | undefined
 
   id: string
   value: string
   description?: string
   expiresAt?: string
+  isGlobalAdmin?: boolean
+  entityScopes: EntityScopeFormProps []
 }
 
 const editApiKeyFormPropsProto = (): EditApiKeyFormProps => ({
@@ -29,52 +30,20 @@ const editApiKeyFormPropsProto = (): EditApiKeyFormProps => ({
   value: '',
   description: '',
   expiresAt: undefined,
+  isGlobalAdmin: false,
+  entityScopes: [],
 })
 
 const EditApiKeyFormSchema = object({
   id: string().min(1),
-  value: string(),
+  value: string().min(1),
   description: string(),
   expiresAt: string().optional(),
+  isGlobalAdmin: boolean().optional(),
+  entityScopes: array(EntityScopeFormPropsSchema)
 })
-
-type PatchableApiKeyFields = {
-  description?: string
-  expiresAt?: string
-}
-
-const mapFormStateToPatchRequest = (formState: EditApiKeyFormProps): PatchableApiKeyFields => ({
-  description: formState.description,
-  expiresAt: formState.expiresAt,
-})
-
-const buildPatchApiKeyRequestFromDelta = (delta: Delta<PatchableApiKeyFields>): PatchApiKeyRequest => {
-  const ops = delta.operations ?? {}
-  const request: PatchApiKeyRequest = {
-    operations: {},
-  }
-
-  if (ops.description === PatchOperation.SetField && 'description' in delta) {
-    request.description = delta.description as string
-    request.operations!.description = PatchOperation.SetField
-  }
-
-  if (ops.expiresAt === PatchOperation.SetField && 'expiresAt' in delta) {
-    request.expiresAt = delta.expiresAt as string
-    request.operations!.expiresAt = PatchOperation.SetField
-  }
-
-  if (ops.expiresAt === PatchOperation.RemoveField) {
-    request.expiresAt = undefined
-    request.operations!.expiresAt = PatchOperation.RemoveField
-  }
-
-  return request
-}
-
 
 // Component properties
-
 interface EditApiKeyProps {
   apiKeyId: string
   onSubmitted?: (entity: ApiKeyResponse) => void
@@ -87,9 +56,10 @@ const EditApiKey: FC<EditApiKeyProps> = (props) => {
     apiKeyId,
     onSubmitted,
     cancelEnabled = false,
-    onCancel,
+    onCancel
   } = props
 
+  const { identity } = useAppSelector(state => state.identity)
   const initialFormState = editApiKeyFormPropsProto()
 
   const {
@@ -97,7 +67,7 @@ const EditApiKey: FC<EditApiKeyProps> = (props) => {
     errors,
     formIsValid,
     handleInputChange,
-    setInitialState,
+    setInitialState
   } = useFormState<EditApiKeyFormProps>({
     initialState: initialFormState,
     validationSchema: EditApiKeyFormSchema,
@@ -110,12 +80,19 @@ const EditApiKey: FC<EditApiKeyProps> = (props) => {
     const newState: EditApiKeyFormProps = {
       id: response.id,
       value: response.apiKey,
-      description: response.description ?? '',
-      expiresAt: response.expiresAt,
+      description: response.description ?? undefined,
+      expiresAt: response.expiresAt ?? undefined,
+      isGlobalAdmin: response.isGlobalAdmin,
+      entityScopes: (response.entityScopes ?? []).map(scope => ({
+        id: scope.id,
+        entityId: scope.entityId,
+        entityType: scope.entityType,
+        scope: scope.scope
+      }))
     }
 
     setInitialState(newState)
-    // Backup = last server state
+    // Backup = last server state; patchable array items (entityScopes) always have id
     setBackupState(deepCopy(newState))
   }, [setInitialState])
 
@@ -140,24 +117,34 @@ const EditApiKey: FC<EditApiKeyProps> = (props) => {
       })
   }, [apiKeyId, handleInitialization, setInitialState])
 
+  const mapFormStateToPatchRequest = (formState: EditApiKeyFormProps): PatchApiKeyRequest => {
+    return {
+      description: formState.description,
+      expiresAt: formState.expiresAt,
+      isGlobalAdmin: formState.isGlobalAdmin,
+      entityScopes: formState.entityScopes?.map(scope => ({
+        id: scope.id,
+        entityId: scope.entityId,
+        entityType: scope.entityType,
+        scope: scope.scope
+      }))
+    }
+  }
+
   const handleSubmit = () => {
     if (!formIsValid) return
 
     const fromFormState = mapFormStateToPatchRequest(formState)
     const fromBackupState = mapFormStateToPatchRequest(backupState)
 
-    const delta = deepDelta(
-      fromFormState as Record<string, unknown>,
-      fromBackupState as Record<string, unknown>
-    ) as Delta<PatchableApiKeyFields>
+    const delta = deepDelta(fromFormState, fromBackupState, { arrays: { entityScopes: ENTITY_SCOPES_ARRAY_POLICY } })
 
-    if (!deltaHasOperations(delta as Record<string, unknown>)) {
+    if (!deltaHasOperations(delta)) {
       addToast('No changes detected', 'info')
       return
     }
 
-    const requestData = buildPatchApiKeyRequestFromDelta(delta)
-    const request = PatchApiKeyRequestSchema.safeParse(requestData)
+    const request = PatchApiKeyRequestSchema.safeParse(delta)
     if (!request.success) {
       request.error.issues.forEach(error => {
         addToast(error.message, 'error')
@@ -208,8 +195,8 @@ const EditApiKey: FC<EditApiKeyProps> = (props) => {
           colspan={12}
           label={'API Key'}
           value={formState.value}
-          errorText={errors.value}
-          onChange={(e) => handleInputChange('value', e.target.value)}
+          errorText={errors.apiKey}
+          onChange={(e) => handleInputChange('apiKey', e.target.value)}
           readOnly={true}
           enableCopy={true}
         />
@@ -227,6 +214,28 @@ const EditApiKey: FC<EditApiKeyProps> = (props) => {
           errorText={errors.expiresAt}
           onChange={(dateTime) => handleInputChange('expiresAt', dateTime)}
         />
+        {identity?.isGlobalAdmin && (
+          <CheckBoxComponent
+            colspan={12}
+            label={'Is Global Admin'}
+            value={formState.isGlobalAdmin ?? false}
+            onChange={(e) => handleInputChange('isGlobalAdmin', e.target.checked)}
+          />
+        )}
+        {!formState.isGlobalAdmin && (
+          <EditUserScopes
+            allowIdentityAndApiKeyScopes={false}
+            colspan={12}
+            id={formState.id}
+            entityScopes={formState.entityScopes}
+            onChange={(entityScopes) => {
+              const newState = deepCopy(formState)
+              newState.entityScopes = entityScopes
+
+              setInitialState(newState)
+            }}
+          />
+        )}
       </div>
     </FormContent>
     <FormFooter
@@ -241,5 +250,5 @@ const EditApiKey: FC<EditApiKeyProps> = (props) => {
 }
 
 export {
-  EditApiKey,
+  EditApiKey
 }

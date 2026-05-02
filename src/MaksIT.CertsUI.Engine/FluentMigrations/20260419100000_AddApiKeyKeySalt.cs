@@ -1,9 +1,10 @@
 using FluentMigrator;
+using MaksIT.CertsUI.Engine;
 
 namespace MaksIT.CertsUI.Engine.FluentMigrations;
 
 /// <summary>
-/// Per-key salt for API key material (pepper is app-wide from <see cref="DomainServices.IIdentityDomainConfiguration.Pepper"/>). Empty <c>KeySalt</c> denotes legacy SHA-256-only rows.
+/// Per-key salt for API key material (pepper is app-wide from <see cref="ICertsEngineConfiguration.JwtSettingsConfiguration"/> / <see cref="IJwtSettingsConfiguration.PasswordPepper"/>). Empty <c>KeySalt</c> denotes legacy SHA-256-only rows.
 /// </summary>
 [Migration(20260419100000)]
 public class AddApiKeyKeySalt : Migration {

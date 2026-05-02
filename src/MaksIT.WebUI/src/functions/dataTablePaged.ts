@@ -1,6 +1,6 @@
-import { PagedResponse } from '../models/letsEncryptServer/common/PagedResponse'
+import { PagedResponse } from '../models/certsUI/common/PagedResponse'
 
-/** Virtualized DataTable view model (Vault-compatible). */
+/** Virtualized DataTable view model (client paging/search helpers). */
 export interface DataTablePageView<T> {
   items: T[]
   pageNumber: number

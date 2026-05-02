@@ -6,10 +6,11 @@ using MaksIT.CertsUI.Engine.Extensions;
 using MaksIT.CertsUI;
 using MaksIT.CertsUI.Authorization.Filters;
 using MaksIT.CertsUI.Engine.RuntimeCoordination;
+using MaksIT.CertsUI.Extensions;
 using MaksIT.CertsUI.HostedServices;
 using MaksIT.CertsUI.Infrastructure;
-using MaksIT.CertsUI.Mappers;
 using MaksIT.CertsUI.Services;
+using MaksIT.CertsUI.Trng;
 using Npgsql;
 using MaksIT.Results.Mvc;
 using System.Text.Json;
@@ -47,8 +48,21 @@ var configurationSection = configuration.GetSection("Configuration");
 var appSettings = configurationSection.Get<Configuration>()
   ?? throw new InvalidOperationException("Required configuration section 'Configuration' is missing or invalid.");
 
+var engineCfg = appSettings.CertsEngineConfiguration;
+var certsConnectionString = string.IsNullOrWhiteSpace(engineCfg.ConnectionString)
+  ? builder.Configuration.GetConnectionString("Certs")
+  : engineCfg.ConnectionString;
+if (string.IsNullOrWhiteSpace(certsConnectionString))
+  throw new InvalidOperationException(
+    "PostgreSQL connection is required: set Configuration:CertsEngineConfiguration:ConnectionString in secrets, or ConnectionStrings:Certs.");
+
+engineCfg.ConnectionString = certsConnectionString;
+
 // Allow configurations to be available through IOptions<Configuration>
 builder.Services.Configure<Configuration>(configurationSection);
+builder.Services.PostConfigure<Configuration>(opts => {
+  opts.CertsEngineConfiguration.ConnectionString = certsConnectionString;
+});
 
 // Configure JSON serialization options for the API
 static void ConfigureJsonSerializerOptions(JsonSerializerOptions options) {
@@ -65,53 +79,31 @@ builder.Services.AddOptions<JsonOptions>().Configure(o =>
   ConfigureJsonSerializerOptions(o.JsonSerializerOptions));
 
 builder.Services.AddScoped<JwtAuthorizationFilter>();
-builder.Services.AddScoped<JwtOrApiKeyAuthorizationFilter>();
+builder.Services.AddScoped<CertsUIAuthorizationFilter>();
 
 // Hosted services: coordination/bootstrap lease, then renewal sweeps (each uses short-lived Postgres leases — symmetric pods).
 builder.Services.AddHostedService<InitializationHostedService>();
 builder.Services.AddHostedService<AutoRenewal>();
 
-// PostgreSQL: prefer Configuration:CertsUIEngineConfiguration:ConnectionString in appsecrets.json; fallback ConnectionStrings:Certs for older files.
-var certsConnectionString = appSettings.CertsUIEngineConfiguration.ConnectionString
-  ?? builder.Configuration.GetConnectionString("Certs");
-if (string.IsNullOrWhiteSpace(certsConnectionString))
-  throw new InvalidOperationException(
-    "PostgreSQL connection is required: set Configuration:CertsUIEngineConfiguration:ConnectionString in secrets (same pattern as MaksIT.Vault VaultEngineConfiguration:ConnectionString), or ConnectionStrings:Certs.");
-
-var engineSection = appSettings.CertsUIEngineConfiguration;
-
-// Identity / flow configuration must be registered before AddCertsEngine (engine domain services depend on pepper, etc.).
-builder.Services.AddSingleton<IIdentityDomainConfiguration>(sp =>
-  sp.GetRequiredService<IOptions<Configuration>>().Value.CertsUIEngineConfiguration.JwtSettingsConfiguration);
-builder.Services.AddSingleton<ITwoFactorSettingsConfiguration>(sp =>
-  sp.GetRequiredService<IOptions<Configuration>>().Value.CertsUIEngineConfiguration.TwoFactorSettingsConfiguration);
-builder.Services.AddSingleton<ICertsFlowEngineConfiguration>(sp =>
-  sp.GetRequiredService<IOptions<Configuration>>().Value.CertsUIEngineConfiguration);
-builder.Services.AddSingleton<IDefaultAdminBootstrapConfiguration>(sp =>
-  sp.GetRequiredService<IOptions<Configuration>>().Value.CertsUIEngineConfiguration.Admin);
+// Engine identity/JWT/2FA settings are consumed via ICertsEngineConfiguration (registered in AddCertsEngine), same pattern as MaksIT.Vault.
 // Single process-wide lease holder id (see IRuntimeInstanceId) — must stay Singleton for app_runtime_leases coherence.
 builder.Services.AddSingleton<IRuntimeInstanceId, RuntimeInstanceIdProvider>();
 
-// Register engine services
-builder.Services.AddCertsEngine(new MaksIT.CertsUI.Engine.CertsEngineConfiguration {
-  ConnectionString = certsConnectionString,
-  AutoSyncSchema = engineSection.AutoSyncSchema,
-  LetsEncryptProduction = engineSection.Production,
-  LetsEncryptStaging = engineSection.Staging,
-});
+// Register engine services (same bound instance as Configuration:CertsEngineConfiguration)
+builder.Services.AddCertsEngine(engineCfg);
 
 builder.Services.AddScoped<ICacheService, CacheService>();
 
+builder.Services.AddCertsUIMappers();
+
 // Controller services
+builder.Services.AddSingleton<ITrngClient, LocalTrngClient>();
 builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
 builder.Services.AddHttpClient<ICertsFlowDomainService, CertsFlowDomainService>();
 builder.Services.AddScoped<ICertsFlowService, CertsFlowService>();
 builder.Services.AddHttpClient<IAgentService, AgentService>();
 builder.Services.AddScoped<IAgentDeploymentService>(sp => (IAgentDeploymentService)sp.GetRequiredService<IAgentService>());
 builder.Services.AddScoped<IAccountService, AccountService>();
-builder.Services.AddScoped<UserToResponseMapper>();
-builder.Services.AddScoped<ApiKeyToResponseMapper>();
-builder.Services.AddScoped<AccountToResponseMapper>();
 builder.Services.AddScoped<IIdentityService, IdentityService>();
 
 // Add CORS services to the container and configure to allow any origin

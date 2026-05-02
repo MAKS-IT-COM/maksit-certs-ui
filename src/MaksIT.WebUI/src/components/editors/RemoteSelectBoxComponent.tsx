@@ -18,7 +18,9 @@ interface RemoteSelectBoxProps<TRequest extends PagedRequest> {
   errorText?: string
    
   // Field used to compare with the value
-  idField?: string 
+  idField?: string
+  /** Property on each search hit used as the option label (default {@code name}). */
+  labelField?: string
   // Fields to search against when filtering options
   filterFields?: string[]
 
@@ -39,6 +41,7 @@ const RemoteSelectBoxComponent = <TRequest extends PagedRequest>(props: RemoteSe
     errorText,
 
     idField = 'id',
+    labelField = 'name',
     filterFields = ['name'],
 
     value = '',
@@ -96,9 +99,11 @@ const RemoteSelectBoxComponent = <TRequest extends PagedRequest>(props: RemoteSe
     label={label}
     placeholder={placeholder}
     options={options?.map(item => {
+      const row = item as Record<string, unknown>
+      const labelRaw = row[labelField] ?? row.name ?? row.id
       return {
         value: item.id,
-        label: item.name
+        label: labelRaw != null ? String(labelRaw) : item.id
       }
     })}
     idField={idField}

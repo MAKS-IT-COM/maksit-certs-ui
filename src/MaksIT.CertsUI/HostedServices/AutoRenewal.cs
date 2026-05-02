@@ -46,6 +46,10 @@ public sealed class AutoRenewal(
         if (purge.IsSuccess && purge.Value > 0)
           logger.LogInformation("Purged {Count} HTTP-01 challenge row(s) older than 10 days.", purge.Value);
 
+        var purgeSessions = await certsFlowDomain.PurgeExpiredAcmeSessionsAsync(stoppingToken).ConfigureAwait(false);
+        if (purgeSessions.IsSuccess && purgeSessions.Value > 0)
+          logger.LogInformation("Purged {Count} expired ACME session row(s).", purgeSessions.Value);
+
         var loadAccountsFromCacheResult = await registrationCacheDomain.LoadAllAsync(stoppingToken).ConfigureAwait(false);
         if (!loadAccountsFromCacheResult.IsSuccess || loadAccountsFromCacheResult.Value == null) {
           LogErrorMessages(loadAccountsFromCacheResult.Messages);

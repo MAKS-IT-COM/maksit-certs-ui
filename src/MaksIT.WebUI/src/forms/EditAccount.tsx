@@ -1,7 +1,7 @@
 import { FC, useCallback, useEffect, useState } from 'react'
 import { FormContainer, FormContent, FormFooter, FormHeader } from '../components/FormLayout'
 import { ButtonComponent, CheckBoxComponent, TextBoxComponent } from '../components/editors'
-import { GetAccountResponse } from '../models/letsEncryptServer/account/responses/GetAccountResponse'
+import { GetAccountResponse } from '../models/certsUI/account/responses/GetAccountResponse'
 import { useFormState } from '../hooks/useFormState'
 import { array, boolean, object, string, ZodType } from 'zod'
 import { PlusIcon, TrashIcon } from 'lucide-react'
@@ -9,7 +9,7 @@ import { getData, patchData } from '../axiosConfig'
 import { ApiRoutes, GetApiRoute } from '../AppMap'
 import { FieldContainer } from '../components/editors/FieldContainer'
 import { deepCopy, deepDelta, deltaHasOperations } from '../functions'
-import { PatchAccountRequest, PatchAccountRequestSchema } from '../models/letsEncryptServer/account/requests/PatchAccountRequest'
+import { PatchAccountRequest, PatchAccountRequestSchema } from '../models/certsUI/account/requests/PatchAccountRequest'
 import { addToast } from '../components/Toast/addToast'
 
 
@@ -94,7 +94,7 @@ const EditAccount: FC<EditAccountProps> = (props) => {
     const newState = {
       ...RegisterFormProto(),
       isDisabled: response.isDisabled,
-      description: response.description,
+      description: response.description ?? '',
       contacts: [...response.contacts],
       hostnames: (response.hostnames ?? []).map(h => ({
         ...EditAccountHostnameFormProto(),

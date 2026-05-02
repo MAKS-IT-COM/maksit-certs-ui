@@ -10,7 +10,7 @@ export interface VaultStyleListFooterProps {
   onNext: () => void
 }
 
-/** Footer: “Showing a–b of n” + prev/next — same information pattern as Vault paged lists. */
+/** Footer: “Showing a–b of n” + prev/next for paged lists. */
 const VaultStyleListFooter: FC<VaultStyleListFooterProps> = (props) => {
   const { pageNumber, pageSize, totalRecords, loading, onPrevious, onNext } = props
 

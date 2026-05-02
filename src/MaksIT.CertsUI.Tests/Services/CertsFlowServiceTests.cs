@@ -4,7 +4,7 @@ using MaksIT.CertsUI.Engine.DomainServices;
 using Microsoft.Extensions.Logging.Abstractions;
 using MaksIT.CertsUI.Engine.Dto.Certs;
 using MaksIT.CertsUI.Engine.Infrastructure;
-using MaksIT.CertsUI.Engine.Persistance.Services;
+using MaksIT.CertsUI.Engine.Persistence.Services;
 using MaksIT.CertsUI.Engine.RuntimeCoordination;
 using MaksIT.CertsUI.Engine.Services;
 using MaksIT.Results;
@@ -16,22 +16,19 @@ namespace MaksIT.CertsUI.Tests.Services;
 
 public sealed class CertsFlowServiceTests
 {
-    private sealed class TestCertsFlowEngineConfiguration(WebApiTestFixture fx) : ICertsFlowEngineConfiguration {
-        public string AgentServiceToReload => fx.AppOptions.Value.CertsUIEngineConfiguration.Agent.ServiceToReload;
-    }
-
     private static CertsFlowDomainService CreateSut(
         WebApiTestFixture fx,
         Mock<ILetsEncryptService> le,
-        Mock<IRegistrationCachePersistanceService>? registrationCache = null,
+        Mock<IRegistrationCachePersistenceService>? registrationCache = null,
         Mock<IAgentDeploymentService>? agent = null,
         Mock<ITermsOfServiceCachePersistenceService>? termsOfServiceCache = null,
         Mock<IAcmeHttpChallengePersistenceService>? httpChallenges = null,
+        Mock<IAcmeSessionPersistenceService>? acmeSessions = null,
         Mock<IRuntimeLeaseService>? runtimeLease = null,
         Mock<IRuntimeInstanceId>? runtimeInstance = null,
         HttpMessageHandler? httpHandler = null)
     {
-        registrationCache ??= new Mock<IRegistrationCachePersistanceService>();
+        registrationCache ??= new Mock<IRegistrationCachePersistenceService>();
         var registrationDomain = new RegistrationCacheDomainService(
             NullLogger<RegistrationCacheDomainService>.Instance,
             registrationCache.Object);
@@ -54,6 +51,9 @@ public sealed class CertsFlowServiceTests
             httpChallenges.Setup(c => c.DeleteOlderThanAsync(It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(Result<int>.Ok(0));
         }
+        acmeSessions ??= new Mock<IAcmeSessionPersistenceService>();
+        acmeSessions.Setup(s => s.DeleteExpiredAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<int>.Ok(0));
         var runtimeLeaseProvided = runtimeLease is not null;
         runtimeLease ??= new Mock<IRuntimeLeaseService>();
         if (!runtimeLeaseProvided) {
@@ -74,9 +74,10 @@ public sealed class CertsFlowServiceTests
             le.Object,
             registrationDomain,
             agent.Object,
-            new TestCertsFlowEngineConfiguration(fx),
+            fx.AppOptions.Value.CertsEngineConfiguration,
             termsOfServiceCache.Object,
             httpChallenges.Object,
+            acmeSessions.Object,
             runtimeLease.Object,
             runtimeInstance.Object);
     }
@@ -136,7 +137,7 @@ public sealed class CertsFlowServiceTests
         using var fx = new WebApiTestFixture();
         var sessionId = Guid.NewGuid();
         var requestedAccount = Guid.NewGuid();
-        var cache = new Mock<IRegistrationCachePersistanceService>();
+        var cache = new Mock<IRegistrationCachePersistenceService>();
         cache.Setup(c => c.LoadAsync(requestedAccount, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<RegistrationCache?>.InternalServerError(null, "missing"));
 
@@ -166,7 +167,7 @@ public sealed class CertsFlowServiceTests
             IsStaging = false,
             ChallengeType = "http-01"
         };
-        var cache = new Mock<IRegistrationCachePersistanceService>();
+        var cache = new Mock<IRegistrationCachePersistenceService>();
         cache.Setup(c => c.LoadAsync(accountId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<RegistrationCache?>.Ok(reg));
 
@@ -379,7 +380,7 @@ public sealed class CertsFlowServiceTests
                 ["h"] = new CertificateCache { Cert = "x", Private = null, PrivatePem = "y" }
             }
         };
-        var cache = new Mock<IRegistrationCachePersistanceService>();
+        var cache = new Mock<IRegistrationCachePersistenceService>();
         cache.Setup(c => c.LoadAsync(accountId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<RegistrationCache?>.Ok(reg));
         var le = new Mock<ILetsEncryptService>();
@@ -408,7 +409,7 @@ public sealed class CertsFlowServiceTests
                 ["h"] = new CertificateCache { Cert = "x", Private = null, PrivatePem = "y" }
             }
         };
-        var cache = new Mock<IRegistrationCachePersistanceService>();
+        var cache = new Mock<IRegistrationCachePersistenceService>();
         cache.Setup(c => c.LoadAsync(accountId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<RegistrationCache?>.Ok(reg));
         var le = new Mock<ILetsEncryptService>();
@@ -437,13 +438,13 @@ public sealed class CertsFlowServiceTests
                 ["h"] = new CertificateCache { Cert = "CERT", Private = null, PrivatePem = "PEM" }
             }
         };
-        var cache = new Mock<IRegistrationCachePersistanceService>();
+        var cache = new Mock<IRegistrationCachePersistenceService>();
         cache.Setup(c => c.LoadAsync(accountId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<RegistrationCache?>.Ok(reg));
         var agent = new Mock<IAgentDeploymentService>();
         agent.Setup(a => a.UploadCerts(It.IsAny<Dictionary<string, string>>()))
             .ReturnsAsync(Result.Ok());
-        agent.Setup(a => a.ReloadService(fx.AppOptions.Value.CertsUIEngineConfiguration.Agent.ServiceToReload))
+        agent.Setup(a => a.ReloadService(fx.AppOptions.Value.CertsEngineConfiguration.Agent.ServiceToReload))
             .ReturnsAsync(Result.Ok());
         var le = new Mock<ILetsEncryptService>();
         var sut = CreateSut(fx, le, cache, agent);
@@ -453,7 +454,7 @@ public sealed class CertsFlowServiceTests
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
         agent.Verify(a => a.UploadCerts(It.IsAny<Dictionary<string, string>>()), Times.Once);
-        agent.Verify(a => a.ReloadService(fx.AppOptions.Value.CertsUIEngineConfiguration.Agent.ServiceToReload), Times.Once);
+        agent.Verify(a => a.ReloadService(fx.AppOptions.Value.CertsEngineConfiguration.Agent.ServiceToReload), Times.Once);
     }
 
     [Fact]

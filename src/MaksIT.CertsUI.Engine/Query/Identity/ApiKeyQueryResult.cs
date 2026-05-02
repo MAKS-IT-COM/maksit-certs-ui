@@ -1,13 +1,16 @@
 using MaksIT.Core.Abstractions.Query;
+using MaksIT.CertsUI.Engine;
+
 
 namespace MaksIT.CertsUI.Engine.Query.Identity;
 
-/// <summary>
-/// Projection for API key list/search rows.
-/// </summary>
 public class ApiKeyQueryResult : QueryResultBase<Guid> {
-  public string? Description { get; set; }
+  public string? Description { get; set; } // Optional description for the API key
+
   public DateTime CreatedAt { get; set; }
-  public DateTime? ExpiresAt { get; set; }
-  public DateTime? RevokedAt { get; set; }
+  public DateTime? ExpiresAt { get; set; } // Optional expiration date
+
+  #region Authorization management
+  public bool IsGlobalAdmin { get; set; }
+  #endregion
 }

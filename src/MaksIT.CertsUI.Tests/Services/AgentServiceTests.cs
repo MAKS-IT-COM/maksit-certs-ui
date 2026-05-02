@@ -1,4 +1,6 @@
 using System.Net;
+using MaksIT.Core.Webapi.Models;
+using MaksIT.CertsUI.Authorization;
 using MaksIT.CertsUI.Services;
 using MaksIT.CertsUI.Tests.Infrastructure;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -8,6 +10,20 @@ namespace MaksIT.CertsUI.Tests.Services;
 
 public class AgentServiceTests
 {
+    private static JwtTokenData TestJwt() =>
+        new() {
+            Token = "test",
+            Username = "test",
+            ClaimRoles = [],
+            IssuedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddHours(1),
+            UserId = Guid.Empty,
+            IsGlobalAdmin = true
+        };
+
+    private static CertsUIAuthorizationData TestAuth() =>
+        new() { JwtTokenData = TestJwt() };
+
     private sealed class OkHandler : HttpMessageHandler
     {
         private readonly string _body;
@@ -34,9 +50,9 @@ public class AgentServiceTests
             Timeout = TimeSpan.FromSeconds(5)
         };
 
-        var sut = new AgentService(fx.AppOptions, NullLogger<AgentService>.Instance, client);
+        var sut = new AgentService(NullLogger<AgentService>.Instance, fx.AppOptions, client);
 
-        var result = await sut.GetHelloWorld();
+        var result = await sut.GetHelloWorld(TestAuth());
 
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);

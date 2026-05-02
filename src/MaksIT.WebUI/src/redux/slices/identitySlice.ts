@@ -11,10 +11,13 @@ import { readIdentity, removeIdentity, writeIdentity, normalizeLoginResponse } f
 import { RefreshTokenRequest } from '../../models/identity/login/RefreshTokenRequest'
 import { jwtDecode } from 'jwt-decode'
 import { Claims } from '../../models/identity/Claims'
+import { parseAclEntries, type AclEntry } from '../../functions'
 
 interface Identity extends LoginResponse {
   userId?: string
   username?: string
+  isGlobalAdmin: boolean
+  acls?: AclEntry[]
 }
 
 interface IdentityState {
@@ -51,7 +54,6 @@ const logout = createAsyncThunk(
     const apiRoute = GetApiRoute(ApiRoutes.identityLogout)
     const response = await postData<LogoutRequest, LogoutResponse>(apiRoute.route, {
       logoutFromAllDevices,
-      token: identity.token,
     })
     return response.payload
   }
@@ -92,9 +94,25 @@ const enrichStateWithJwtContent = (token: string, identity: Identity) => {
       const usernameClaim = (jwtContent['username'] ?? jwtContent['preferred_username']) as string | undefined
       identity.username = (usernameClaim?.trim()) ? usernameClaim : nameClaim
     }
-  }
 
-  console.log('Enriched identity:', identity)
+    if (jwtContent[Claims.AclEntry]) {
+      const jwtAcls: string[] = Array.isArray(jwtContent[Claims.AclEntry])
+        ? jwtContent[Claims.AclEntry] as string[]
+        : jwtContent[Claims.AclEntry]
+          ? [jwtContent[Claims.AclEntry] as string]
+          : []
+
+      if (jwtAcls?.includes('global:admin') ?? false) {
+        jwtAcls.splice(jwtAcls.indexOf('global:admin'), 1)
+        identity.isGlobalAdmin = true
+      }
+      else {
+        identity.isGlobalAdmin = false
+      }
+
+      identity.acls = parseAclEntries(jwtAcls)
+    }
+  }
 }
 
 const identitySlice = createSlice({
@@ -106,6 +124,7 @@ const identitySlice = createSlice({
 
       if (identity) {
         state.identity = {
+          isGlobalAdmin: false,
           ...identity,
         }
         enrichStateWithJwtContent(identity.token, state.identity)
@@ -139,6 +158,7 @@ const identitySlice = createSlice({
         const normalized = normalizeLoginResponse(action.payload)
         if (normalized) {
           state.identity = {
+            isGlobalAdmin: false,
             ...normalized,
           }
           writeIdentity(normalized)
@@ -175,6 +195,7 @@ const identitySlice = createSlice({
         const normalized = normalizeLoginResponse(action.payload)
         if (normalized) {
           state.identity = {
+            isGlobalAdmin: false,
             ...normalized,
           }
           writeIdentity(normalized)

@@ -4,7 +4,7 @@ namespace MaksIT.CertsUI.Engine.FluentMigrations;
 
 /// <summary>
 /// Previously re-added <c>users.JwtTokensJson</c> when a prior migration had dropped that JSON column.
-/// <see cref="DropUsersJwtTokensJson"/> removes the column; persisted sessions use <c>jwt_tokens</c> only (same role as Vault’s <c>JwtToken</c> rows).
+/// <see cref="DropUsersJwtTokensJson"/> removes the column; persisted sessions use <c>jwt_tokens</c> only.
 /// </summary>
 [Migration(20260426120000)]
 public class RestoreUsersJwtTokensJsonIfDropped : Migration {

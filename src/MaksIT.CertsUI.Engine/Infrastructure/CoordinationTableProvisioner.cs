@@ -38,6 +38,8 @@ public static class CoordinationTableProvisioner {
         expires_at_utc timestamp with time zone NOT NULL
       );
       CREATE INDEX IF NOT EXISTS "IX_acme_sessions_expires_at_utc" ON public.acme_sessions (expires_at_utc);
+      ALTER TABLE public.acme_sessions ADD COLUMN IF NOT EXISTS account_scope_id uuid NULL;
+      CREATE INDEX IF NOT EXISTS "IX_acme_sessions_account_scope_id" ON public.acme_sessions (account_scope_id);
       """,
       conn);
     await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);

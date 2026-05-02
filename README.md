@@ -61,7 +61,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, pull request expectations, and
 
 ## Patch and delta reference
 
-How PATCH payloads (deltas) are built and applied is documented in **[assets/docs/PATCH_DELTA_REFERENCE.md](assets/docs/PATCH_DELTA_REFERENCE.md)**. It matches the **MaksIT.Core** contract and is aligned with the same topic in **MaksIT-Vault** (this repo focuses on **account** PATCH and **`hostnames`** in the WebUI).
+How PATCH payloads (deltas) are built and applied is documented in **[assets/docs/PATCH_DELTA_REFERENCE.md](assets/docs/PATCH_DELTA_REFERENCE.md)**. It matches the **MaksIT.Core** contract; this repo focuses on **account** PATCH and **`hostnames`** in the WebUI.
 
 - [TL;DR (start here)](assets/docs/PATCH_DELTA_REFERENCE.md#tldr-start-here)
 - [1. Core contract (MaksIT.Core)](assets/docs/PATCH_DELTA_REFERENCE.md#1-core-contract-maksitcore)
@@ -74,7 +74,7 @@ How PATCH payloads (deltas) are built and applied is documented in **[assets/doc
 
 ## Login and refresh token architecture
 
-How login, JWT access tokens, refresh tokens, axios interceptors, and logout interact is documented in **[assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md)**. It is **aligned** with the same topic in **MaksIT-Vault** when both repos sit side by side; see the doc’s “Related” section for the sibling link. **Certs WebAPI** uses a **settings-backed** user store (not Vault’s database/ACL stack); **2FA** is **not** implemented on the Certs backend (the WebUI login fields are disabled).
+How login, JWT access tokens, refresh tokens, axios interceptors, and logout interact is documented in **[assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md)**. **Certs WebAPI** persists users in PostgreSQL; **2FA** follows whatever this repo’s backend and WebUI implement (shared models may carry optional fields).
 
 - [1. Overview](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md#1-overview)
 - [2. Token model](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md#2-token-model)
@@ -87,7 +87,7 @@ How login, JWT access tokens, refresh tokens, axios interceptors, and logout int
 
 ## Reverse proxy routing (YARP)
 
-How the **YARP** edge splits **ACME challenge**, **Swagger**, **WebAPI**, and **WebUI** traffic is documented in **[assets/docs/REVERSE_PROXY_ROUTING.md](assets/docs/REVERSE_PROXY_ROUTING.md)**. It is aligned with **MaksIT-Vault** for the same deployment pattern; Certs adds **`/.well-known/acme-challenge/`** routing for HTTP-01.
+How the **YARP** edge splits **ACME challenge**, **Swagger**, **WebAPI**, and **WebUI** traffic is documented in **[assets/docs/REVERSE_PROXY_ROUTING.md](assets/docs/REVERSE_PROXY_ROUTING.md)**, including **`/.well-known/acme-challenge/`** for HTTP-01.
 
 - [Route table](assets/docs/REVERSE_PROXY_ROUTING.md#route-table)
 - [HTTP-01 (Let’s Encrypt)](assets/docs/REVERSE_PROXY_ROUTING.md#http-01-lets-encrypt)
@@ -297,7 +297,7 @@ EOF
 ```
 
 **Note:**  
-PostgreSQL is configured as **`Configuration:CertsUIEngineConfiguration:ConnectionString`** — same structural pattern as MaksIT.Vault’s **`Configuration:VaultEngineConfiguration:ConnectionString`**. For Docker Compose, use the Postgres service hostname (here **`postgres`**) and credentials that match **`docker-compose.override.yml`** (**`certsui`** / **`certsui`** / database **`certsui`** by default). The host also accepts legacy **`ConnectionStrings:Certs`** if needed. Replace placeholder values `<your-auth-secret>`, `<your-pepper>`, `<your-agent-key>`, with secure, your environment-specific values.
+PostgreSQL is configured as **`Configuration:CertsEngineConfiguration:ConnectionString`**. For Docker Compose, use the Postgres service hostname (here **`postgres`**) and credentials that match **`docker-compose.override.yml`** (**`certsui`** / **`certsui`** / database **`certsui`** by default). The host also accepts legacy **`ConnectionStrings:Certs`** if needed. Replace placeholder values `<your-auth-secret>`, `<your-pepper>`, `<your-agent-key>`, with secure, your environment-specific values.
 Make sure `<your-agent-key>` matches the key configured in your agent deployment.
 
 **2. Create the file  `/opt/Compose/MaksIT.CertsUI/configMap/appsettings.json` with this command:**
@@ -528,7 +528,7 @@ Set-Content -Path 'C:\Compose\MaksIT.CertsUI\secrets\appsecrets.json' -Value @'
 ```
 
 **Note:**  
-PostgreSQL is **`Configuration:CertsUIEngineConfiguration:ConnectionString`** (same pattern as MaksIT.Vault **`VaultEngineConfiguration:ConnectionString`**). For Docker Compose, use the Postgres service hostname (here **`postgres`**) and credentials that match **`docker-compose.override.yml`** (**`certsui`** defaults). Legacy **`ConnectionStrings:Certs`** is still supported. Replace placeholder values `<your-auth-secret>`, `<your-pepper>`, `<your-agent-key>`, with secure, your environment-specific values.
+PostgreSQL is **`Configuration:CertsEngineConfiguration:ConnectionString`**. For Docker Compose, use the Postgres service hostname (here **`postgres`**) and credentials that match **`docker-compose.override.yml`** (**`certsui`** defaults). Legacy **`ConnectionStrings:Certs`** is still supported. Replace placeholder values `<your-auth-secret>`, `<your-pepper>`, `<your-agent-key>`, with secure, your environment-specific values.
 Make sure `<your-agent-key>` matches the key configured in your agent deployment.
 
 **2. Create the file  `C:\Compose\MaksIT.CertsUI\configMap\appsettings.json` with this command:**
@@ -670,7 +670,7 @@ kubectl create namespace certs-ui
 
 **Step 2: Create the Secret (`appsecrets.json`)**
 
-Replace the placeholder values with your actual secrets. This secret contains the PostgreSQL connection string, authentication, and agent keys required by the Webapi (same shape as the chart’s templated `appsecrets.json`, comparable to MaksIT.Vault’s `appsecrets.json`).
+Replace the placeholder values with your actual secrets. This secret contains the PostgreSQL connection string, authentication, and agent keys required by the Webapi (same shape as the chart’s templated `appsecrets.json`).
 
 ```json
 {
@@ -816,7 +816,7 @@ components:
       storageClass: local-path
 ```
 
-Override **`certsServerSecrets`** (including **`certsServerSecrets.certsEngineConfiguration.connectionString`** for PostgreSQL, Vault-shaped like **`VaultEngineConfiguration:ConnectionString`**) and **`certsServerConfig`** here for production (JWT issuer/audience, agent hostname, ACME endpoints, and auth secrets). Chart defaults are placeholders only.
+Override **`certsServerSecrets`** (including **`certsServerSecrets.certsEngineConfiguration.connectionString`** for PostgreSQL) and **`certsServerConfig`** here for production (JWT issuer/audience, agent hostname, ACME endpoints, and auth secrets). Chart defaults are placeholders only.
 
 **Services:** The chart renders one `Service` per component (`server`, `client`, `reverseproxy`). Each `service` block supports `enabled`, `type`, `port`, and `targetPort` only. For Cilium LB-IPAM, MetalLB, or cloud load balancers, use a separate manifest or your platform’s pattern so you can set annotations, `loadBalancerIP`, and session affinity; point that Service at the **reverseproxy** pods (`app.kubernetes.io/component: reverseproxy`).
 
