@@ -3,17 +3,19 @@ import { setShowUserOffcanvas } from '../redux/slices/identitySlice'
 
 const UserButton = () => {
   const dispatch = useAppDispatch()
-  const { identity } = useAppSelector(state => state.identity)
+  const identity = useAppSelector((s) => s.identity.identity)
 
-  if (!identity) return <></>
+  if (!identity?.username)
+    return null
 
-  return <button
-    className={'bg-white text-blue-500 px-2 py-1 rounded'}
-    onClick={() => {
-      dispatch(setShowUserOffcanvas())
-    }}>{identity.username}</button>
+  return (
+    <button
+      className={'bg-white text-blue-500 px-2 py-1 rounded'}
+      onClick={() => dispatch(setShowUserOffcanvas())}
+    >
+      {identity.username}
+    </button>
+  )
 }
 
-export {
-  UserButton
-}
+export { UserButton }

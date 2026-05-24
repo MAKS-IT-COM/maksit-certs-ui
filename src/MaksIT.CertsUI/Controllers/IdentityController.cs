@@ -20,11 +20,11 @@ public class IdentityController(
   private readonly IIdentityService _identityService = identityService;
 
   #region Search
-  [ServiceFilter(typeof(JwtAuthorizationFilter))]
+  [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpPost("search")]
   [ProducesResponseType(typeof(PagedResponse<UserResponse>), StatusCodes.Status200OK)]
   public IActionResult GetUsers([FromBody] SearchUserRequest requestData) {
-    var jwtTokenDataResult = HttpContext.GetJwtTokenData();
+    var jwtTokenDataResult = HttpContext.GetActingJwtTokenData();
     if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
       return jwtTokenDataResult.ToActionResult();
 
@@ -34,11 +34,11 @@ public class IdentityController(
     return result.ToActionResult();
   }
 
-  [ServiceFilter(typeof(JwtAuthorizationFilter))]
+  [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpPost("scopes/search")]
   [ProducesResponseType(typeof(PagedResponse<SearchUserEntityScopeResponse>), StatusCodes.Status200OK)]
   public IActionResult GetUserEntityScopes([FromBody] SearchUserEntityScopeRequest requestData) {
-    var jwtTokenDataResult = HttpContext.GetJwtTokenData();
+    var jwtTokenDataResult = HttpContext.GetActingJwtTokenData();
     if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
       return jwtTokenDataResult.ToActionResult();
 
@@ -50,11 +50,11 @@ public class IdentityController(
   #endregion
 
   #region Read
-  [ServiceFilter(typeof(JwtAuthorizationFilter))]
+  [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpGet("user/{id:guid}")]
   [ProducesResponseType(typeof(UserResponse), StatusCodes.Status200OK)]
   public IActionResult GetUser(Guid id) {
-    var jwtTokenDataResult = HttpContext.GetJwtTokenData();
+    var jwtTokenDataResult = HttpContext.GetActingJwtTokenData();
     if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
       return jwtTokenDataResult.ToActionResult();
 
@@ -66,11 +66,11 @@ public class IdentityController(
   #endregion
 
   #region Create
-  [ServiceFilter(typeof(JwtAuthorizationFilter))]
+  [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpPost("user")]
   [ProducesResponseType(typeof(UserResponse), StatusCodes.Status200OK)]
   public async Task<IActionResult> PostUser([FromBody] CreateUserRequest requestData) {
-    var jwtTokenDataResult = HttpContext.GetJwtTokenData();
+    var jwtTokenDataResult = HttpContext.GetActingJwtTokenData();
     if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
       return jwtTokenDataResult.ToActionResult();
 
@@ -88,11 +88,11 @@ public class IdentityController(
   /// <param name="id">Nullable Id as user can patch his own data</param>
   /// <param name="requestData"></param>
   /// <returns></returns>
-  [ServiceFilter(typeof(JwtAuthorizationFilter))]
+  [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpPatch("user/{id:guid}")]
   [ProducesResponseType(typeof(UserResponse), StatusCodes.Status200OK)]
   public async Task<IActionResult> PatchUser(Guid id, [FromBody] PatchUserRequest requestData) {
-    var jwtTokenDataResult = HttpContext.GetJwtTokenData();
+    var jwtTokenDataResult = HttpContext.GetActingJwtTokenData();
     if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
       return jwtTokenDataResult.ToActionResult();
 
@@ -104,11 +104,11 @@ public class IdentityController(
   #endregion
 
   #region Delete
-  [ServiceFilter(typeof(JwtAuthorizationFilter))]
+  [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpDelete("user/{id:guid}")]
   [ProducesResponseType(StatusCodes.Status200OK)]
   public async Task<IActionResult> DeleteUser(Guid id) {
-    var jwtTokenDataResult = HttpContext.GetJwtTokenData();
+    var jwtTokenDataResult = HttpContext.GetActingJwtTokenData();
     if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
       return jwtTokenDataResult.ToActionResult();
 
@@ -134,11 +134,11 @@ public class IdentityController(
     return result.ToActionResult();
   }
 
-  [ServiceFilter(typeof(JwtAuthorizationFilter))]
+  [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpPost("logout")]
   [ProducesResponseType(StatusCodes.Status200OK)]
   public async Task<IActionResult> Logout([FromBody] LogoutRequest requetData) {
-    var jwtTokenDataResult = HttpContext.GetJwtTokenData();
+    var jwtTokenDataResult = HttpContext.GetActingJwtTokenData();
     if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
       return jwtTokenDataResult.ToActionResult();
 

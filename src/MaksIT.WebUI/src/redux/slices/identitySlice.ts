@@ -2,22 +2,24 @@ import { createSlice, PayloadAction, createAsyncThunk } from '@reduxjs/toolkit'
 import { RootState } from '../store'
 
 import { postData } from '../../axiosConfig'
-import { LoginResponse } from '../../models/identity/login/LoginResponse'
-import { LoginRequest } from '../../models/identity/login/LoginRequest'
-import { ApiRoutes, GetApiRoute } from '../../AppMap'
-import { LogoutRequest } from '../../models/identity/logout/LogoutRequest'
-import { LogoutResponse } from '../../models/identity/logout/LogoutResponse'
-import { readIdentity, removeIdentity, writeIdentity, normalizeLoginResponse } from '../../localStorage/identity'
-import { RefreshTokenRequest } from '../../models/identity/login/RefreshTokenRequest'
+import type {
+  LoginRequest,
+  LoginResponse,
+  LogoutRequest,
+  LogoutResponse,
+  RefreshTokenRequest,
+} from '@maks-it.com/webui-contracts'
+import { Claims } from '@maks-it.com/webui-contracts'
+import { ApiRoutes, GetApiRoute } from '../../apiRoutes'
+import { readIdentity, removeIdentity, writeIdentity } from '@maks-it.com/webui-core'
 import { jwtDecode } from 'jwt-decode'
-import { Claims } from '../../models/identity/Claims'
-import { parseAclEntries, type AclEntry } from '../../functions'
+import { parseCertsAclEntries, type CertsAclEntry } from '../../models/acl'
 
 interface Identity extends LoginResponse {
   userId?: string
   username?: string
   isGlobalAdmin: boolean
-  acls?: AclEntry[]
+  acls?: CertsAclEntry[]
 }
 
 interface IdentityState {
@@ -110,7 +112,7 @@ const enrichStateWithJwtContent = (token: string, identity: Identity) => {
         identity.isGlobalAdmin = false
       }
 
-      identity.acls = parseAclEntries(jwtAcls)
+      identity.acls = parseCertsAclEntries(jwtAcls)
     }
   }
 }
@@ -155,15 +157,14 @@ const identitySlice = createSlice({
       })
       .addCase(login.fulfilled, (state, action: PayloadAction<LoginResponse | undefined>) => {
         state.status = 'idle'
-        const normalized = normalizeLoginResponse(action.payload)
-        if (normalized) {
+        if (action.payload) {
           state.identity = {
             isGlobalAdmin: false,
-            ...normalized,
+            ...action.payload,
           }
-          writeIdentity(normalized)
+          writeIdentity(action.payload)
 
-          enrichStateWithJwtContent(normalized.token, state.identity)
+          enrichStateWithJwtContent(action.payload.token, state.identity)
         }
       })
       .addCase(login.rejected, (state) => {
@@ -192,15 +193,14 @@ const identitySlice = createSlice({
       .addCase(refreshJwt.fulfilled, (state, action: PayloadAction<LoginResponse | undefined>) => {
         state.status = 'idle'
 
-        const normalized = normalizeLoginResponse(action.payload)
-        if (normalized) {
+        if (action.payload) {
           state.identity = {
             isGlobalAdmin: false,
-            ...normalized,
+            ...action.payload,
           }
-          writeIdentity(normalized)
+          writeIdentity(action.payload)
 
-          enrichStateWithJwtContent(normalized.token, state.identity)
+          enrichStateWithJwtContent(action.payload.token, state.identity)
         }
         else {
           // Refresh API returned error (e.g. 401 Invalid refresh token); treat as logged out

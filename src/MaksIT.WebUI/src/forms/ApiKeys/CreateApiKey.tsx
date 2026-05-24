@@ -1,18 +1,20 @@
 import { FC, useMemo } from 'react'
 import { array, boolean, object, RefinementCtx, string, ZodType } from 'zod'
-import { ApiKeyResponse } from '../../models/certsUI/apiKeys/ApiKeyResponse'
-import { useFormState } from '../../hooks/useFormState'
-import { addToast } from '../../components/Toast/addToast'
+import { ApiKeyResponse } from '../../models/apiKey/ApiKeyResponse'
+import { useFormState } from '@maks-it.com/webui-core'
+import { addToast } from '@maks-it.com/webui-components'
 import { postData } from '../../axiosConfig'
 import { ApiRoutes, GetApiRoute } from '../../AppMap'
-import { Offcanvas } from '../../components/Offcanvas'
-import { FormContainer, FormContent, FormFooter, FormHeader } from '../../components/FormLayout'
-import { ButtonComponent, CheckBoxComponent, DateTimePickerComponent, TextBoxComponent } from '../../components/editors'
-import { CreateApiKeyRequest, CreateApiKeyRequestSchema } from '../../models/certsUI/apiKeys/CreateApiKeyRequest'
+import { Offcanvas } from '@maks-it.com/webui-components'
+import { FormContainer, FormContent, FormFooter, FormHeader } from '@maks-it.com/webui-components'
+import { ButtonComponent, CheckBoxComponent, DateTimePickerComponent, TextBoxComponent } from '@maks-it.com/webui-components'
+import { CreateApiKeyRequest, createCreateApiKeyRequestSchema } from '../../models/apiKey/CreateApiKeyRequest'
 import { EditUserScopes, EntityScopeFormProps, EntityScopeFormPropsSchema } from '../shared/EditScopes'
-import { deepCopy, hasFlag } from '../../functions'
+import { deepCopy, hasFlag } from '@maks-it.com/webui-core'
 import { useAppSelector } from '../../redux/hooks'
-import { ScopeEntityType, ScopePermission } from '../../models/engine/scopeEnums'
+import { ScopeEntityType } from '../../models/ScopeEntityType'
+import { ScopePermission } from '@maks-it.com/webui-core'
+import { refineCreateGlobalAdminAssignment } from '../../models/engine/globalAdminZod'
 
 
 // Form state interface and validation
@@ -47,6 +49,11 @@ const CreateApiKeyFormPropsSchema: ZodType<CreateApiKeyFormProps> = object({
   }
 })
 
+const createCreateApiKeyFormSchema = (actorIsGlobalAdmin: boolean): ZodType<CreateApiKeyFormProps> =>
+  CreateApiKeyFormPropsSchema.superRefine((val, ctx) =>
+    refineCreateGlobalAdminAssignment(val, ctx, actorIsGlobalAdmin)
+  )
+
 interface CreateApiKeyProps {
   isOpen?: boolean
   onSubmitted?: (entity: ApiKeyResponse) => void
@@ -61,7 +68,10 @@ const CreateApiKey: FC<CreateApiKeyProps> = (props) => {
   const { identity } = useAppSelector(state => state.identity)
 
   const initialFormState = useMemo(createApiKeyFormPropsProto, [])
-  const validationSchema = useMemo(() => CreateApiKeyFormPropsSchema, [])
+  const validationSchema = useMemo(
+    () => createCreateApiKeyFormSchema(identity?.isGlobalAdmin ?? false),
+    [identity?.isGlobalAdmin]
+  )
 
   const {
     formState,
@@ -75,7 +85,7 @@ const CreateApiKey: FC<CreateApiKeyProps> = (props) => {
   })
 
   const handleSubmit = () => {
-    if (!formIsValid) return
+    if (!formIsValid || !identity) return
 
     const requestData: CreateApiKeyRequest = {
       description: formState.description,
@@ -88,7 +98,7 @@ const CreateApiKey: FC<CreateApiKeyProps> = (props) => {
       }))
     }
 
-    const request = CreateApiKeyRequestSchema.safeParse(requestData)
+    const request = createCreateApiKeyRequestSchema(identity.isGlobalAdmin).safeParse(requestData)
 
     if (!request.success) {
       request.error.issues.forEach(error => {

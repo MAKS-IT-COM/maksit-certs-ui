@@ -49,7 +49,7 @@ certsServerSecrets:
   authSecret: changeme-generate-a-long-random-string
   authPepper: ""
   agentKey: ""
-  adminPassword: changeme-generate-a-strong-password
+  adminPassword: password
   certsEngineConfiguration:
     connectionString: ""
 

@@ -1,8 +1,8 @@
 import { FC } from 'react'
-import { ButtonComponent } from '../../../components/editors'
-import { Offcanvas } from '../../../components/Offcanvas'
+import { ButtonComponent } from '@maks-it.com/webui-components'
+import { Offcanvas } from '@maks-it.com/webui-components'
 import { QRCodeSVG } from 'qrcode.react'
-import { FormContainer, FormContent, FormHeader } from '../../../components/FormLayout'
+import { FormContainer, FormContent, FormHeader } from '@maks-it.com/webui-components'
 
 
 interface EnableTwoFactorProps {

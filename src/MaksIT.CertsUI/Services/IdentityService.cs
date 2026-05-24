@@ -126,11 +126,15 @@ public class IdentityService(
   /// <remarks>
   /// Last update: 02/03/2026
   /// </remarks>
-  private Result CreateUserRBAC(JwtTokenData jwtTokenData, CreateUserRequest requestData) => RBACWrapperJwtToken(
-    jwtTokenData,
-    (jwtTokenData) => {
-        return Result.Ok();
-    });
+  private Result CreateUserRBAC(JwtTokenData jwtTokenData, CreateUserRequest requestData) {
+    var globalAdminCheck = RbacHelpers.EnsureActorMayAssignGlobalAdmin(jwtTokenData, requestData.IsGlobalAdmin);
+    if (!globalAdminCheck.IsSuccess)
+      return globalAdminCheck;
+
+    return RBACWrapperJwtToken(
+      jwtTokenData,
+      (_) => Result.Ok());
+  }
 
   /// <summary>
   /// Performs RBAC (Role-Based Access Control) checks to determine if the current user is authorized to patch (update) the specified user.
@@ -156,6 +160,11 @@ public class IdentityService(
   /// Last update: 02/03/2026
   /// </remarks>
   private Result<User?> PatchUserRBAC(JwtTokenData jwtTokenData, Guid userId, PatchUserRequest requestData) {
+    var globalAdminPatchCheck = RbacHelpers.EnsureActorMayPatchGlobalAdminFlag(
+      jwtTokenData, requestData, nameof(PatchUserRequest.IsGlobalAdmin));
+    if (!globalAdminPatchCheck.IsSuccess)
+      return Result<User?>.Forbidden(null, "Only a global admin can assign or remove the global admin flag.");
+
     var targetIdentityResult = _identityDomainService.ReadUserById(userId);
     if (!targetIdentityResult.IsSuccess || targetIdentityResult.Value == null)
       return targetIdentityResult.ToResultOfType<User?>(_ => null);
@@ -374,7 +383,8 @@ public class IdentityService(
     var pepper = _appSettings.CertsEngineConfiguration.JwtSettingsConfiguration.PasswordPepper;
     var newUser = new User(requestData.Username, requestData.Password, pepper)
       .SetEmail(requestData.Email)
-      .SetMobileNumber(requestData.MobileNumber);
+      .SetMobileNumber(requestData.MobileNumber)
+      .SetIsActive(true);
 
     var sagaBuilder = new LocalSagaBuilder(_logger);
 

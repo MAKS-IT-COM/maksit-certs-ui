@@ -1,31 +1,40 @@
 import React, { useEffect, KeyboardEvent, useState } from 'react'
-import { LoginRequest, LoginRequestSchema } from '../models/identity/login/LoginRequest'
+import { type LoginRequest, LoginRequestSchema } from '@maks-it.com/webui-contracts'
+import { type FormValidationSchema, useFormState } from '@maks-it.com/webui-core'
+import { useNavigate } from 'react-router-dom'
+import { ButtonComponent, CheckBoxComponent, TextBoxComponent } from '@maks-it.com/webui-components'
 import { useAppDispatch, useAppSelector } from '../redux/hooks'
 import { login } from '../redux/slices/identitySlice'
-import { useFormState } from '../hooks/useFormState'
-import { useNavigate } from 'react-router-dom'
-import { ButtonComponent, CheckBoxComponent, TextBoxComponent } from './editors'
 
-const LoginScreen: React.FC = () => {
+export interface LoginScreenProps {
+  companyUrl?: string
+  appTitle?: string
+  logoSrc?: string
+  appLogoSrc?: string
+  validationSchema?: FormValidationSchema<LoginRequest>
+}
+
+const LoginScreen: React.FC<LoginScreenProps> = ({
+  companyUrl = '',
+  appTitle = 'Sign in',
+  logoSrc = '/logo.png',
+  appLogoSrc = '/certs-ui-logo-only.png',
+  validationSchema = LoginRequestSchema,
+}) => {
   const [use2FA, setUse2FA] = useState(false)
   const [use2FARecovery, setUse2FARecovery] = useState(false)
 
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
-  const { identity } = useAppSelector((state) => state.identity)
+  const identity = useAppSelector((s) => s.identity.identity)
 
-  const {
-    formState,
-    errors,
-    formIsValid,
-    handleInputChange,
-  } = useFormState<LoginRequest>({
+  const { formState, errors, formIsValid, handleInputChange } = useFormState<LoginRequest>({
     initialState: { username: '', password: '' },
-    validationSchema: LoginRequestSchema,
+    validationSchema,
   })
 
   useEffect(() => {
-    if (!identity || new Date(identity.refreshTokenExpiresAt) < new Date()) {
+    if (!identity?.refreshTokenExpiresAt || new Date(identity.refreshTokenExpiresAt) < new Date()) {
       navigate('/login', { replace: true })
     } else {
       navigate('/', { replace: true })
@@ -34,41 +43,45 @@ const LoginScreen: React.FC = () => {
 
   const handleUse2FA = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUse2FA(e.target.checked)
-    if (!e.target.checked) {
+    if (!e.target.checked)
       setUse2FARecovery(false)
-    }
   }
 
   const handleLogin = () => {
-    if (!formIsValid) return
+    if (!formIsValid)
+      return
 
     const newFormState = { ...formState }
+    if (newFormState.twoFactorCode === '')
+      delete newFormState.twoFactorCode
+    if (newFormState.twoFactorRecoveryCode === '')
+      delete newFormState.twoFactorRecoveryCode
 
-    if (newFormState.twoFactorCode === '') delete newFormState.twoFactorCode
-    if (newFormState.twoFactorRecoveryCode === '') delete newFormState.twoFactorRecoveryCode
-
-    dispatch(login(newFormState))
+    void dispatch(login(newFormState))
   }
 
   const handleSubmit = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'Enter') handleLogin()
+    if (e.key === 'Enter')
+      handleLogin()
   }
 
   return (
     <div className={'relative min-h-screen bg-gray-100 flex items-center justify-center'}>
-      <a
-        href={import.meta.env.VITE_COMPANY_URL}
-        target={'_blank'}
-        rel={'noopener noreferrer'}
-        className={'absolute top-6 left-8 flex items-center space-x-3 z-10'}
-      >
-        <img src={'/logo.png'} alt={'Logo'} className={'h-10 w-auto'} />
-      </a>
+      {companyUrl && (
+        <a
+          href={companyUrl}
+          target={'_blank'}
+          rel={'noopener noreferrer'}
+          className={'absolute top-6 left-8 flex items-center space-x-3 z-10'}
+        >
+          <img src={logoSrc} alt={'Logo'} className={'h-10 w-auto'} />
+        </a>
+      )}
 
       <div className={'w-full max-w-md bg-white rounded-lg shadow-md p-8 space-y-6'} onKeyDown={handleSubmit} tabIndex={0}>
         <div className={'flex justify-center items-center space-x-3 mb-2'}>
-          <img src={'/certs-ui-logo-only.png'} alt={'CertsUI'} className={'h-12 w-auto'} />
-          <span className={'text-2xl font-bold text-gray-800 select-none'}>{import.meta.env.VITE_APP_TITLE}</span>
+          <img src={appLogoSrc} alt={appTitle} className={'h-12 w-auto'} />
+          <span className={'text-2xl font-bold text-gray-800 select-none'}>{appTitle}</span>
         </div>
 
         <div className={'space-y-4'}>
@@ -80,7 +93,6 @@ const LoginScreen: React.FC = () => {
               onChange={(e) => handleInputChange('username', e.target.value)}
               errorText={errors.username}
             />
-
             <TextBoxComponent
               label={'Password'}
               placeholder={'Password...'}
@@ -123,11 +135,7 @@ const LoginScreen: React.FC = () => {
             </div>
           )}
 
-          <ButtonComponent
-            label={'Sign in'}
-            buttonHierarchy={'primary'}
-            onClick={handleLogin}
-          />
+          <ButtonComponent label={'Sign in'} buttonHierarchy={'primary'} onClick={handleLogin} />
         </div>
       </div>
     </div>

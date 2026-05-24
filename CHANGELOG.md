@@ -4,250 +4,106 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.4.1] - 2026-04-30
+## [3.5.0] - 2026-05-24
+
+**Release status:** **3.3.4** is the last published release. **3.5.0** consolidates all changes since **3.3.4** (HA, Engine/Vault alignment, client libraries, Web UI shared packages).
 
 ### Breaking
 
-- **Engine query ports (Vault-style):** **`IUserQueryService`**, **`IApiKeyQueryService`**, and **`IApiKeyEntityScopeQueryService`** no longer expose async paged **`Search…Async`** with string filters. They now use synchronous **`Search`** / **`Count`** with optional **`Expression<Func<TDto, bool>>?`** predicates (Linq2Db-translatable), **`skip` / `limit`**, and **`Result`** types—matching the thin-search wiring in **`IdentityService`** / **`ApiKeyService`**. Custom Engine hosts must update call sites and registrations.
-- **ACME session persistence:** **`IAcmeSessionStore`**, **`AcmePostgresSessionStore`**, **`AcmeSessionSnapshot`**, and **`AcmeSessionJsonSerializer`** are removed. **`ILetsEncryptService`** now depends on **`IAcmeSessionPersistenceService`** (**`AcmeSessionPersistenceServiceLinq2Db`**) for **`acme_sessions`** JSON load/save.
-- **`ICertsFlowDomainService`:** Constructor takes **`IRegistrationCacheDomainService`** instead of **`IRegistrationCachePersistenceService`** (registration cache orchestration moved behind **`RegistrationCacheDomainService`**).
+- **HA / interactive ACME:** Removed **`IPrimaryReplicaWorkload`**, **`PrimaryReplicaGate`**, **`PrimaryReplicaShutdownHostedService`**, and **`CertsFlowPrimaryReplica`**. All replicas may run configure-client, init, orders, challenge completion, certificate download, apply, and revoke. The API no longer returns **HTTP 503** with **`urn:maksit:certs-ui:primary-replica-required`**. Clients that retried on that signal should use normal error semantics only.
+- **HTTP-01 challenge:** **`AcmeChallengeAsync`** no longer writes tokens under **`AcmeFolder`** or reads legacy on-disk files. Challenge text is served from PostgreSQL only; ingress must reach **`GET /.well-known/acme-challenge/{token}`** on this app (or equivalent).
+- **Startup / filesystem:** Removed the shared **`init`** marker under **`DataFolder`**, **`AcmeFolder`**, and **`DataFolder`** settings, and default server **acme**/**data** PVC mounts. Followers wait until the database reports at least one user.
+- **Configuration:** **`CertsUIEngineConfiguration`** renamed to **`CertsEngineConfiguration`** in appsettings, Helm **`values.yaml`**, and secrets templates.
+- **Engine layout:** **`Persistance`** → **`Persistence`**; **`CertsLinq2DbMapping`** → **`CertsUILinq2DbMapping`**.
+- **Engine query ports (Vault-style):** **`IUserQueryService`**, **`IApiKeyQueryService`**, and **`IApiKeyEntityScopeQueryService`** use synchronous **`Search`** / **`Count`** with optional **`Expression<Func<TDto, bool>>?`** predicates, **`skip` / `limit`**, and **`Result`** types — not async paged **`Search…Async`** with string filters.
+- **ACME session persistence:** **`IAcmeSessionStore`**, **`AcmePostgresSessionStore`**, **`AcmeSessionSnapshot`**, and **`AcmeSessionJsonSerializer`** removed. **`ILetsEncryptService`** depends on **`IAcmeSessionPersistenceService`** (**`AcmeSessionPersistenceServiceLinq2Db`**) for **`acme_sessions`** JSON load/save.
+- **`ICertsFlowDomainService`:** Constructor takes **`IRegistrationCacheDomainService`** instead of **`IRegistrationCachePersistenceService`**.
+- **Web UI:** Removed the in-repo shared UI stack (layout, DataTable, form editors, deep/enum helpers, local toast). The SPA depends on **`@maks-it.com/webui-core`**, **`webui-components`**, and **`webui-contracts`** (private npm registry; **`src/MaksIT.WebUI/.npmrc`**).
+- **E2E tests:** **`CertsUiApiKeyE2ETests`** removed from **`MaksIT.CertsUI.Tests`**; API-key E2E lives in **`MaksIT.CertsUI.Client.Tests`** (`Category=E2E`).
+- **Terms of Service API:** Interactive ACME uses only **`GET /api/certs/{sessionId}/terms-of-service`** (stateless **`isStaging`** variant removed).
+- **Startup migrations:** Removed legacy EF-era baseline, **`VersionInfo` → `version_info`** rename repair, PascalCase → snake_case column repair, and **`RunMigrationsService.BaselineVersion`**. **`MigrateUp`** expects schema managed only by in-process FluentMigrator migrations.
+- **Database:** **`users.JwtTokensJson`** removed; sessions live in **`jwt_tokens`** only (no duplicate JSON on **`users`**).
+- **Deprecated host:** Removed legacy **`MaksIT.Webapi`** and **`MaksIT.Webapi.Tests`** in favor of **`MaksIT.CertsUI`** / **`MaksIT.CertsUI.Tests`**.
 
 ### Added
 
-- **`ExpressionCompose`** (`QueryServices/ExpressionCompose.cs`) for composing nested Linq2Db predicates (Vault parity).
-- **`IRegistrationCacheDomainService`** / **`RegistrationCacheDomainService`**, **`RegistrationCachePayloadDocument`**, and **`RegistrationCachePayloadJsonTests`** (Engine unit tests) for registration-cache JSON handling; **`RegistrationCacheDto`** now extends **`DtoDocumentBase<Guid>`** with **`AccountId`** as an alias of **`Id`**; persistence and mapping updates in **`RegistrationCachePersistenceServiceLinq2Db`** / **`CertsLinq2DbMapping`**.
-- **`IAcmeSessionPersistenceService`**, **`AcmeSessionPersistenceServiceLinq2Db`**, and **`AcmeSessionPayloadMapper`** for PostgreSQL-backed ACME **`State`** persistence.
-- **`ApiKeyEntityScopeDto`** and **`ApiKeyEntityScopeQueryServiceStub`** adjustments for entity-scope search parity.
-- **Docs:** **`assets/docs/ARCHITECTURE_LAYERING.md`** (layering, spine flows, Pattern A/B); **[CONTRIBUTING.md](CONTRIBUTING.md)** links to it and documents **`dotnet test`** for **`MaksIT.CertsUI.Engine.Tests`** / **`MaksIT.CertsUI.Tests`**.
+- **`MaksIT.CertsUI.Client`:** HTTP client library with API key auth (**`ICertsUIClient`**, **`CertsUIClient`**, **`ServiceCollectionExtensions`**, **`CertsUIApiException`**).
+- **`MaksIT.CertsUI.Contracts`:** Shared wire types (**`AccountResponse`**, **`HostnameResponse`**, **`RuntimeInstanceIdResponse`**).
+- **`MaksIT.CertsUI.Client.PowerShell`:** Binary module (**`Connect-CertsUI`**, **`Get-CertsUIAccounts`**, **`Invoke-CertsUICreateAccount`**, etc.; requires **PowerShell 7** on **.NET 10**).
+- **`MaksIT.CertsUI.Client.Tests`:** Unit tests plus relocated API-key E2E suite.
+- **PowerShell E2E:** **`src/e2e-tests/`** scenarios and **`Test-CertsUiApiKeyE2E.ps1`** / **`.bat`** (Vault-style **`CERTSUI_E2E_CREDENTIALS`**).
+- **Docs:** **`assets/docs/POWERSHELL_CLIENT_MODULE.md`**, **`assets/docs/ARCHITECTURE_LAYERING.md`**, HA and login architecture docs; **[CONTRIBUTING.md](CONTRIBUTING.md)** links layering doc and **`dotnet test`** guidance.
+- **New backend host:** **`MaksIT.CertsUI`** WebAPI with controllers, JWT and JWT-or-API-key authorization, hosted services, and mapping/configuration abstractions.
+- **Engine platform:** Domain-oriented **`MaksIT.CertsUI.Engine`** (`Domain`, `Dto`, `DomainServices`, `Persistence`, `QueryServices`, `Infrastructure`, `FluentMigrations`) with Linq2Db mappings and migration services.
+- **Engine (Vault parity):** **`EntityScopeBase`**; **`UserAuthorization`** / **`ApiKeyAuthorization`** aggregates; split **`UserEntityScope`** / **`ApiKeyEntityScope`**; **`IdentityDomainService`** / **`ApiKeyDomainService`** refactor aligned with MaksIT.Vault.
+- **`ExpressionCompose`** for composing nested Linq2Db predicates.
+- **`IRegistrationCacheDomainService`** / **`RegistrationCacheDomainService`**, **`RegistrationCachePayloadDocument`**, and **`RegistrationCachePayloadJsonTests`**.
+- **`IAcmeSessionPersistenceService`**, **`AcmeSessionPersistenceServiceLinq2Db`**, and **`AcmeSessionPayloadMapper`** for PostgreSQL-backed ACME **`State`**.
+- **`PostgresStartupWait`** — waits for PostgreSQL and retries FluentMigrator **`MigrateUp`** on transient startup failures.
+- **API / RBAC:** **`GetActingJwtTokenData`** maps API keys to a synthetic **`JwtTokenData`** principal; **`RbacHelpers.EnsureActorMayAssignGlobalAdmin`** / **`EnsureActorMayPatchGlobalAdminFlag`**.
+- **HA runtime coordination:** DB-backed HTTP-01 challenge persistence and runtime leases (**`acme_http_challenges`**, **`app_runtime_leases`**, **`acme_sessions`**, **`terms_of_service_cache`**); coordinated bootstrap and renewal execution.
+- **Kubernetes:** Per-component Helm **`replicaCount`**, PodDisruptionBudget support, health endpoints (**`/health/live`**, **`/health/ready`**), optional **`kubernetesUpstreamHosts`** for in-cluster YARP upstreams.
+- **LetsEncrypt:** Per-host ACME rate-limit cooldown on **`RegistrationCache`**; **`AcmeProblemKind`** enumeration; in-memory **`AcmeSessionStore`** (later superseded by PostgreSQL persistence); partial **`LetsEncryptService`** files; **`State.TryGetAccountKey`**; **`LetsEncrypt.Tests`** for retry parsing and cooldown JSON.
+- **Frontend:** Users/API Keys pages and forms; identity/API-key UX with list/filter/paging (later migrated to **`webui-*`** packages).
+- **Test suite:** **`MaksIT.CertsUI.Tests`** and **`MaksIT.CertsUI.Engine.Tests`** with Postgres/WebAPI fixtures.
+- **Release tooling:** **`DotNetDockerPush`** per-image **`versionEnvFiles`** (temporary **`VITE_APP_VERSION`** rewrite) and optional per-image **`contextPath`** (upstreamed to **maksit-repoutils** 1.0.11).
+- **Helm / config:** **`certsEngineConfiguration.autoSyncSchema`** (default **`true`**) for add-only column sync on startup.
 
 ### Changed
 
-- **`LetsEncryptService`:** Uses **`IAcmeSessionPersistenceService`**; helper updates in **`LetsEncryptService.Helpers.cs`**.
-- **`CertsFlowDomainService`:** **`PurgeStaleHttpChallengesAsync`** (HTTP-01 cleanup); **`AutoRenewal`** calls it before renewal work.
-- **`CacheService`:** Thin façade over **`IRegistrationCacheDomainService`** (host API unchanged for callers).
-- **`IdentityService`** / **`ApiKeyService`:** Build predicates and call **`Count`** + **`Search`** on **`IUserQueryService`** / **`IApiKeyQueryService`** / **`IApiKeyEntityScopeQueryService`**.
-- **Engine:** Dropped **`Newtonsoft.Json`** package reference from **`MaksIT.CertsUI.Engine`** (STJ-only JSON paths).
-- **Web UI:** **`axiosConfig`** **`getData`** / **`postData`** (and related helpers) return **`{ payload, status, ok }`** so callers can distinguish HTTP status; forms and slices updated (**`SearchUser`**, **`SearchApiKey`**, **`Utilities`**, **`EditUser`**, **`Home`**, **`FileUploadComponent`**, **`identitySlice`**, etc.).
-- **Integration tests:** **`InMemoryUserStore`**, **`CacheServiceTests`**, **`CertsFlowServiceTests`**, **`ApiKeyQueryServiceIntegrationTests`**, **`AccountServicePatchAccountIntegrationTests`** aligned with the new ports.
+- **Identity / API key controllers:** Use **`GetActingJwtTokenData`** instead of JWT-only **`GetJwtTokenData`** for user and API-key CRUD/search.
+- **IdentityService** / **ApiKeyService:** Build predicates and call **`Count`** + **`Search`** on query services; thin-search wiring (Pattern B).
+- **Web UI:** Migrated to **`@maks-it.com/webui-*`** packages; **`createWebUiHttpClient`**; **`apiRoutes.ts`**; pages under **`src/pages/`**; **`webUi/dataSources.ts`**; models reorganized under domain folders aligned with **`webui-contracts`**. Earlier step: **`axiosConfig`** helpers return **`{ payload, status, ok }`**.
+- **ACME sessions:** Let's Encrypt client **`State`** persisted in PostgreSQL **`acme_sessions`** so any replica can continue after load balancing.
+- **LetsEncrypt / `HttpClient`:** **`ConfigureClient`** uses absolute ACME directory URL instead of assigning **`BaseAddress`** on the shared client.
+- **`CertsFlowDomainService`:** **`PurgeStaleHttpChallengesAsync`** (HTTP-01 cleanup); **`AutoRenewal`** calls it before renewal work; skips hostnames in ACME cooldown window.
+- **`LetsEncryptService`:** Uses **`IAcmeSessionPersistenceService`**; dropped **`Newtonsoft.Json`** from Engine (STJ-only JSON paths).
+- **`CacheService`:** Thin façade over **`IRegistrationCacheDomainService`**.
+- **Bootstrap / renewal:** **`InitializationHostedService`** acquires **`certs-ui-bootstrap`** (**`RuntimeLeaseNames.BootstrapCoordinator`**) for empty-database admin creation, then releases. **`AutoRenewal`** acquires **`certs-ui-renewal-sweep`** (**`RuntimeLeaseNames.RenewalSweep`**) per sweep. Lease name **`certs-ui-primary`** replaced by bootstrap and renewal sweep constants.
+- **HA / ToS cache:** Terms of Service PDF caching moved from pod filesystem to PostgreSQL **`terms_of_service_cache`** with TTL/HTTP validators.
+- **FluentMigrator:** Standard **`VersionInfo`** table and columns; **`.ScanIn(…).For.All()`** discovery; migrations run in **`Program.cs`** after **`Build()`** before hosted services; logged host/database and migration count; coordination DDL repair after **`MigrateUp`** when tables missing despite applied version.
+- **Schema sync:** **`AutoSyncSchema`** add-only (**`ADD COLUMN IF NOT EXISTS`**; no DROP); desired map includes **`users.IsActive`**, **`TwoFactorSharedKey`**.
+- **Docker Compose / Helm:** YARP upstream env vars for in-cluster vs Compose hostnames; **`components.server.service.sessionAffinity`** defaults to **`false`** (stateless LB); **`certsClientRuntime.apiUrl`** defaults to **`/api`**; optional **`preStop`** sleep and **`terminationGracePeriodSeconds`** for rolling updates.
+- **Container image:** **`MaksIT.CertsUI`** Dockerfile installs **`libgssapi-krb5-2`** for Npgsql GSS support on slim images.
+- **Namespace and solution layout:** Standardized around **`MaksIT.CertsUI*`** host/engine split; ACME contracts moved from legacy **`Entities`/`Models`** into **`Domain`** / **`Dto`**.
+- **LetsEncrypt:** Broader nullable annotations; **`CachedHostname`** primary constructor; certificate loading via **`X509Certificate2.CreateFromPem`** / **`X509CertificateLoader.LoadCertificate`**.
+- **Integration tests:** **`InMemoryUserStore`**, **`CacheServiceTests`**, **`CertsFlowServiceTests`**, **`ApiKeyQueryServiceIntegrationTests`**, **`AccountServicePatchAccountIntegrationTests`** aligned with new ports.
+- **README:** Architecture references, HA guidance, E2E instructions for dotnet test and PowerShell scenarios.
 
-## [3.4.0] - 2026-04-27
+### Fixed
 
-### Breaking
-
-- **HA / interactive ACME:** `CertsFlowDomainService` no longer checks `IPrimaryReplicaWorkload.IsPrimary`. All replicas may run configure-client, init, orders, challenge completion, certificate download, apply, and revoke. The API no longer returns **HTTP 503** with `ProblemDetails.type` **`urn:maksit:certs-ui:primary-replica-required`** for those flows. Clients that retried on that signal (for example the SPA) should treat normal error semantics only.
-- **HTTP-01 challenge:** `AcmeChallengeAsync` no longer writes tokens under **`AcmeFolder`** or reads a legacy on-disk file. Challenge text is served from PostgreSQL only; ingress must reach **`GET /.well-known/acme-challenge/{token}`** on this app (or equivalent) rather than a shared volume of token files.
-- **Startup:** Removed the shared **`init`** marker file under **`DataFolder`**. Followers wait until the database reports at least one user (same readiness signal, without filesystem coupling).
-- **HA / process model:** Removed **`IPrimaryReplicaWorkload`**, **`PrimaryReplicaGate`**, and **`PrimaryReplicaShutdownHostedService`**. There is no long-lived “primary replica” or lease renewal loop in the API process.
-
-### Changed
-
-- **ACME sessions:** Let's Encrypt client **`State`** is persisted in PostgreSQL table **`acme_sessions`** (`session_id`, payload JSON, timestamps) so any replica can continue the same ACME session after load balancing.
-- **LetsEncrypt / `HttpClient`:** `ConfigureClient` fetches the ACME directory using an absolute URL derived from staging/production configuration instead of assigning **`BaseAddress`** on the shared **`HttpClient`**.
-- **`InitializationHostedService`:** Dropped unused **`IOptions<Configuration>`** from the constructor (DI callers unchanged except the removed parameter).
-- **Bootstrap:** **`InitializationHostedService`** acquires **`certs-ui-bootstrap`** (`RuntimeLeaseNames.BootstrapCoordinator`), runs **`CoordinationTableProvisioner`** + optional default admin, **releases** the lease, and exits. Other pods wait until **`users`** exist.
-- **Renewal:** **`AutoRenewal`** acquires **`certs-ui-renewal-sweep`** (`RuntimeLeaseNames.RenewalSweep`) for each sweep, runs work, **releases**, then sleeps. Any pod may win the next sweep.
-- **Lease names:** Replaced **`certs-ui-primary`** with **`BootstrapCoordinator`** and **`RenewalSweep`** constants (see **`RuntimeLeaseNames`**).
-- **Helm (cloud-native defaults):** **`components.server.service.sessionAffinity.enabled`** defaults to **`false`** so the server `Service` uses stateless load balancing (no **`ClientIP`** stickiness). Enable explicitly only when needed.
-- **Helm:** **`certsClientRuntime.apiUrl`** default is **`/api`** so the Web UI calls the API on the same browser origin (typical single-ingress / reverse-proxy setup). Override with a full URL when UI and API are on different hosts.
+- **Startup / HA:** Bootstrap lease no longer blocks extra replicas when users already exist; cooperative cancel on host shutdown; **`CoordinationTableProvisioner`** with explicit **`public.*`** DDL; **`RuntimeLeaseServiceNpgsql`** uses **`public.app_runtime_leases`**; post-migrate verification for coordination tables.
+- **FluentMigrator:** Empty connection string no longer puts runner in connectionless/preview mode; throw when engine connection string missing; maintenance DB bootstrap warns instead of failing when role cannot **`CREATE DATABASE`**.
+- **Identity / PostgreSQL:** **`users.JwtTokensJson`** column dropped; new inserts no longer hit **`23502`**; token rows normalized into **`jwt_tokens`**.
+- **Helm / reverseproxy:** YARP upstreams no longer default to unresolvable Compose hostnames in Kubernetes when **`kubernetesUpstreamHosts`** is enabled.
+- **LetsEncrypt:** **`RevokeCertificate`** fails correctly on non-success; disposes HTTP response on success; **`NewOrder`** logs authorization status; **`TryGetCachedCertificate`** returns **`false`** when private key blob missing.
+- **`AccountService.PatchAccountAsync`:** Returns account built from cache after reload, not stale in-memory instance.
+- **WebUI Terms of Service:** PDF worker loaded from Vite-bundled asset (**`pdf.worker.min.mjs?url`**) for dev and production.
 
 ### Removed
 
-- **`CertsFlowPrimaryReplica`**, **`PrimaryReplicaRequiredObjectResult`**, and **`CertsFlowResultExtensions`** / **`ToCertsFlowActionResult`**; **`CertsFlowController`** uses **`ToActionResult()`** like other API controllers.
-- **Web UI:** Primary-replica **503** auto-retry logic in **`axiosConfig.ts`**.
-- **Configuration / Helm:** **`AcmeFolder`** and **`DataFolder`** settings and the default **server** **acme**/**data** PVC mounts (cloud-native: no app-local disk for ACME or bootstrap markers). **`AddMemoryCache()`** host registration removed (unused).
-
-### Upgrade notes
-
-- **Migrations:** Apply FluentMigrator through **`3.4.0`** (includes **`acme_sessions`** and related coordination entries) before relying on cross-replica ACME sessions.
-- **Compose / secrets:** Remove **`acme`** and **`data`** bind mounts from **`docker-compose.override.yml`** if you still have them; they are no longer read by the application.
-- **Operations:** If you alert or filter on lease name **`certs-ui-primary`**, retarget to **`certs-ui-bootstrap`** and **`certs-ui-renewal-sweep`**.
-
-## [3.3.22] - 2026-04-27
-
-### Changed
-
-- **Release tooling / frontend image versioning:** `DockerPush` now supports per-image `versionEnvFiles` and temporarily rewrites `VITE_APP_VERSION` in `src/MaksIT.WebUI/.env` and `src/MaksIT.WebUI/.env.prod` to the release semver from `<Version>` (for example `3.3.22`) during docker build/push, then restores original files so placeholders remain unchanged in git.
-- **HA / Terms of Service PDF cache:** Replaced pod-filesystem Terms of Service PDF caching with shared PostgreSQL cache table `terms_of_service_cache` (`url`, `url_hash_hex`, `etag`, `last_modified_utc`, `content_type`, `content_bytes`, `fetched_at_utc`, `expires_at_utc`). ToS retrieval now uses cache TTL/HTTP validators and no longer relies on local files.
-- **Terms of Service API:** Uses only session-based endpoint `GET /api/certs/{sessionId}/terms-of-service` for interactive ACME flows (stateless `isStaging` variant removed).
-
-## [3.3.21] - 2026-04-26
-
-### Changed
-
-- **FluentMigrator:** Restored FluentMigrator defaults for the migration history table (**`VersionInfo`**, columns **`Version`**, **`AppliedOn`**, **`Description`**). Removed **`CertsFluentMigratorVersionTableMetaData`**, custom **`IVersionTableMetaDataAccessor`** registration, and post-migrate verification against **`version_info`**.
-
-## [3.3.20] - 2026-04-26
-
-### Fixed
-
-- **FluentMigrator DI:** Attempted to force **`version_info`** by replacing **`IVersionTableMetaDataAccessor`** registrations. **Superseded in 3.3.21:** reverted to default **`VersionInfo`** table and standard column names (see **3.3.21**).
-
-## [3.3.19] - 2026-04-26
-
-### Removed
-
-- **Startup migrations:** Removed legacy compatibility paths (EF-era baseline that seeded the version table when **`users`** already existed, **`VersionInfo` → `version_info` rename**, PascalCase → snake_case column repair, and **`RunMigrationsService.BaselineVersion`**).
-
-### Upgrade notes
-
-- **Breaking:** **Recreate the Certs engine database** (or use a new empty database) if you still relied on those removed startup paths; **`MigrateUp`** expects a schema managed only by FluentMigrator migrations in-process.
-
-## [3.3.18] - 2026-04-26
-
-### Changed
-
-- **Docker Compose:** **`docker-compose.override.yml`** sets the same **`ReverseProxy__Clusters__*__Destinations__d1__Address`** environment variables as Kubernetes (**`http://server:5000/`** / **`http://client:5173/`** on the Compose network), so YARP behavior does not depend only on baked-in **`appsettings.json`**.
-- **Helm:** Optional **`components.reverseproxy.kubernetesUpstreamHosts`** (default **`true`**) toggles injection of in-cluster upstream URLs; set **`false`** only for custom Service naming. Single-replica and HA clusters use the same DNS pattern.
-
-### Fixed
-
-- **Helm / reverseproxy:** YARP upstreams defaulted to Compose hostnames **`server`** / **`client`**, which do not resolve in Kubernetes. The chart sets **`ReverseProxy__Clusters__*__Destinations__d1__Address`** to **`http://<release-fullname>-server:<port>/`** and **`http://<release-fullname>-client:<port>/`** when **`kubernetesUpstreamHosts`** is enabled (ports from **`components.server.service.port`** and **`components.client.service.port`**).
-
-## [3.3.17] - 2026-04-26
-
-### Changed
-
-- **HA / API:** Non-primary replicas return **`Result.ServiceUnavailable`** with stable marker `urn:maksit:certs-ui:primary-replica-required` for ACME orchestration; the host maps that to **HTTP 503**, **`Retry-After`**, and **RFC 7807 `ProblemDetails`** (replacing ad-hoc 429-style overload semantics for this case).
-- **Helm:** Default **`components.server.service.sessionAffinity`** (`ClientIP`, configurable timeout), **`terminationGracePeriodSeconds`**, and a short **`preStop` sleep** so rolling updates drain connections before the primary lease TTL window. Disable or tune under **`components.server`** if your ingress already pins API traffic.
-
-## [3.3.16] - 2026-04-26
-
-### Changed
-
-- **HA / primary replica:** A single elected instance holds Postgres lease `certs-ui-primary` (`RuntimeLeaseNames.PrimaryReplica`), renews it periodically, and is the only instance with `IPrimaryReplicaWorkload.IsPrimary` after startup. It runs coordination DDL, identity bootstrap, **all ACME domain flows** (`CertsFlowDomainService`), and **`AutoRenewal`**. Other replicas serve HTTP (identity, health, etc.) and **`AcmeChallengeAsync`** (HTTP-01 token materialization for ingress). Followers reject ACME orchestration at the domain layer until they become primary after failover.
-- **Startup:** Removed separate `certs-ui-bootstrap` lease; primary lease serializes first-time admin creation. `PrimaryReplicaShutdownHostedService` (registered last) releases the primary lease on shutdown.
-
-## [3.3.15] - 2026-04-26
-
-### Fixed
-
-- **Startup / HA:** `InitializationHostedService` no longer takes the bootstrap lease when PostgreSQL already has users. Only the empty-database path waits on the lease (single-writer default admin). Extra replicas used to block on the lease until Kubernetes canceled `StartAsync`, surfacing as `TaskCanceledException` at startup while the first replica held the lease.
-- **Startup:** Retry backoff treats `OperationCanceledException` when the host is stopping as shutdown (no misleading “initialization failed” loop); cooperative cancel still ends startup.
-
-## [3.3.14] - 2026-04-26
-
-### Fixed
-
-- **Identity / PostgreSQL:** Removed redundant `users.JwtTokensJson` (historical JSON blob of sessions on the user row). **Server-side session allowlist semantics are unchanged:** issued sessions remain rows in `jwt_tokens` and are validated the same way as in Vault’s persisted `JwtToken` model—only the duplicate JSON encoding was dropped. New `users` inserts no longer hit `23502` on that column. FluentMigrator `DropUsersJwtTokensJson` (`20260426140000`) drops the column when present; the baseline no longer creates it; `JwtTokensTableMigrateFromJson` copies from JSON only if that column still exists (upgrades from older DBs).
-
-### Changed
-
-- **FluentMigrator:** `RestoreUsersJwtTokensJsonIfDropped` (`20260426120000`) is now a no-op (revision kept for databases that already applied it). Session material is stored only in `jwt_tokens`, not duplicated as JSON on `users`.
-
-## [3.3.13] - 2026-04-26
-
-### Fixed
-
-- **HA lease / `42P01`:** Added `CoordinationTableProvisioner` with explicit `public.*` DDL; `InitializationHostedService` calls it immediately before bootstrap lease acquire (idempotent, same as post-migrate repair). `RuntimeLeaseServiceNpgsql` now uses `public.app_runtime_leases` in SQL so a non-default `search_path` cannot miss the table. Post-migrate verification requires `public.app_runtime_leases` plus `users` or `"VersionInfo"`.
-
-### Upgrade notes (Kubernetes / Helm)
-
-- **Pin container tags to the app semver** (e.g. `3.3.13` for server, client, reverseproxy) via `global.image.tag` and/or `components.*.image.tag`. The chart resolves the effective tag with `global.image.tag` when set (see `src/helm/templates/_helpers.tpl`).
-- **Do not rely on `latest` + `imagePullPolicy: IfNotPresent` alone** — nodes keep the first pulled digest, so you can run an old server binary while the OCI chart is already `3.3.13`. Use an explicit semver tag and/or `pullPolicy: Always` (or bump `global.rolloutNonce` / `global.rollme` per chart NOTES) when upgrading.
-- **Push all three images** for the tag you pin (`certs-ui/server`, `certs-ui/client`, `certs-ui/reverseproxy`) so every deployment can pull successfully.
-
-## [3.3.12] - 2026-04-26
-
-### Fixed
-
-- **FluentMigrator:** Use `.ScanIn(…).For.All()` instead of `.For.Migrations()` so in-process discovery matches FluentMigrator guidance (avoids “no migrations” / incomplete runner behavior in some versions).
-- **FluentMigrator:** Throw if the engine connection string is empty when registering the runner — a null/empty `WithGlobalConnectionString` puts the processor in **connectionless/preview** mode (SQL logged, **nothing committed**), which matches reports of empty databases with no errors.
-- **Migrations:** Log host/database (no password) and count of `[Migration]` types before `MigrateUp`; after coordination DDL, verify `public.users` or `public."VersionInfo"` exists or fail with an actionable error (wrong `Database=`, permissions, or preview mode).
-- **Database bootstrap:** If the role cannot open a maintenance connection to database `postgres` (common for locked-down app users), log a warning and skip automatic `CREATE DATABASE` instead of failing the whole migration step.
-
-## [3.3.11] - 2026-04-26
-
-### Added
-
-- **Database:** FluentMigrator `RestoreUsersJwtTokensJsonIfDropped` (`20260426120000`) initially re-added `users.JwtTokensJson` with `ADD COLUMN IF NOT EXISTS` for databases that had dropped it under an older `JwtTokensTableMigrateFromJson` revision. **Superseded in 3.3.14:** that revision is a no-op and `DropUsersJwtTokensJson` drops the column; tokens stay in `jwt_tokens` only.
-- **Helm / config:** `certsServerConfig.configuration.certsEngineConfiguration.autoSyncSchema` (default `true`) is rendered into server `appsettings.json` so add-only schema sync runs on every startup unless explicitly disabled.
-
-### Changed
-
-- **Startup schema policy:** Documented expand-only expectations — FluentMigrator `Up()` should add tables/columns; avoid dropping renamed columns in routine `Up()` without an explicit follow-up plan. `JwtTokensTableMigrateFromJson` no longer drops `JwtTokensJson` in that revision’s `Up()` (tokens are normalized into `jwt_tokens`). **3.3.14** removes `JwtTokensJson` from the live schema via `DropUsersJwtTokensJson`.
-- **Schema sync:** `AutoSyncSchema` defaults to **true** in repo `appsettings.json`; `SchemaSyncService` desired map includes `users.IsActive` and `TwoFactorSharedKey`. **3.3.14** stops treating `JwtTokensJson` as a desired column. Still **ADD COLUMN IF NOT EXISTS** only (no DROP in sync).
-- **ICertsEngineConfiguration / ISchemaSyncService:** Clarified that add-only sync is recommended and describes the no-DROP guarantee.
-
-## [3.3.10] - 2026-04-26
-
-### Fixed
-
-- **Database:** After FluentMigrator `MigrateUp`, `RunMigrationsService` applies idempotent `CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS` for `acme_http_challenges` and `app_runtime_leases`. If `VersionInfo` already records the migration but tables are missing (restore drift, partial apply, manual DB edits), FluentMigrator would skip `Up()` and the bootstrap lease would fail with `42P01`; this repair aligns schema with runtime needs.
-
-## [3.3.9] - 2026-04-26
-
-### Fixed
-
-- **Startup / database:** FluentMigrator (`EnsureCertsEngineMigratedAsync`) now runs in `Program.cs` immediately after `WebApplication.Build()` and before `RunAsync`, so schema (including `app_runtime_leases`) exists before any `IHostedService` starts. `InitializationHostedService` only performs bootstrap lease + identity init.
-
-## [3.3.8] - 2026-04-26
-
-### Fixed
-
-- **Startup / database:** `InitializationHostedService` now runs FluentMigrator (`EnsureCertsEngineMigratedAsync`) before acquiring the bootstrap PostgreSQL lease, so `app_runtime_leases` exists on an empty database (same ordering idea as Vault: migrate first, then coordination).
-- **Startup:** While waiting for the bootstrap lease, migrations are not re-run on every poll interval (`migrationsApplied` guard).
-
-### Changed
-
-- **Container image:** `MaksIT.CertsUI` Dockerfile installs `libgssapi-krb5-2` so Npgsql can load GSS/Kerberos support without missing-library warnings on slim `aspnet` images.
-
-## [3.3.7] - 2026-04-25
-
-### Added
-
-- **HA runtime coordination:** Added DB-backed HTTP-01 challenge persistence and runtime lease infrastructure (`acme_http_challenges`, `app_runtime_leases`) plus coordinated startup/renewal execution.
-- **Kubernetes readiness model:** Added per-component Helm `replicaCount` + PodDisruptionBudget support and health endpoints (`/health/live`, `/health/ready`) for probes.
-- **New backend host:** Added `MaksIT.CertsUI` WebAPI host with controllers, authorization filters (JWT and JWT-or-API-key), hosted services, and mapping/configuration abstractions.
-- **Engine platform expansion:** Added a domain-oriented `MaksIT.CertsUI.Engine` structure (`Domain`, `Dto`, `DomainServices`, `Persistence`, `QueryServices`, `Infrastructure`, `FluentMigrations`) with linq2db mappings and migration services.
-- **Frontend identity/api-key UX:** Added Users/API Keys pages and forms (`CreateUser`, `EditUser`, `SearchUser`, `CreateApiKey`) with reusable list/filter/paging components.
-- **Test suite:** Added `MaksIT.CertsUI.Tests` with service and integration coverage plus shared Postgres/WebAPI fixtures.
-
-### Changed
-
-- **Namespace and solution layout:** Standardized around `MaksIT.CertsUI*` and moved responsibilities into clearer host/engine layers.
-- **Engine model organization:** Reorganized ACME and related contracts from legacy top-level `Entities`/`Models` into `Domain` and `Dto`.
-- **Helm/runtime behavior:** Updated deployment templates to support `env.valueFrom`, pod-name-based holder identity, and probe wiring for live/ready endpoints.
-- **Documentation:** Updated README architecture references and linked HA architecture guidance.
-- **WebUI contracts:** Aligned identity/API-key request/response and paged-search models with updated backend endpoints.
-
-### Removed
-
-- **Deprecated host:** Removed legacy `MaksIT.Webapi` project and its old controllers/services/background services.
-- **Legacy engine layout:** Removed obsolete top-level engine files (`Entities`, `Models`, previous ACME helper locations, old project `.vscode` files).
-- **Old test project:** Removed `MaksIT.Webapi.Tests` in favor of `MaksIT.CertsUI.Tests`.
-
-## [3.3.6] - 2026-04-13
-
-### Added
-
-- **LetsEncrypt:** Per-host ACME rate-limit cooldown on `RegistrationCache` (`AcmeRenewalNotBeforeUtcByHostname`), with HTTP `Retry-After` and problem-detail parsing (`AcmeRetryAfterParser`), structured logging, and `Result.TooManyRequests` when the CA returns `rateLimited`.
-- **LetsEncrypt:** `AcmeProblemKind` as an `Enumeration` (RFC 8555 problem `type` URIs) instead of ad hoc strings; `LetsEncrytException` exposes `ProblemKind`, `RetryAfterUtc`, and optional rate-limit hostname.
-- **LetsEncrypt:** `AcmeSessionStore` for per-session `State` in memory; `LetsEncryptService` split into partial files (`LetsEncryptService.Helpers.cs`) for HTTP/JWS/error helpers.
-- **LetsEncrypt:** `State.TryGetAccountKey` for a single place to validate account key material after `Init`.
-- **LetsEncrypt.Tests:** Unit tests for retry parsing, problem-kind resolution, and cooldown JSON round-trip.
-
-### Changed
-
-- **AutoRenewal:** Skips hostnames that are still in an ACME cooldown window (with debug logs for skipped hosts).
-- **Certs flow:** Persists registration cache after failed full certificate flows when a session exists so cooldown metadata is saved.
-- **LetsEncrypt:** Broader nullable reference annotations on ACME DTOs (`Problem`, `AcmeDirectory`, `AuthorizationChallengeError`, etc.) and explicit null guards in `LetsEncryptService`.
-
-### Fixed
-
-- **LetsEncrypt:** Certificate PEM loading uses `X509Certificate2.CreateFromPem` instead of the obsolete `X509Certificate2(byte[])` constructor (SYSLIB0057).
-- **LetsEncrypt:** `RevokeCertificate` now fails correctly on non-success responses (missing `return`), uses the same problem-document handling as other ACME calls, and disposes the HTTP response on successful revoke.
-- **LetsEncrypt:** `NewOrder` authorization error log line now logs the authorization status, not the order status.
-
-## [3.3.5] - 2026-04-12
-
-### Changed
-
-- `CachedHostname` now uses a C# 12 primary constructor (same public construction as before).
-
-### Fixed
-
-- `RegistrationCache` loads cached PEM certificates via `X509CertificateLoader.LoadCertificate` and disposes them with `using` where certificates are parsed for expiry and host listing.
-- `RegistrationCache.TryGetCachedCertificate` returns `false` when the cached entry has no private key blob, avoiding a null argument when importing key material.
+- **`CertsFlowPrimaryReplica`**, **`PrimaryReplicaRequiredObjectResult`**, **`CertsFlowResultExtensions`** / **`ToCertsFlowActionResult`**; **`CertsFlowController`** uses **`ToActionResult()`**.
+- **Web UI (local):** **`DataTable`**, **`FormLayout`**, **`Layout`**, **`LazyLoadTable`**, editor components, **`Toast`**, **`Offcanvas`**, **`useFormState`**, **`localStorage/identity`**, legacy **`functions/`** / **`models/`** trees superseded by **`webui-*`** packages.
+- **Web UI:** Primary-replica **503** auto-retry in **`axiosConfig.ts`**.
+- **Configuration / Helm:** **`AcmeFolder`**, **`DataFolder`**, default **acme**/**data** PVC mounts; **`AddMemoryCache()`** host registration (unused).
+- **Legacy engine layout:** Obsolete top-level engine files, old **`.vscode`** project files.
+
+### Upgrade notes (from 3.3.4)
+
+**3.3.4** is the last published release. **3.5.0** uses a new host, PostgreSQL-backed registration cache, and FluentMigrator schema — there is no in-place migration of Let's Encrypt account material from **3.3.4**. Use backup → install → restore:
+
+1. **On 3.3.4 (before upgrade):** Sign in to the Web UI, open **Utilities**, and **Download cache files** (full registration-cache ZIP). Store the file safely — it contains your Let's Encrypt account keys and cached certificate data. Optionally export Postman/API backups of any other settings you rely on.
+2. **Prepare 3.5.0:** Provision a **new empty PostgreSQL database** (or drop and recreate the engine database). Update Helm/secrets: rename **`certsUIEngineConfiguration`** → **`certsEngineConfiguration`**, set **`ConnectionString`**, and remove legacy **`acme`** / **`data`** bind mounts from **`docker-compose.override.yml`** if present.
+3. **Deploy 3.5.0:** Install the new server, client, and reverse-proxy images (pin tags to **`3.5.0`**, not **`latest`**). On first start, FluentMigrator creates the schema; bootstrap creates the default admin when the database has no users.
+4. **Restore accounts:** Sign in on **3.5.0**, open **Utilities**, and **Upload cache files** with the ZIP from step 1. Verify accounts and certificates in the UI before decommissioning **3.3.4**.
+5. **Re-create operators:** Users, API keys, and JWT sessions from **3.3.4** are not migrated automatically — recreate users/API keys in **3.5.0** as needed.
+
+**Also check when upgrading:**
+
+- **Operations:** Retarget alerts from lease **`certs-ui-primary`** to **`certs-ui-bootstrap`** and **`certs-ui-renewal-sweep`**.
+- **Web UI build:** Configure npm auth for **`@maks-it.com/*`** (see **`src/MaksIT.WebUI/.npmrc`**) when building the client image locally.
+- **E2E:** **`dotnet test`** on **`MaksIT.CertsUI.Client.Tests`** with **`Category=E2E`**; set **`CERTSUI_E2E_EXPECT_MIN_DISTINCT_INSTANCES=2`** for HA (PowerShell E2E defaults to **1** for Docker Compose).
+- **Repo utils:** **`utils/`** refreshed from **maksit-repoutils** 1.0.14 (`engines/`, `plugins/`, `modules/`, `tools/`). Run **`utils\Invoke-ReleasePackage.bat`** for release; **`utils\Invoke-TestEngine.bat`** for tests and coverage badges; refresh via **`utils\Update-RepoUtils.bat`** (set **`dryRun`: false** in **`utils/tools/Update-RepoUtils/scriptSettings.json`**).
 
 ## [3.3.4] - 2026-04-01
 
@@ -314,6 +170,3 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - Initial release.
-
-
-

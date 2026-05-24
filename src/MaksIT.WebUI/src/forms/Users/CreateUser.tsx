@@ -1,18 +1,20 @@
 import { FC, useMemo } from 'react'
-import { UserResponse } from '../../models/identity/user/UserResponse'
+import { UserResponse } from '../../models/user/UserResponse'
 import { array, boolean, object, RefinementCtx, string, ZodType } from 'zod'
-import { useFormState } from '../../hooks/useFormState'
-import { Offcanvas } from '../../components/Offcanvas'
-import { FormContainer, FormContent, FormFooter, FormHeader } from '../../components/FormLayout'
-import { ButtonComponent, CheckBoxComponent, TextBoxComponent } from '../../components/editors'
+import { useFormState } from '@maks-it.com/webui-core'
+import { Offcanvas } from '@maks-it.com/webui-components'
+import { FormContainer, FormContent, FormFooter, FormHeader } from '@maks-it.com/webui-components'
+import { ButtonComponent, CheckBoxComponent, TextBoxComponent } from '@maks-it.com/webui-components'
 import { EditUserScopes, EntityScopeFormProps, EntityScopeFormPropsSchema } from '../shared/EditScopes'
-import { addToast } from '../../components/Toast/addToast'
-import { CreateUserRequest, CreateUserRequestSchema } from '../../models/identity/user/CreateUserRequest'
+import { addToast } from '@maks-it.com/webui-components'
+import { CreateUserRequest, createCreateUserRequestSchema } from '../../models/user/CreateUserRequest'
 import { postData } from '../../axiosConfig'
 import { ApiRoutes, GetApiRoute } from '../../AppMap'
-import { deepCopy, hasFlag } from '../../functions'
+import { deepCopy, hasFlag } from '@maks-it.com/webui-core'
 import { useAppSelector } from '../../redux/hooks'
-import { ScopeEntityType, ScopePermission } from '../../models/engine/scopeEnums'
+import { ScopeEntityType } from '../../models/ScopeEntityType'
+import { ScopePermission } from '@maks-it.com/webui-core'
+import { refineCreateGlobalAdminAssignment } from '../../models/engine/globalAdminZod'
 
 
 // Form state interface and validation
@@ -64,6 +66,11 @@ const CreateUserFormSchema: ZodType<CreateUserFormProps> = object({
   }
 })
 
+const createCreateUserFormSchema = (actorIsGlobalAdmin: boolean): ZodType<CreateUserFormProps> =>
+  CreateUserFormSchema.superRefine((val, ctx) =>
+    refineCreateGlobalAdminAssignment(val, ctx, actorIsGlobalAdmin)
+  )
+
 interface CreateUserProps {
   isOpen?: boolean
   onSubmitted?: (entity: UserResponse) => void
@@ -78,7 +85,10 @@ const CreateUser: FC<CreateUserProps> = (props) => {
   const { identity } = useAppSelector(state => state.identity)
 
   const initialFormState = useMemo(createUserFormPropsProto, [])
-  const validationSchema = useMemo(() => CreateUserFormSchema, [])
+  const validationSchema = useMemo(
+    () => createCreateUserFormSchema(identity?.isGlobalAdmin ?? false),
+    [identity?.isGlobalAdmin]
+  )
 
   const {
     formState,
@@ -107,7 +117,7 @@ const CreateUser: FC<CreateUserProps> = (props) => {
       }))
     }
 
-    const request = CreateUserRequestSchema.safeParse(requestData)
+    const request = createCreateUserRequestSchema(identity?.isGlobalAdmin ?? false).safeParse(requestData)
 
     if (!request.success) {
       request.error.issues.forEach(error => {

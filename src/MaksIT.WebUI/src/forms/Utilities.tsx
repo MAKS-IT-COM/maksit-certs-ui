@@ -1,12 +1,12 @@
 import { FC, useState } from 'react'
-import { FormContainer, FormContent, FormFooter, FormHeader } from '../components/FormLayout'
-import { ButtonComponent, FileUploadComponent } from '../components/editors'
+import { FormContainer, FormContent, FormFooter, FormHeader } from '@maks-it.com/webui-components'
+import { ButtonComponent, FileUploadComponent } from '@maks-it.com/webui-components'
 import { ApiRoutes, GetApiRoute } from '../AppMap'
 import { deleteData, getBinary, getData, postFile } from '../axiosConfig'
-import { addToast } from '../components/Toast/addToast'
-import { extractFilenameFromHeaders, saveBinaryToDisk } from '../functions'
+import { addToast } from '@maks-it.com/webui-components'
+import { extractFilenameFromHeaders, saveBinaryToDisk } from '@maks-it.com/webui-core'
 import { downloadZip } from 'client-zip'
-import { HelloWorldResponse } from '../models/Agent/HelloWorldResponse'
+import { HelloWorldResponse } from '../models/agent/HelloWorldResponse'
 
 
 const Utilities: FC = () => {

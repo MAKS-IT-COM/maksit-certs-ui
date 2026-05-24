@@ -1,13 +1,13 @@
 import { FC } from 'react'
-import { ButtonComponent, TextBoxComponent } from '../../../components/editors'
-import { Offcanvas } from '../../../components/Offcanvas'
-import { PatchUserChangePasswordRequest, PatchUserChangePasswordRequestSchema } from '../../../models/identity/user/PatchUserRequest'
-import { useFormState } from '../../../hooks/useFormState'
-import { PatchOperation } from '../../../models/PatchOperation'
-import { UserResponse } from '../../../models/identity/user/UserResponse'
+import { ButtonComponent, TextBoxComponent } from '@maks-it.com/webui-components'
+import { Offcanvas } from '@maks-it.com/webui-components'
+import { PatchUserChangePasswordRequest, PatchUserChangePasswordRequestSchema } from '../../../models/user/PatchUserRequest'
+import { useFormState } from '@maks-it.com/webui-core'
+import { PatchOperation } from '@maks-it.com/webui-contracts'
+import { UserResponse } from '../../../models/user/UserResponse'
 import { ApiRoutes, GetApiRoute } from '../../../AppMap'
 import { patchData } from '../../../axiosConfig'
-import { FormContainer, FormContent, FormHeader } from '../../../components/FormLayout'
+import { FormContainer, FormContent, FormHeader } from '@maks-it.com/webui-components'
 
 interface ChangePasswordProps {
     userId: string;

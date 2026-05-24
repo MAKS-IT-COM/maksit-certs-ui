@@ -17,11 +17,11 @@ public class APIKeyController(
   private readonly IApiKeyService _apiKeyService = apiKeyService;
 
   #region Search
-  [ServiceFilter(typeof(JwtAuthorizationFilter))]
+  [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpPost("search")]
   [ProducesResponseType(typeof(PagedResponse<SearchAPIKeyResponse>), StatusCodes.Status200OK)]
   public IActionResult GetAPIKeys([FromBody] SearchAPIKeyRequest requestData) {
-    var jwtTokenDataResult = HttpContext.GetJwtTokenData();
+    var jwtTokenDataResult = HttpContext.GetActingJwtTokenData();
     if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
       return jwtTokenDataResult.ToActionResult();
 
@@ -31,11 +31,11 @@ public class APIKeyController(
     return result.ToActionResult();
   }
 
-  [ServiceFilter(typeof(JwtAuthorizationFilter))]
+  [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpPost("search/entity-scopes")]
   [ProducesResponseType(typeof(PagedResponse<SearchApiKeyEntityScopeResponse>), StatusCodes.Status200OK)]
   public IActionResult SearchApiKeyEntityScopes([FromBody] SearchApiKeyEntityScopeRequest requestData) {
-    var jwtTokenDataResult = HttpContext.GetJwtTokenData();
+    var jwtTokenDataResult = HttpContext.GetActingJwtTokenData();
     if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
       return jwtTokenDataResult.ToActionResult();
 
@@ -48,11 +48,11 @@ public class APIKeyController(
   #endregion
 
   #region Read
-  [ServiceFilter(typeof(JwtAuthorizationFilter))]
+  [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpGet("{apiKeyId:guid}")]
   [ProducesResponseType(typeof(ApiKeyResponse), StatusCodes.Status200OK)]
   public IActionResult ReadAPIKey([FromRoute] Guid apiKeyId) {
-    var jwtTokenDataResult = HttpContext.GetJwtTokenData();
+    var jwtTokenDataResult = HttpContext.GetActingJwtTokenData();
     if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
       return jwtTokenDataResult.ToActionResult();
 
@@ -64,11 +64,11 @@ public class APIKeyController(
   #endregion
 
   #region Create
-  [ServiceFilter(typeof(JwtAuthorizationFilter))]
+  [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpPost]
   [ProducesResponseType(typeof(ApiKeyResponse), StatusCodes.Status200OK)]
   public async Task<IActionResult> CreateAPIKey([FromBody] CreateApiKeyRequest request) {
-    var jwtTokenDataResult = HttpContext.GetJwtTokenData();
+    var jwtTokenDataResult = HttpContext.GetActingJwtTokenData();
     if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
       return jwtTokenDataResult.ToActionResult();
 
@@ -80,11 +80,11 @@ public class APIKeyController(
   #endregion
 
   #region Patch
-  [ServiceFilter(typeof(JwtAuthorizationFilter))]
+  [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpPatch("{apiKeyId:guid}")]
   [ProducesResponseType(typeof(ApiKeyResponse), StatusCodes.Status200OK)]
   public async Task<IActionResult> PatchApiKey(Guid apiKeyId, [FromBody] PatchApiKeyRequest request) {
-    var jwtTokenDataResult = HttpContext.GetJwtTokenData();
+    var jwtTokenDataResult = HttpContext.GetActingJwtTokenData();
     if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
       return jwtTokenDataResult.ToActionResult();
 
@@ -96,11 +96,11 @@ public class APIKeyController(
   #endregion
 
   #region Delete
-  [ServiceFilter(typeof(JwtAuthorizationFilter))]
+  [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpDelete("{apiKeyId:guid}")]
   [ProducesResponseType(StatusCodes.Status200OK)]
   public async Task<IActionResult> DeleteAPIKey([FromRoute] Guid apiKeyId) {
-    var jwtTokenDataResult = HttpContext.GetJwtTokenData();
+    var jwtTokenDataResult = HttpContext.GetActingJwtTokenData();
     if (!jwtTokenDataResult.IsSuccess || jwtTokenDataResult.Value == null)
       return jwtTokenDataResult.ToActionResult();
 

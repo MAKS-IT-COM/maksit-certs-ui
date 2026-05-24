@@ -1,8 +1,8 @@
 
 import { Routes } from 'react-router-dom'
 import { GetRoutes } from './AppMap'
-import { Loader } from './components/Loader'
-import { Toast } from './components/Toast'
+import { ToastContainer as Toast } from '@maks-it.com/webui-components'
+import { Loader } from './components'
 
 const App = () => {
 

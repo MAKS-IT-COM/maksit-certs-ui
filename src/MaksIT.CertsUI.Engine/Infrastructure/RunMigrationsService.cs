@@ -33,8 +33,9 @@ public sealed class RunMigrationsService(
       .Count(t => t.GetCustomAttribute<MigrationAttribute>(inherit: false) is not null);
     logger.LogInformation("FluentMigrator discovered {MigrationCount} migration type(s) in {Assembly}.", migrationTypeCount, typeof(BaselineCertsSchema).Assembly.GetName().Name);
 
+    await PostgresStartupWait.WaitUntilReadyAsync(config.ConnectionString, logger, cancellationToken).ConfigureAwait(false);
     await EnsureDatabaseExistsAsync(cancellationToken).ConfigureAwait(false);
-    await Task.Run(() => migrationRunner.MigrateUp(), cancellationToken).ConfigureAwait(false);
+    await PostgresStartupWait.MigrateUpWithRetryAsync(migrationRunner, logger, cancellationToken).ConfigureAwait(false);
     await CoordinationTableProvisioner.EnsureAsync(config.ConnectionString, cancellationToken).ConfigureAwait(false);
     await VerifyCoreSchemaAsync(cancellationToken).ConfigureAwait(false);
     logger.LogInformation("Certs database migrations completed.");

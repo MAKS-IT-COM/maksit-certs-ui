@@ -1,11 +1,8 @@
 import { Link, Route } from 'react-router-dom'
 import { HomePage } from './pages/HomePage'
 import { ComponentType, FC, ReactNode } from 'react'
-import { Layout } from './components/Layout'
-import { LoginScreen } from './components/LoginScreen'
-import { Authorization } from './components/Authorization'
-import { UserOffcanvas } from './components/UserOffcanvas'
-import { UserButton } from './components/UserButton'
+import { Layout } from '@maks-it.com/webui-components'
+import { Authorization, LoginScreen, UserButton, UserOffcanvas } from './components'
 import { UtilitiesPage } from './pages/UtilitiesPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { LetsEncryptTermsOfServicePage } from './pages/LetsEncryptTermsOfServicePage'
@@ -152,68 +149,8 @@ const AppMap: AppMapType[] = [
   },
 ]
 
-// AGENT_TEST = 'api/agent/test',
-
-
-
-
-enum ApiRoutes {
-
-  // Accounts
-  ACCOUNTS_GET = 'GET|/accounts',
-
-  ACCOUNT_POST = 'POST|/account',
-  ACCOUNT_GET = 'GET|/account/{accountId}',
-  ACCOUNT_PATCH = 'PATCH|/account/{accountId}',
-  ACCOUNT_DELETE = 'DELETE|/account/{accountId}',
-
-  // ACCOUNT_ID_CONTACTS = 'GET|/account/{accountId}/contacts',
-  // ACCOUNT_ID_CONTACT_ID = 'GET|/account/{accountId}/contact/{index}',
-
-  // ACCOUNT_ID_HOSTNAMES = 'GET|/account/{accountId}/hostnames',
-  // ACCOUNT_ID_HOSTNAME_ID = 'GET|/account/{accountId}/hostname/{index}',
-
-
-
-  // Certs flow
-  CERTS_FLOW_CONFIGURE_CLIENT = 'POST|/certs/configure-client',
-  CERTS_FLOW_TERMS_OF_SERVICE = 'GET|/certs/{sessionId}/terms-of-service',
-  CERTS_FLOW_CERTIFICATES_APPLY = 'POST|/certs/{accountId}/certificates/apply',
-
-  // Caches
-  FULL_CACHE_DOWNLOAD_GET = 'GET|/cache/download',
-  FULL_CACHE_UPLOAD_POST = 'POST|/cache/upload',
-  FULL_CACHE_DELETE = 'DELETE|/cache',
-
-  CACHE_DOWNLOAD_GET = 'GET|/cache/{accountId}/download/',
-  CACHE_UPLOAD_POST = 'POST|/cache/{accountId}/upload/',
-
-  // Agents
-  AGENT_TEST = 'GET|/agent/test',
-
-  // Secrets
-  generateSecret = 'GET|/secret/generatesecret',
-
-  // Identity
-  identitySearch = 'POST|/identity/search',
-  identitySearchUserScopes = 'POST|/identity/scopes/search',
-  identityGet = 'GET|/identity/user/{userId}',
-  identityPost = 'POST|/identity/user',
-  identityPatch = 'PATCH|/identity/user/{userId}',
-  identityDelete = 'DELETE|/identity/user/{userId}',
-
-  identityLogin = 'POST|/identity/login',
-  identityRefresh = 'POST|/identity/refresh',
-  identityLogout = 'POST|/identity/logout',
-
-  // API keys
-  apikeySearch = 'POST|/apikey/search',
-  apikeySearchEntityScopes = 'POST|/apikey/search/entity-scopes',
-  apikeyPost = 'POST|/apikey',
-  apikeyGet = 'GET|/apikey/{apiKeyId}',
-  apikeyPatch = 'PATCH|/apikey/{apiKeyId}',
-  apikeyDelete = 'DELETE|/apikey/{apiKeyId}',
-}
+export { ApiRoutes, GetApiRoute } from './apiRoutes'
+export type { ApiRoute } from './apiRoutes'
 
 const GetMenuItems = (linkArea: LinkArea) => {
   return AppMap.filter(item => item.linkArea?.includes(linkArea)).map((item, index) => {
@@ -258,25 +195,7 @@ const GetRoutes = () => {
   )
 }
 
-interface ApiRoute {
-  method: string,
-  route: string
-}
-
-const GetApiRoute = (apiRoute: ApiRoutes): ApiRoute => {
-  const apiUrl = window.RUNTIME_CONFIG?.API_URL || import.meta.env.VITE_API_URL
-
-  const [method, route] = apiRoute.split('|')
-
-  return {
-    method,
-    route: `${apiUrl}${route}`
-  }
-}
-
 export {
   GetMenuItems,
   GetRoutes,
-  ApiRoutes,
-  GetApiRoute
 }

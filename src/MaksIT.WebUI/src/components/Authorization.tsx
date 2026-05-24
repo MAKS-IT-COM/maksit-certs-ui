@@ -4,46 +4,41 @@ import { useAppDispatch, useAppSelector } from '../redux/hooks'
 import { setIdentityFromLocalStorage } from '../redux/slices/identitySlice'
 
 interface AuthorizationProps {
-  children: React.ReactNode;
+  children: React.ReactNode
 }
 
-const Authorization: FC<AuthorizationProps> = (props) => {
-  const { children } = props
+const Authorization: FC<AuthorizationProps> = ({ children }) => {
+  const dispatch = useAppDispatch()
+  const { identity, hydrated } = useAppSelector((s) => s.identity)
 
   const navigate = useNavigate()
   const location = useLocation()
-  const dispatch = useAppDispatch()
-  const { identity, hydrated } = useAppSelector((state) => state.identity)
 
   const isTokenExpired = useMemo(() => {
-    if (!identity || !identity.refreshTokenExpiresAt)
+    if (!identity?.refreshTokenExpiresAt)
       return true
 
     return new Date(identity.refreshTokenExpiresAt) < new Date()
   }, [identity])
 
   useEffect(() => {
-    // Load identity from local storage on first mount
-    if (!hydrated) {
+    if (!hydrated)
       dispatch(setIdentityFromLocalStorage())
-    }
   }, [dispatch, hydrated])
 
   useEffect(() => {
-    if (!hydrated) return
+    if (!hydrated)
+      return
 
     if (isTokenExpired) {
       navigate('/login', { replace: true, state: { from: location } })
     }
   }, [hydrated, isTokenExpired, navigate, location])
 
-  if (!hydrated) {
-    return <></>
-  }
+  if (!hydrated)
+    return null
 
-  return !isTokenExpired
-    ? children
-    : <></>
+  return !isTokenExpired ? children : null
 }
 
 export { Authorization }

@@ -1,32 +1,39 @@
 import { FC, useCallback, useEffect, useState } from 'react'
-import { FormContainer, FormContent, FormHeader } from '../../components/FormLayout'
-import { Offcanvas } from '../../components/Offcanvas'
+import { FormContainer, FormContent, FormHeader } from '@maks-it.com/webui-components'
+import { Offcanvas } from '@maks-it.com/webui-components'
 import { CreateApiKey } from './CreateApiKey'
 import { useAppSelector } from '../../redux/hooks'
 import { deleteData, postData } from '../../axiosConfig'
 import { ApiRoutes, GetApiRoute } from '../../AppMap'
-import { PagedResponse } from '../../models/certsUI/common/PagedResponse'
-import { SearchAPIKeyRequest } from '../../models/certsUI/apiKeys/search/SearchAPIKeyRequest'
-import { SearchAPIKeyResponse } from '../../models/certsUI/apiKeys/search/SearchAPIKeyResponse'
-import { ApiKeyResponse } from '../../models/certsUI/apiKeys/ApiKeyResponse'
-import { createColumn, createColumns, DataTable, DataTableFilter, DataTableLabel } from '../../components/DataTable'
+import { PagedResponse } from '@maks-it.com/webui-contracts'
+import { SearchApiKeyRequest } from '../../models/apiKey/search/SearchApiKeyRequest'
+import { SearchApiKeyResponse } from '../../models/apiKey/search/SearchApiKeyResponse'
+import { ApiKeyResponse } from '../../models/apiKey/ApiKeyResponse'
+import {
+  createColumn,
+  createColumns,
+  DataTable,
+  DataTableFilter,
+  DataTableLabel,
+} from '@maks-it.com/webui-components'
 import { EditApiKey } from './EditApiKey'
-import { hasFlag } from '../../functions'
-import { ScopeEntityType, ScopePermission } from '../../models/engine/scopeEnums'
+import { hasFlag } from '@maks-it.com/webui-core'
+import { ScopeEntityType } from '../../models/ScopeEntityType'
+import { ScopePermission } from '@maks-it.com/webui-core'
 
 
 const SearchApiKey: FC = () => {
 
   const { identity } = useAppSelector(state => state.identity)
 
-  const [pagedRequest, setPagedRequest] = useState<SearchAPIKeyRequest>({})
-  const [rawd, setRawd] = useState<PagedResponse<SearchAPIKeyResponse> | undefined>(undefined)
+  const [pagedRequest, setPagedRequest] = useState<SearchApiKeyRequest>({})
+  const [rawd, setRawd] = useState<PagedResponse<SearchApiKeyResponse> | undefined>(undefined)
 
   const [apiKeyId, setApiKeyId] = useState<string | undefined>(undefined)
   const [creating, setCreating] = useState<boolean>(false)
 
   const columns = createColumns([
-    createColumn<SearchAPIKeyResponse, 'id'>({
+    createColumn<SearchApiKeyResponse, 'id'>({
       id: 'id',
       accessorKey: 'id',
       header: 'Id',
@@ -44,7 +51,7 @@ const SearchApiKey: FC = () => {
         return <DataTableLabel type={'normal'} value={value} />
       }
     }),
-    createColumn<SearchAPIKeyResponse, 'description'>({
+    createColumn<SearchApiKeyResponse, 'description'>({
       id: 'description',
       accessorKey: 'description',
       header: 'Description',
@@ -60,7 +67,7 @@ const SearchApiKey: FC = () => {
         <DataTableLabel type={'normal'} value={props.value ?? ''} />
       ),
     }),
-    createColumn<SearchAPIKeyResponse, 'createdAt'>({
+    createColumn<SearchApiKeyResponse, 'createdAt'>({
       id: 'createdAt',
       accessorKey: 'createdAt',
       header: 'Created At',
@@ -76,7 +83,7 @@ const SearchApiKey: FC = () => {
         <DataTableLabel type={'normal'} value={props.value} dataType={'date'} />
       ),
     }),
-    createColumn<SearchAPIKeyResponse, 'expiresAt'>({
+    createColumn<SearchApiKeyResponse, 'expiresAt'>({
       id: 'expiresAt',
       accessorKey: 'expiresAt',
       header: 'Expires At',
@@ -92,7 +99,7 @@ const SearchApiKey: FC = () => {
         <DataTableLabel type={'normal'} value={props.value ?? ''} />
       ),
     }),
-    createColumn<SearchAPIKeyResponse, 'isGlobalAdmin'>({
+    createColumn<SearchApiKeyResponse, 'isGlobalAdmin'>({
       id: 'isGlobalAdmin',
       accessorKey: 'isGlobalAdmin',
       header: 'Global Admin',
@@ -113,7 +120,7 @@ const SearchApiKey: FC = () => {
   ])
 
   const loadData = useCallback(() => {
-    postData<SearchAPIKeyRequest, PagedResponse<SearchAPIKeyResponse>>(GetApiRoute(ApiRoutes.apikeySearch).route, pagedRequest).then((response) => {
+    postData<SearchApiKeyRequest, PagedResponse<SearchApiKeyResponse>>(GetApiRoute(ApiRoutes.apikeySearch).route, pagedRequest).then((response) => {
       setRawd(response.payload ?? undefined)
     }).finally(() => {})
   }, [pagedRequest])

@@ -109,6 +109,7 @@ public class User : DomainDocumentBase<Guid> {
 
     (PasswordSalt, PasswordHash) = saltedHash.Value;
     CreatedAt = DateTime.UtcNow;
+    IsActive = true;
   }
   #endregion
 

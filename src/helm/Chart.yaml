@@ -2,7 +2,7 @@ apiVersion: v2
 name: certs-ui
 description: MaksIT CertsUI
 type: application
-# In git, version/appVersion are placeholders only. HelmPush (Release-Package) replaces
+# In git, version/appVersion are placeholders only. DotNetHelmPush (Invoke-ReleasePackage) replaces
 # them with the app semver from the release pipeline (git tag / DotNetReleaseVersion) before package and push.
 version: 0.0.0
 appVersion: "0.0.0"

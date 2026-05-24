@@ -1,15 +1,15 @@
 import { FC, useCallback, useEffect, useState } from 'react'
 import { array, boolean, object, string } from 'zod'
-import { ApiKeyResponse } from '../../models/certsUI/apiKeys/ApiKeyResponse'
-import { useFormState } from '../../hooks/useFormState'
+import { ApiKeyResponse } from '../../models/apiKey/ApiKeyResponse'
+import { useFormState } from '@maks-it.com/webui-core'
 import { getData, patchData } from '../../axiosConfig'
 import { ApiRoutes, GetApiRoute } from '../../AppMap'
-import { PatchApiKeyRequest, PatchApiKeyRequestSchema } from '../../models/certsUI/apiKeys/PatchApiKeyRequest'
-import type { PatchApiKeyEntityScopeRequest } from '../../models/certsUI/apiKeys/PatchApiKeyEntityScopeRequest'
-import { deepCopy, deepDelta, deltaHasOperations, ENTITY_SCOPES_ARRAY_POLICY } from '../../functions'
-import { addToast } from '../../components/Toast/addToast'
-import { FormContainer, FormContent, FormFooter, FormHeader } from '../../components/FormLayout'
-import { ButtonComponent, CheckBoxComponent, DateTimePickerComponent, SecretComponent, TextBoxComponent } from '../../components/editors'
+import { PatchApiKeyRequest, createPatchApiKeyRequestSchema } from '../../models/apiKey/PatchApiKeyRequest'
+import type { PatchApiKeyEntityScopeRequest } from '../../models/apiKey/PatchApiKeyEntityScopeRequest'
+import { deepCopy, deepDelta, deltaHasOperations, ENTITY_SCOPES_ARRAY_POLICY } from '@maks-it.com/webui-core'
+import { addToast } from '@maks-it.com/webui-components'
+import { FormContainer, FormContent, FormFooter, FormHeader } from '@maks-it.com/webui-components'
+import { ButtonComponent, CheckBoxComponent, DateTimePickerComponent, SecretComponent, TextBoxComponent } from '@maks-it.com/webui-components'
 import { EditUserScopes, EntityScopeFormProps, EntityScopeFormPropsSchema } from '../shared/EditScopes'
 import { useAppSelector } from '../../redux/hooks'
 
@@ -158,17 +158,16 @@ const EditApiKey: FC<EditApiKeyProps> = (props) => {
       return
     }
 
-    const request = PatchApiKeyRequestSchema.safeParse(delta)
-    if (!request.success) {
-      request.error.issues.forEach(error => {
+    const validated = createPatchApiKeyRequestSchema(identity?.isGlobalAdmin ?? false).safeParse(delta)
+    if (!validated.success) {
+      validated.error.issues.forEach(error => {
         addToast(error.message, 'error')
       })
-
       return
     }
 
     patchData<PatchApiKeyRequest, ApiKeyResponse>(GetApiRoute(ApiRoutes.apikeyPatch).route
-      .replace('{apiKeyId}', apiKeyId), request.data)
+      .replace('{apiKeyId}', apiKeyId), validated.data)
       .then(response => {
         if (!response.ok || !response.payload) return
 
@@ -233,6 +232,7 @@ const EditApiKey: FC<EditApiKeyProps> = (props) => {
           colspan={12}
           id={formState.id}
           entityScopes={formState.entityScopes}
+          targetIsGlobalAdmin={formState.isGlobalAdmin ?? false}
           onChange={(entityScopes) => handleInputChange('entityScopes', entityScopes)}
         />
         {identity?.isGlobalAdmin && (

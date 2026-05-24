@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MaksIT.CertsUI.Client.PowerShell</RootNamespace>
+    <Description>PowerShell module with cmdlets for MaksIT CertsUI API (uses MaksIT.CertsUI.Client).</Description>
+    <Version>1.0.0</Version>
+    <PackageId>MaksIT.CertsUI.Client.PowerShell</PackageId>
+    <Authors>MaksIT</Authors>
+    <AssemblyName>MaksIT.CertsUI.Client.PowerShell</AssemblyName>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Management.Automation" Version="7.6.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MaksIT.CertsUI.Client\MaksIT.CertsUI.Client.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="MaksIT.CertsUI.Client.PowerShell.psd1">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

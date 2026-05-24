@@ -1,6 +1,6 @@
 import { FC, useEffect, useState } from 'react'
 
-import { FormContainer, FormContent, FormFooter, FormHeader } from '../components/FormLayout'
+import { FormContainer, FormContent, FormFooter, FormHeader } from '@maks-it.com/webui-components'
 import { ApiRoutes, GetApiRoute } from '../AppMap'
 import { getData, postData } from '../axiosConfig'
 

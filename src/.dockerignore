@@ -1,3 +1,4 @@
+# When build context is MaksIT/ (parent of maksit-certs-ui and maksit-webui).
 **/.classpath
 **/.dockerignore
 **/.env
@@ -19,8 +20,10 @@
 **/node_modules
 **/npm-debug.log
 **/obj
+**/dist
 **/secrets.dev.yaml
 **/values.dev.yaml
+maksit-vault/
 LICENSE
 README.md
 !**/.gitignore

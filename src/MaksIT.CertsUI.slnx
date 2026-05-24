@@ -13,6 +13,10 @@
   <Project Path="docker-compose.dcproj">
     <Build Solution="*|Any CPU" />
   </Project>
+  <Project Path="MaksIT.CertsUI.Client.PowerShell/MaksIT.CertsUI.Client.PowerShell.csproj" />
+  <Project Path="MaksIT.CertsUI.Client.Tests/MaksIT.CertsUI.Client.Tests.csproj" />
+  <Project Path="MaksIT.CertsUI.Client/MaksIT.CertsUI.Client.csproj" />
+  <Project Path="MaksIT.CertsUI.Contracts/MaksIT.CertsUI.Contracts.csproj" />
   <Project Path="MaksIT.CertsUI.Engine.Tests/MaksIT.CertsUI.Engine.Tests.csproj" />
   <Project Path="MaksIT.CertsUI.Engine/MaksIT.CertsUI.Engine.csproj" />
   <Project Path="MaksIT.CertsUI.Tests/MaksIT.CertsUI.Tests.csproj" />

@@ -42,6 +42,7 @@ If you find this project useful, please consider supporting its development:
     - [Secrets and Configuration](#secrets-and-configuration)
     - [Running the Project with Docker Compose](#running-the-project-with-docker-compose)
   - [MaksIT.CertsUI Server installation on Kubernetes](#maksitcertsui-server-installation-on-kubernetes)
+    - [1. Prerequisites (PostgreSQL)](#1-prerequisites-postgresql)
     - [2. Prepare Namespace, Secrets, and ConfigMap](#2-prepare-namespace-secrets-and-configmap)
     - [3. Create a Minimal Custom Values File](#3-create-a-minimal-custom-values-file)
     - [4. Install the Helm Chart](#4-install-the-helm-chart)
@@ -244,33 +245,25 @@ The Webapi is designed for deployment in secure environments such as Kubernetes 
 
 ## MaksIT.CertsUI Server Installation on Linux with Podman Compose
 
-Podman Compose usage to orchestrate multiple **MaksIT.CertsUI** services on Linux.
+Podman Compose usage to orchestrate **MaksIT.CertsUI** on Linux. Unlike the [Kubernetes](#maksitcertsui-server-installation-on-kubernetes) Helm chart, a full Compose stack **includes PostgreSQL** in the same project (service name **`postgres`**). From **3.5.0** onward, ACME sessions, HTTP-01 tokens, and identity data live in PostgreSQL—the server container does **not** need **`/acme`**, **`/data`**, or **`/tmp`** volume mounts.
+
+For day-to-day development from a git clone, prefer [`src/docker-compose.yml`](src/docker-compose.yml) and [`src/docker-compose.override.yml`](src/docker-compose.override.yml) in this repository (build contexts, dev overrides, optional pgAdmin). The steps below describe a **production-style** layout under `/opt/Compose/MaksIT.CertsUI` using registry images.
 
 ### Prerequisites
 
 - [Podman](https://podman.io/getting-started/installation)
-
-- sudo dnf install podman-compose -y
-
-
-
+- `podman-compose` (for example `sudo dnf install podman-compose -y`)
 - Create these folders:
-  - `/opt/Compose/MaksIT.CertsUI/acme`
-  - `/opt/Compose/MaksIT.CertsUI/data`
-  - `/opt/Compose/MaksIT.CertsUI/tmp`
   - `/opt/Compose/MaksIT.CertsUI/configMap`
   - `/opt/Compose/MaksIT.CertsUI/secrets`
   - `/opt/Compose/MaksIT.CertsUI/client`
-
-Bash command to use:
+  - `/opt/Compose/MaksIT.CertsUI/postgresql/data` (Postgres data directory)
 
 ```bash
-sudo mkdir -p /opt/Compose/MaksIT.CertsUI/acme \
-  /opt/Compose/MaksIT.CertsUI/data \
-  /opt/Compose/MaksIT.CertsUI/tmp \
-  /opt/Compose/MaksIT.CertsUI/configMap \
+sudo mkdir -p /opt/Compose/MaksIT.CertsUI/configMap \
   /opt/Compose/MaksIT.CertsUI/secrets \
-  /opt/Compose/MaksIT.CertsUI/client
+  /opt/Compose/MaksIT.CertsUI/client \
+  /opt/Compose/MaksIT.CertsUI/postgresql/data
 ```
 
 Create the following files in the appropriate folders:
@@ -282,14 +275,17 @@ sudo tee /opt/Compose/MaksIT.CertsUI/secrets/appsecrets.json > /dev/null <<EOF
 {
   "Configuration": {
     "CertsEngineConfiguration": {
-      "ConnectionString": "Host=postgres;Port=5432;Database=certsui;Username=certsui;Password=certsui;SslMode=Prefer"
-    },
-    "Auth": {
-      "Secret": "<your-auth-secret>",
-      "Pepper": "<your-pepper>"
-    },
-    "Agent": {
-      "AgentKey": "<your-agent-key>"
+      "ConnectionString": "Host=postgres;Port=5432;Database=certsui;Username=certsui;Password=certsui;SslMode=Prefer",
+      "Admin": {
+        "Password": "<your-admin-password>"
+      },
+      "JwtSettingsConfiguration": {
+        "JwtSecret": "<your-auth-secret>",
+        "PasswordPepper": "<your-pepper>"
+      },
+      "Agent": {
+        "AgentKey": "<your-agent-key>"
+      }
     }
   }
 }
@@ -297,8 +293,7 @@ EOF
 ```
 
 **Note:**  
-PostgreSQL is configured as **`Configuration:CertsEngineConfiguration:ConnectionString`**. For Docker Compose, use the Postgres service hostname (here **`postgres`**) and credentials that match **`docker-compose.override.yml`** (**`certsui`** / **`certsui`** / database **`certsui`** by default). The host also accepts legacy **`ConnectionStrings:Certs`** if needed. Replace placeholder values `<your-auth-secret>`, `<your-pepper>`, `<your-agent-key>`, with secure, your environment-specific values.
-Make sure `<your-agent-key>` matches the key configured in your agent deployment.
+Secrets use **`Configuration:CertsEngineConfiguration`** (same shape as [`src/helm/values.yaml`](src/helm/values.yaml) templated `appsecrets.json`). Set **`ConnectionString`** to the Compose Postgres service hostname (**`postgres`**) and credentials that match the **`postgres`** service below (**`certsui`** / **`certsui`** / database **`certsui`** by default, aligned with [`src/docker-compose.override.yml`](src/docker-compose.override.yml)). Legacy **`ConnectionStrings:Certs`** is still accepted if **`ConnectionString`** is empty. Replace `<your-admin-password>`, `<your-auth-secret>`, `<your-pepper>`, and `<your-agent-key>` with secure values. Ensure `<your-agent-key>` matches your edge agent deployment.
 
 **2. Create the file  `/opt/Compose/MaksIT.CertsUI/configMap/appsettings.json` with this command:**
 
@@ -311,27 +306,45 @@ sudo tee /opt/Compose/MaksIT.CertsUI/configMap/appsettings.json <<EOF
       "Microsoft.AspNetCore": "Warning"
     }
   },
+  "AllowedHosts": "*",
   "Configuration": {
-    "Auth": {
-      "Issuer": "<your-issuer>",
-      "Audience": "<your-audience>",
-      "Expiration": 15,
-      "RefreshExpiration": 180
-    },
-    "Agent": {
-      "AgentHostname": "http://<your-agent-hostname>",
-      "AgentPort": 5000,
-      "ServiceToReload": "haproxy"
-    },
-    "Production": "https://acme-v02.api.letsencrypt.org/directory",
-    "Staging": "https://acme-staging-v02.api.letsencrypt.org/directory",
+    "CertsEngineConfiguration": {
+      "AutoSyncSchema": true,
+      "Admin": {
+        "Username": "admin"
+      },
+      "JwtSettingsConfiguration": {
+        "JwtSecret": "",
+        "Issuer": "<your-issuer>",
+        "Audience": "<your-audience>",
+        "ExpiresIn": 15,
+        "RefreshTokenExpiresIn": 180,
+        "PasswordPepper": ""
+      },
+      "TwoFactorSettingsConfiguration": {
+        "Label": "CertsUI",
+        "Issuer": "MaksIT.CertsUI",
+        "Algorithm": "",
+        "Digits": 6,
+        "Period": 30,
+        "TimeTolerance": 1
+      },
+      "Agent": {
+        "AgentHostname": "http://<your-agent-hostname>",
+        "AgentPort": 5000,
+        "AgentKey": "",
+        "ServiceToReload": "haproxy"
+      },
+      "Production": "https://acme-v02.api.letsencrypt.org/directory",
+      "Staging": "https://acme-staging-v02.api.letsencrypt.org/directory"
+    }
   }
 }
 EOF
 ```
 
 **Note:**  
-ACME sessions, HTTP-01 challenges, Terms of Service caching, and registration data live in PostgreSQL. Replace all JWT-related placeholder values `<your-issuer>`, `<your-audience>` and `<your-agent-hostname>` with your environment-specific values.
+Non-secret settings live under **`Configuration:CertsEngineConfiguration`** (see [`src/MaksIT.CertsUI/appsettings.json`](src/MaksIT.CertsUI/appsettings.json)). Keep **`JwtSecret`**, **`PasswordPepper`**, **`AgentKey`**, and admin password in **`appsecrets.json`** (empty strings here). ACME sessions, HTTP-01 challenges, ToS cache, and registration data are stored in PostgreSQL. Replace JWT and agent placeholders with your environment values.
 
 **3. Create the file `/opt/Compose/MaksIT.CertsUI/client/config.js` with this command:**
 
@@ -355,7 +368,12 @@ sudo tee /opt/Compose/MaksIT.CertsUI/docker-compose.yml <<EOF
 services:
   reverseproxy:
     image: cr.maks-it.com/certs-ui/reverseproxy:latest
-    container_name: reverseproxy
+    container_name: maksit-certs-ui-reverseproxy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ReverseProxy__Clusters__webapiCluster__Destinations__d1__Address: "http://server:5000/"
+      ReverseProxy__Clusters__webuiCluster__Destinations__d1__Address: "http://client:5173/"
     ports:
       - "8080:8080"
     depends_on:
@@ -366,24 +384,36 @@ services:
 
   client:
     image: cr.maks-it.com/certs-ui/client:latest
-    container_name: certs-ui-client
+    container_name: maksit-certs-ui-client
     volumes:
-    - /opt/Compose/MaksIT.CertsUI/client/config.js:/app/dist/config.js:ro
+      - /opt/Compose/MaksIT.CertsUI/client/config.js:/app/dist/config.js:ro
     networks:
       - certs-ui-network
 
   server:
     image: cr.maks-it.com/certs-ui/server:latest
-    container_name: certs-ui-server
+    container_name: maksit-certs-ui-server
     environment:
-      - ASPNETCORE_ENVIRONMENT=Production
-      - ASPNETCORE_HTTP_PORTS=5000
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "5000"
     volumes:
-      - /opt/Compose/MaksIT.CertsUI/acme:/acme
-      - /opt/Compose/MaksIT.CertsUI/data:/data
-      - /opt/Compose/MaksIT.CertsUI/tmp:/tmp
       - /opt/Compose/MaksIT.CertsUI/configMap/appsettings.json:/configMap/appsettings.json:ro
       - /opt/Compose/MaksIT.CertsUI/secrets/appsecrets.json:/secrets/appsecrets.json:ro
+    depends_on:
+      - postgres
+    networks:
+      - certs-ui-network
+
+  postgres:
+    image: postgres:16
+    container_name: maksit-certs-ui-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: certsui
+      POSTGRES_PASSWORD: certsui
+      POSTGRES_DB: certsui
+    volumes:
+      - /opt/Compose/MaksIT.CertsUI/postgresql/data:/var/lib/postgresql/data
     networks:
       - certs-ui-network
 
@@ -394,76 +424,41 @@ EOF
 ```
 
 **Note:**  
-  - Adjust volume paths if changed
+Adjust volume paths if you use a different base directory. Optional pgAdmin and dev bind mounts are shown in [`src/docker-compose.override.yml`](src/docker-compose.override.yml).
 
-**1. Run Podman compose in Rootfull mode (The only supported by podman-compose):**
+**1. Run Podman compose in Rootfull mode (the only mode supported by podman-compose):**
 
 ```bash
-sudo chown -R 1654:1654 /opt/Compose/MaksIT.CertsUI/{data,acme}
-sudo chmod -R 775 /opt/Compose/MaksIT.CertsUI/{data,acme}
-
-sudo chown -R 1654:1654 /opt/Compose/MaksIT.CertsUI/tmp
-sudo chmod 1777 /opt/Compose/MaksIT.CertsUI/tmp
-
 sudo su -
 sudo bash -c 'echo "export PATH=/usr/local/bin:/usr/local/sbin:\$PATH" >> /root/.bashrc'
 
 exit
 sudo su -
 
-podman compose -f docker-compose.yml up --build
+podman compose -f docker-compose.yml up
 ```
 
-**2. Run Podman compose in Rootless mode (Not supported by podman-compose on Alma10, havent tested):**
+Use `up --build` only when building images from source (for example from [`src/docker-compose.yml`](src/docker-compose.yml)).
 
-Correct UID and GID for `app` user inside container:
+**2. Run Podman compose in Rootless mode (not supported by podman-compose on Alma10; not tested):**
+
+Map container UIDs to your user subuid range if volume permissions fail (for example under `postgresql/data`). Inspect the server image user if needed:
 
 ```bash
-[root@test-podman maksym]# podman exec certs-ui-server id -u app
-1654
-[root@test-podman maksym]# podman exec certs-ui-server id -g app
-1654
+podman exec maksit-certs-ui-server id -u app
 ```
 
-Then you have to find your `subuid` and `subgid` ranges:
+Then run podman compose as your normal user:
 
 ```bash
-[<youruser>@<yourdomain> ~]$ grep $(whoami) /etc/subuid
-<youruser>:524288:65536
-[<youruser>@<yourdomain> ~]$ grep $(whoami) /etc/subgid
-<youruser>:524288:65536
+podman compose -f docker-compose.yml up
 ```
 
-Calculate host UID and GID that maps to container's `app
-
-```
-host_uid = subuid_start + container_uid
-         = 524288 + 1654
-         = 525942
-
-host_gid = 525942
-```
-
-Apply correct ownership and permissions to the volumes:
-
-```bash
-sudo chown -R 525942:525942 /opt/Compose/MaksIT.CertsUI/{data,acme}
-sudo chmod -R 775 /opt/Compose/MaksIT.CertsUI/{data,acme}
-
-sudo chown -R 525942:525942 /opt/Compose/MaksIT.CertsUI/tmp
-sudo chmod 1777 /opt/Compose/MaksIT.CertsUI/tmp
-```
-
-Then run podman compose as normal user:
-
-```bash
-podman compose -f docker-compose.yml up --build
-```
-
-This command builds and starts the following services:
-- **reverseproxy**: YARP edge on port 8080; routes `/api`, `/.well-known/`, and the SPA to **`server`** / **`client`** (same layout as `src/docker-compose.yml` in this repo).
-- **client**: WebUI (Vite) — Compose service name used by YARP (`http://client:5173/` inside the stack).
-- **server**: WebAPI — Compose service name used by YARP (`http://server:5000/` inside the stack).
+This command pulls and starts:
+- **reverseproxy**: YARP edge on port **8080**; routes `/api`, `/.well-known/`, and the SPA to **`server`** / **`client`** (same layout as [`src/docker-compose.yml`](src/docker-compose.yml)).
+- **client**: WebUI — runtime **`config.js`** mount; YARP upstream `http://client:5173/`.
+- **server**: WebAPI — config + secrets mounts only; waits on **`postgres`**; YARP upstream `http://server:5000/`.
+- **postgres**: PostgreSQL **16** with persistent data under **`postgresql/data`**.
 
 **Stop the services:**
 
@@ -478,27 +473,23 @@ podman compose -f docker-compose.yml down
 
 ## MaksIT.CertsUI Server Installation on Windows with Docker Compose
 
-Use Docker Compose to orchestrate multiple **MaksIT.CertsUI** services on Windows.
+Use Docker Compose to orchestrate **MaksIT.CertsUI** on Windows. Like the [Linux Podman](#maksitcertsui-server-installation-on-linux-with-podman-compose) guide, this stack **includes PostgreSQL** (`postgres` service). **3.5.0+** does not use **`/acme`**, **`/data`**, or **`/tmp`** mounts on the server. For development from a clone, use [`src/docker-compose.yml`](src/docker-compose.yml) and [`src/docker-compose.override.yml`](src/docker-compose.override.yml).
 
 ### Prerequisites
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (includes Docker Compose)
 - Create these folders:
-  - `C:\Compose\MaksIT.CertsUI\acme`
-  - `C:\Compose\MaksIT.CertsUI\data`
-  - `C:\Compose\MaksIT.CertsUI\tmp`
   - `C:\Compose\MaksIT.CertsUI\configMap`
   - `C:\Compose\MaksIT.CertsUI\secrets`
-
-Powershell command to use:
+  - `C:\Compose\MaksIT.CertsUI\client`
+  - `C:\Compose\MaksIT.CertsUI\postgresql\data`
 
 ```powershell
 New-Item -Path `
-  'C:\Compose\MaksIT.CertsUI\acme', `
-  'C:\Compose\MaksIT.CertsUI\data', `
-  'C:\Compose\MaksIT.CertsUI\tmp', `
   'C:\Compose\MaksIT.CertsUI\configMap', `
-  'C:\Compose\MaksIT.CertsUI\secrets' `
+  'C:\Compose\MaksIT.CertsUI\secrets', `
+  'C:\Compose\MaksIT.CertsUI\client', `
+  'C:\Compose\MaksIT.CertsUI\postgresql\data' `
   -ItemType Directory -Force
 ```
 
@@ -513,14 +504,17 @@ Set-Content -Path 'C:\Compose\MaksIT.CertsUI\secrets\appsecrets.json' -Value @'
 {
   "Configuration": {
     "CertsEngineConfiguration": {
-      "ConnectionString": "Host=postgres;Port=5432;Database=certsui;Username=certsui;Password=certsui;SslMode=Prefer"
-    },
-    "Auth": {
-      "Secret": "<your-auth-secret>",
-      "Pepper": "<your-pepper>"
-    },
-    "Agent": {
-      "AgentKey": "<your-agent-key>"
+      "ConnectionString": "Host=postgres;Port=5432;Database=certsui;Username=certsui;Password=certsui;SslMode=Prefer",
+      "Admin": {
+        "Password": "<your-admin-password>"
+      },
+      "JwtSettingsConfiguration": {
+        "JwtSecret": "<your-auth-secret>",
+        "PasswordPepper": "<your-pepper>"
+      },
+      "Agent": {
+        "AgentKey": "<your-agent-key>"
+      }
     }
   }
 }
@@ -528,8 +522,7 @@ Set-Content -Path 'C:\Compose\MaksIT.CertsUI\secrets\appsecrets.json' -Value @'
 ```
 
 **Note:**  
-PostgreSQL is **`Configuration:CertsEngineConfiguration:ConnectionString`**. For Docker Compose, use the Postgres service hostname (here **`postgres`**) and credentials that match **`docker-compose.override.yml`** (**`certsui`** defaults). Legacy **`ConnectionStrings:Certs`** is still supported. Replace placeholder values `<your-auth-secret>`, `<your-pepper>`, `<your-agent-key>`, with secure, your environment-specific values.
-Make sure `<your-agent-key>` matches the key configured in your agent deployment.
+Same secret layout as the [Linux Podman](#maksitcertsui-server-installation-on-linux-with-podman-compose) guide and Helm `appsecrets.json`. Use hostname **`postgres`** and **`certsui`** credentials matching the **`postgres`** service below. Legacy **`ConnectionStrings:Certs`** is still supported when **`ConnectionString`** is empty.
 
 **2. Create the file  `C:\Compose\MaksIT.CertsUI\configMap\appsettings.json` with this command:**
 
@@ -542,27 +535,45 @@ Set-Content -Path 'C:\Compose\MaksIT.CertsUI\configMap\appsettings.json' -Value 
       "Microsoft.AspNetCore": "Warning"
     }
   },
+  "AllowedHosts": "*",
   "Configuration": {
-    "Auth": {
-      "Issuer": "<your-issuer>",
-      "Audience": "<your-audience>",
-      "Expiration": 15,
-      "RefreshExpiration": 180
-    },
-    "Agent": {
-      "AgentHostname": "http://<your-agent-hostname>",
-      "AgentPort": 5000,
-      "ServiceToReload": "haproxy"
-    },
-    "Production": "https://acme-v02.api.letsencrypt.org/directory",
-    "Staging": "https://acme-staging-v02.api.letsencrypt.org/directory",
+    "CertsEngineConfiguration": {
+      "AutoSyncSchema": true,
+      "Admin": {
+        "Username": "admin"
+      },
+      "JwtSettingsConfiguration": {
+        "JwtSecret": "",
+        "Issuer": "<your-issuer>",
+        "Audience": "<your-audience>",
+        "ExpiresIn": 15,
+        "RefreshTokenExpiresIn": 180,
+        "PasswordPepper": ""
+      },
+      "TwoFactorSettingsConfiguration": {
+        "Label": "CertsUI",
+        "Issuer": "MaksIT.CertsUI",
+        "Algorithm": "",
+        "Digits": 6,
+        "Period": 30,
+        "TimeTolerance": 1
+      },
+      "Agent": {
+        "AgentHostname": "http://<your-agent-hostname>",
+        "AgentPort": 5000,
+        "AgentKey": "",
+        "ServiceToReload": "haproxy"
+      },
+      "Production": "https://acme-v02.api.letsencrypt.org/directory",
+      "Staging": "https://acme-staging-v02.api.letsencrypt.org/directory"
+    }
   }
 }
 '@
 ```
 
 **Note:**  
-ACME sessions, HTTP-01 challenges, Terms of Service caching, and registration data live in PostgreSQL. Replace all JWT-related placeholder values `<your-issuer>`, `<your-audience>` and `<your-agent-hostname>` with your environment-specific values.
+Non-secret settings under **`Configuration:CertsEngineConfiguration`**; keep JWT/agent/admin secrets in **`appsecrets.json`**. ACME and identity state are in PostgreSQL.
 
 **3. Create the file `C:\Compose\MaksIT.CertsUI\client\config.js` with this command:**
 
@@ -586,7 +597,12 @@ Set-Content -Path 'C:\Compose\MaksIT.CertsUI\docker-compose.yml' -Value @'
 services:
   reverseproxy:
     image: cr.maks-it.com/certs-ui/reverseproxy:latest
-    container_name: reverseproxy
+    container_name: maksit-certs-ui-reverseproxy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ReverseProxy__Clusters__webapiCluster__Destinations__d1__Address: "http://server:5000/"
+      ReverseProxy__Clusters__webuiCluster__Destinations__d1__Address: "http://client:5173/"
     ports:
       - "8080:8080"
     depends_on:
@@ -597,24 +613,36 @@ services:
 
   client:
     image: cr.maks-it.com/certs-ui/client:latest
-    container_name: certs-ui-client
+    container_name: maksit-certs-ui-client
     volumes:
-    - C:\Compose\MaksIT.CertsUI\client\config.js:/app/dist/config.js:ro
+      - C:\Compose\MaksIT.CertsUI\client\config.js:/app/dist/config.js:ro
     networks:
       - certs-ui-network
 
   server:
     image: cr.maks-it.com/certs-ui/server:latest
-    container_name: certs-ui-server
+    container_name: maksit-certs-ui-server
     environment:
-      - ASPNETCORE_ENVIRONMENT=Production
-      - ASPNETCORE_HTTP_PORTS=5000
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "5000"
     volumes:
-      - C:\Compose\MaksIT.CertsUI\acme:/acme
-      - C:\Compose\MaksIT.CertsUI\data:/data
-      - C:\Compose\MaksIT.CertsUI\tmp:/tmp
       - C:\Compose\MaksIT.CertsUI\configMap\appsettings.json:/configMap/appsettings.json:ro
       - C:\Compose\MaksIT.CertsUI\secrets\appsecrets.json:/secrets/appsecrets.json:ro
+    depends_on:
+      - postgres
+    networks:
+      - certs-ui-network
+
+  postgres:
+    image: postgres:16
+    container_name: maksit-certs-ui-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: certsui
+      POSTGRES_PASSWORD: certsui
+      POSTGRES_DB: certsui
+    volumes:
+      - C:\Compose\MaksIT.CertsUI\postgresql\data:/var/lib/postgresql/data
     networks:
       - certs-ui-network
 
@@ -625,16 +653,13 @@ networks:
 ```
 
 **Note:**  
-  - Adjust volume paths if changed
+Adjust paths if you use a different base directory.
 
 ```powershell
-docker compose -f docker-compose.yml up --build
+docker compose -f docker-compose.yml up
 ```
 
-This command builds and starts the following services:
-- **reverseproxy**: YARP edge on port 8080; routes `/api`, `/.well-known/`, and the SPA to **`server`** / **`client`** (same layout as `src/docker-compose.yml` in this repo).
-- **client**: WebUI (Vite) — Compose service name used by YARP (`http://client:5173/` inside the stack).
-- **server**: WebAPI — Compose service name used by YARP (`http://server:5000/` inside the stack).
+This pulls and starts **reverseproxy**, **client**, **server**, and **postgres** (see the [Linux](#running-the-project-with-podman-compose) service list for roles). Use `docker compose ... up --build` only when building images locally from source.
 
 **Stop the services:**
 
@@ -656,6 +681,21 @@ The MaksIT.CertsUI Helm chart is distributed via the MaksIT container registry u
 **What is Helm OCI?**  
 Helm OCI support enables you to pull and install Helm charts directly from container registries (such as Harbor, Docker Hub, or GitHub Container Registry), just like you would with Docker images. This approach is secure, versioned, and recommended for modern Kubernetes deployments.
 
+### 1. Prerequisites (PostgreSQL)
+
+The Helm chart in [`src/helm`](src/helm) deploys **server**, **client**, and **reverseproxy** only. It **does not install PostgreSQL**. You must provide a running PostgreSQL instance **before** installing or upgrading this chart.
+
+**Install order:** PostgreSQL ready → database and role created → connection string and other secrets configured → install or upgrade the certs-ui chart.
+
+1. **Deploy PostgreSQL** using your platform (your own Helm chart, CloudNativePG, a managed service, etc.).
+2. **Create** an application database and login (for example database `certsui`, user `certsui`) with a password you control.
+3. **Verify** that pods in the `certs-ui` namespace can reach the database host and port (DNS, network policies, TLS/`SslMode` as required).
+4. **Configure** `certsServerSecrets.certsEngineConfiguration.connectionString` in your values overlay or Secret (see [step 2](#2-prepare-namespace-secrets-and-configmap) and [`src/helm/values.yaml`](src/helm/values.yaml)). The chart default is an empty placeholder until you set it.
+
+For **high availability** (`components.server.replicaCount` > 1), use a **shared** PostgreSQL deployment that every server replica can reach. The application stores users, refresh tokens, ACME sessions, HTTP-01 challenge tokens, and runtime leases in PostgreSQL—not on server PVCs. See [High availability architecture](#high-availability-architecture) and [`assets/docs/HA_ARCHITECTURE.md`](assets/docs/HA_ARCHITECTURE.md). A single PostgreSQL instance is acceptable for development or single-replica clusters if it meets your availability and backup needs.
+
+Unlike Docker/Podman Compose in this repo (which includes a `postgres` service in `docker-compose`), the Kubernetes chart expects you to operate the database separately.
+
 ### 2. Prepare Namespace, Secrets, and ConfigMap
 
 By default, the chart creates the server Secret, server ConfigMap, and client ConfigMap from Helm values (`certsServerSecrets`, `certsServerConfig`, `certsClientRuntime`) as defined in [`src/helm/values.yaml`](src/helm/values.yaml). Set those keys in your `custom-values.yaml` (see the next section) and you can skip the manual `kubectl` resources below.
@@ -676,14 +716,17 @@ Replace the placeholder values with your actual secrets. This secret contains th
 {
   "Configuration": {
     "CertsEngineConfiguration": {
-      "ConnectionString": "Host=<postgres-host>;Port=5432;Database=certsui;Username=certsui;Password=certsui;SslMode=Prefer"
-    },
-    "Auth": {
-      "Secret": "<your-auth-secret>",
-      "Pepper": "<your-pepper>"
-    },
-    "Agent": {
-      "AgentKey": "<your-agent-key>"
+      "ConnectionString": "Host=<postgres-host>;Port=5432;Database=certsui;Username=certsui;Password=certsui;SslMode=Prefer",
+      "Admin": {
+        "Password": "<your-admin-password>"
+      },
+      "JwtSettingsConfiguration": {
+        "JwtSecret": "<your-auth-secret>",
+        "PasswordPepper": "<your-pepper>"
+      },
+      "Agent": {
+        "AgentKey": "<your-agent-key>"
+      }
     }
   }
 }
@@ -694,14 +737,13 @@ kubectl create secret generic certs-ui-server-secrets \
   --from-literal=appsecrets.json='{
     "Configuration": {
       "CertsEngineConfiguration": {
-        "ConnectionString": "Host=<postgres-host>;Port=5432;Database=certsui;Username=certsui;Password=certsui;SslMode=Prefer"
-      },
-      "Auth": {
-        "Secret": "<your-auth-secret>",
-        "Pepper": "<your-pepper>"
-      },
-      "Agent": {
-        "AgentKey": "<your-agent-key>"
+        "ConnectionString": "Host=<postgres-host>;Port=5432;Database=certsui;Username=certsui;Password=certsui;SslMode=Prefer",
+        "Admin": { "Password": "<your-admin-password>" },
+        "JwtSettingsConfiguration": {
+          "JwtSecret": "<your-auth-secret>",
+          "PasswordPepper": "<your-pepper>"
+        },
+        "Agent": { "AgentKey": "<your-agent-key>" }
       }
     }
   }' \
@@ -709,8 +751,7 @@ kubectl create secret generic certs-ui-server-secrets \
 ```
 
 **Note:**  
-Replace `<postgres-host>`, `<user>`, `<password>`, and the auth placeholders with your environment-specific values. Replace placeholder values `<your-auth-secret>`, `<your-pepper>`, `<your-agent-key>`, with secure values.
-Make sure `<your-agent-key>` matches the key configured in your agent deployment.
+Replace `<postgres-host>` with the PostgreSQL instance from [step 1](#1-prerequisites-postgresql). Use the same **`CertsEngineConfiguration`** secret shape as Compose and [`src/helm/values.yaml`](src/helm/values.yaml). Ensure `<your-agent-key>` matches your edge agent.
 
 **Step 3: Create the ConfigMap (`appsettings.json`)**
 
@@ -726,19 +767,36 @@ Edit the values as needed for your environment. This configmap contains applicat
   },
   "AllowedHosts": "*",
   "Configuration": {
-    "Auth": {
-      "Issuer": "<your-issuer>",
-      "Audience": "<your-audience>",
-      "Expiration": 15,
-      "RefreshExpiration": 180
-    },
-    "Agent": {
-      "AgentHostname": "http://<your-agent-hostname>",
-      "AgentPort": 5000,
-      "ServiceToReload": "haproxy"
-    },
-    "Production": "https://acme-v02.api.letsencrypt.org/directory",
-    "Staging": "https://acme-staging-v02.api.letsencrypt.org/directory",
+    "CertsEngineConfiguration": {
+      "AutoSyncSchema": true,
+      "Admin": {
+        "Username": "admin"
+      },
+      "JwtSettingsConfiguration": {
+        "JwtSecret": "",
+        "Issuer": "<your-issuer>",
+        "Audience": "<your-audience>",
+        "ExpiresIn": 15,
+        "RefreshTokenExpiresIn": 180,
+        "PasswordPepper": ""
+      },
+      "TwoFactorSettingsConfiguration": {
+        "Label": "CertsUI",
+        "Issuer": "MaksIT.CertsUI",
+        "Algorithm": "",
+        "Digits": 6,
+        "Period": 30,
+        "TimeTolerance": 1
+      },
+      "Agent": {
+        "AgentHostname": "http://<your-agent-hostname>",
+        "AgentPort": 5000,
+        "AgentKey": "",
+        "ServiceToReload": "haproxy"
+      },
+      "Production": "https://acme-v02.api.letsencrypt.org/directory",
+      "Staging": "https://acme-staging-v02.api.letsencrypt.org/directory"
+    }
   }
 }
 ```
@@ -746,27 +804,37 @@ Edit the values as needed for your environment. This configmap contains applicat
 ```bash
 kubectl create configmap certs-ui-server-configmap \
   --from-literal=appsettings.json='{
-    "Logging": {
-      "LogLevel": {
-        "Default": "Information",
-        "Microsoft.AspNetCore": "Warning"
-      }
-    },
+    "Logging": { "LogLevel": { "Default": "Information", "Microsoft.AspNetCore": "Warning" } },
     "AllowedHosts": "*",
     "Configuration": {
-      "Auth": {
-        "Issuer": "<your-issuer>",
-        "Audience": "<your-audience>",
-        "Expiration": 15,
-        "RefreshExpiration": 180
-      },
-      "Agent": {
-        "AgentHostname": "http://<your-agent-hostname>",
-        "AgentPort": 5000,
-        "ServiceToReload": "haproxy"
-      },
-      "Production": "https://acme-v02.api.letsencrypt.org/directory",
-      "Staging": "https://acme-staging-v02.api.letsencrypt.org/directory",
+      "CertsEngineConfiguration": {
+        "AutoSyncSchema": true,
+        "Admin": { "Username": "admin" },
+        "JwtSettingsConfiguration": {
+          "JwtSecret": "",
+          "Issuer": "<your-issuer>",
+          "Audience": "<your-audience>",
+          "ExpiresIn": 15,
+          "RefreshTokenExpiresIn": 180,
+          "PasswordPepper": ""
+        },
+        "TwoFactorSettingsConfiguration": {
+          "Label": "CertsUI",
+          "Issuer": "MaksIT.CertsUI",
+          "Algorithm": "",
+          "Digits": 6,
+          "Period": 30,
+          "TimeTolerance": 1
+        },
+        "Agent": {
+          "AgentHostname": "http://<your-agent-hostname>",
+          "AgentPort": 5000,
+          "AgentKey": "",
+          "ServiceToReload": "haproxy"
+        },
+        "Production": "https://acme-v02.api.letsencrypt.org/directory",
+        "Staging": "https://acme-staging-v02.api.letsencrypt.org/directory"
+      }
     }
   }' \
   -n certs-ui
@@ -801,7 +869,7 @@ Replace `<your-public-hostname>` with the hostname or IP users use to reach the 
 
 ### 3. Create a Minimal Custom Values File
 
-Below is a minimal `custom-values.yaml` aligned with the chart’s value schema in [`src/helm/values.yaml`](src/helm/values.yaml). It sets the client API URL, storage class for server PVCs, and optional registry pull secrets.
+Below is a minimal `custom-values.yaml` aligned with the chart’s value schema in [`src/helm/values.yaml`](src/helm/values.yaml). From **3.5.0**, the chart does not mount **`/acme`** or **`/data`** by default (`components.server.persistence.volumes` is empty). Add volumes only if you need extra local mounts.
 
 ```yaml
 global:
@@ -814,9 +882,10 @@ components:
   server:
     persistence:
       storageClass: local-path
+      volumes: []
 ```
 
-Override **`certsServerSecrets`** (including **`certsServerSecrets.certsEngineConfiguration.connectionString`** for PostgreSQL) and **`certsServerConfig`** here for production (JWT issuer/audience, agent hostname, ACME endpoints, and auth secrets). Chart defaults are placeholders only.
+Override **`certsServerSecrets`** (including **`certsServerSecrets.certsEngineConfiguration.connectionString`** for the PostgreSQL instance from [step 1](#1-prerequisites-postgresql)) and **`certsServerConfig`** here for production (JWT issuer/audience, agent hostname, ACME endpoints, and auth secrets). Chart defaults are placeholders only.
 
 **Services:** The chart renders one `Service` per component (`server`, `client`, `reverseproxy`). Each `service` block supports `enabled`, `type`, `port`, and `targetPort` only. For Cilium LB-IPAM, MetalLB, or cloud load balancers, use a separate manifest or your platform’s pattern so you can set annotations, `loadBalancerIP`, and session affinity; point that Service at the **reverseproxy** pods (`app.kubernetes.io/component: reverseproxy`).
 
@@ -843,11 +912,11 @@ helm upgrade --install certs-ui oci://cr.maks-it.com/charts/certs-ui `
 ```
 
 **Note:**
-`Chart.yaml` in the repository uses placeholder `version` / `appVersion` (`0.0.0`); the release pipeline sets both from the app semver when pushing the chart. When installing from your registry, pass `--version` with the chart version you published (same semver as the app release, e.g. `3.3.4`).
+`Chart.yaml` in the repository uses placeholder `version` / `appVersion` (`0.0.0`); the release pipeline sets both from the app semver when pushing the chart. When installing from your registry, pass `--version` with the chart version you published (same semver as the app release, e.g. `3.5.0`).
 
 ### 5. Uninstall the Helm Chart
 
-PVCs for the server component use `helm.sh/resource-policy: keep` by default (`components.server.persistence.volumes[].pvc.keep: true`), so **`helm uninstall` does not delete them**—ACME and data volumes remain until you remove the claims manually. Set `pvc.keep: false` on a volume if you want that claim deleted with the release.
+By default **`components.server.persistence.volumes`** is empty (no application data PVCs in **3.5.0**). If you add optional PVCs with `pvc.keep: true`, **`helm uninstall` does not delete those claims** until you remove them manually. Set `pvc.keep: false` on a volume if you want the claim removed with the release.
 
 To uninstall the release (deployments, services, etc.) run:
 
@@ -865,7 +934,10 @@ helm uninstall certs-ui -n certs-ui
 
 ## Run E2E Against k3s Ingress (PowerShell)
 
-Use the API-key E2E tests from `MaksIT.CertsUI.Tests` to validate health, authorization, and multi-replica routing behavior through your ingress.
+Use the API-key E2E tests to validate health, authorization, and multi-replica routing behavior through your ingress.
+
+- **dotnet test:** [`src/MaksIT.CertsUI.Client.Tests/README.E2E.md`](src/MaksIT.CertsUI.Client.Tests/README.E2E.md)
+- **PowerShell module + scenarios:** [`src/e2e-tests/`](src/e2e-tests/) — [`MaksIT.CertsUI.Client.PowerShell`](src/MaksIT.CertsUI.Client.PowerShell/) cmdlets; run `Test-CertsUiApiKeyE2E.ps1` or `Test-CertsUiApiKeyE2E.bat`
 
 ### 1) Create a read-capable API key
 
@@ -881,19 +953,31 @@ $env:CERTSUI_E2E_EXPECT_MIN_DISTINCT_INSTANCES = "2"
 
 Notes:
 - `CERTSUI_E2E_BASE_URL` must be the public ingress URL (no `/api` suffix).
-- `CERTSUI_E2E_EXPECT_MIN_DISTINCT_INSTANCES` defaults to `2` if omitted.
-- Ensure ingress session affinity is disabled (or not sticky) for the multi-replica assertion.
+- **PowerShell E2E:** `MultiReplica` defaults to **1** instance (Docker Compose). Set `CERTSUI_E2E_EXPECT_MIN_DISTINCT_INSTANCES=2` for k8s HA.
+- **dotnet test E2E:** `CERTSUI_E2E_EXPECT_MIN_DISTINCT_INSTANCES` defaults to `2` if omitted.
+- For HA runs, ensure ingress session affinity is disabled (or not sticky).
 
-### 3) Run only the API-key E2E suite
+### 3) Run the API-key E2E suite
+
+**dotnet test:**
 
 ```powershell
-dotnet test .\src\MaksIT.CertsUI.Tests\MaksIT.CertsUI.Tests.csproj --filter "FullyQualifiedName~CertsUiApiKeyE2ETests"
+dotnet test .\src\MaksIT.CertsUI.Client.Tests\MaksIT.CertsUI.Client.Tests.csproj --filter "Category=E2E"
 ```
+
+**PowerShell scenarios** (set `CERTSUI_E2E_CREDENTIALS` — same encoding as Vault `VAULT_E2E_CREDENTIALS`):
+
+```powershell
+pwsh -File .\src\e2e-tests\Test-CertsUiApiKeyE2E.ps1
+# or: .\src\e2e-tests\Test-CertsUiApiKeyE2E.bat
+```
+
+See [README.E2E.md](src/MaksIT.CertsUI.Client.Tests/README.E2E.md) for credential encoding and scenario filters (`-Scenario Health`, etc.).
 
 ### 4) Optional: run only the replica-distribution assertion
 
 ```powershell
-dotnet test .\src\MaksIT.CertsUI.Tests\MaksIT.CertsUI.Tests.csproj --filter "FullyQualifiedName~ApiKey_StickyLessRequests_RuntimeInstanceId_ObservesMultipleReplicas"
+dotnet test .\src\MaksIT.CertsUI.Client.Tests\MaksIT.CertsUI.Client.Tests.csproj --filter "FullyQualifiedName~ApiKey_StickyLessRequests_RuntimeInstanceId_ObservesMultipleReplicas"
 ```
 
 If this test reports fewer instances than expected, check:

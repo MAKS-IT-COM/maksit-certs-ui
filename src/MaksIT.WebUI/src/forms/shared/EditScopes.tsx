@@ -1,13 +1,14 @@
 import { FC, useEffect, useMemo, useRef } from 'react'
 import z, { array, object, RefinementCtx, string, ZodType } from 'zod'
 import { useAppSelector } from '../../redux/hooks'
-import { useFormState } from '../../hooks/useFormState'
-import { ButtonComponent } from '../../components/editors'
+import { useFormState } from '@maks-it.com/webui-core'
+import { ButtonComponent } from '@maks-it.com/webui-components'
 import { Shield, Trash2 } from 'lucide-react'
-import { deepCopy, deepEqual, enumToArr, hasAnyFlag, hasFlag, toggleFlag } from '../../functions'
+import { deepCopy, deepEqual, enumToArr, hasAnyFlag, hasFlag, toggleFlag } from '@maks-it.com/webui-core'
 
 import { CERTS_UI_PLATFORM_SCOPE_ENTITY_ID } from '../../models/engine/platformScope'
-import { ScopeEntityType, ScopePermission } from '../../models/engine/scopeEnums'
+import { ScopeEntityType } from '../../models/ScopeEntityType'
+import { ScopePermission } from '@maks-it.com/webui-core'
 
 export interface EntityScopeFormProps {
   id?: string
@@ -19,7 +20,7 @@ export interface EntityScopeFormProps {
 export const EntityScopeFormPropsSchema: ZodType<EntityScopeFormProps> = object({
   id: string().optional(),
   entityId: string(),
-  entityType: z.nativeEnum(ScopeEntityType),
+  entityType: z.enum(ScopeEntityType),
   scope: z.number(),
 }).superRefine((val: EntityScopeFormProps, ctx: RefinementCtx) => {
   if (
@@ -33,7 +34,7 @@ export const EntityScopeFormPropsSchema: ZodType<EntityScopeFormProps> = object(
     )
   ) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       message: 'invalid scope permission value',
       path: ['entityScopes'],
     })
@@ -61,6 +62,8 @@ interface EditUserRolesProps {
   onChange?: (entityScopes: EntityScopeFormProps[]) => void
   emptyStateMessage?: string
   allowIdentityAndApiKeyScopes?: boolean
+  /** When true, the edited user/API key is global admin — scopes are read-only. */
+  targetIsGlobalAdmin?: boolean
 }
 
 const SCOPE_TYPE_LABELS: Record<ScopeEntityType, string> = {
@@ -100,6 +103,7 @@ const EditUserScopes: FC<EditUserRolesProps> = (props) => {
     onChange,
     emptyStateMessage,
     allowIdentityAndApiKeyScopes = false,
+    targetIsGlobalAdmin = false,
   } = props
 
   const { identity } = useAppSelector((state) => state.identity)
@@ -227,6 +231,7 @@ const EditUserScopes: FC<EditUserRolesProps> = (props) => {
   )
 
   const canEdit = identity?.userId !== id
+  const scopesEditable = canEdit && !targetIsGlobalAdmin
 
   const colSpanClass =
     colspan === 12
@@ -247,17 +252,26 @@ const EditUserScopes: FC<EditUserRolesProps> = (props) => {
 
   return (
     <div className={colSpanClass}>
-      <div className="grid grid-cols-12 gap-4 w-full">
+      <fieldset
+        disabled={!scopesEditable}
+        className="grid grid-cols-12 gap-4 w-full min-w-0 border-0 p-0 m-0 disabled:opacity-60"
+      >
         <div className="col-span-12 border border-gray-200 rounded-lg bg-white p-5 shadow-sm">
           <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2 mb-4">
             <Shield className="w-4 h-4 text-blue-500" />
             Add scope
           </h3>
 
+          {targetIsGlobalAdmin && (
+            <p className="text-xs text-gray-500 mb-4">
+              Global admins have full access; entity scopes do not apply.
+            </p>
+          )}
+
           <div className="flex flex-col gap-5">
             <fieldset
               className="rounded-md border border-gray-200 bg-gray-50/50 px-4 py-3 col-span-12"
-              disabled={!allowIdentityAndApiKeyScopes}
+              disabled={!allowIdentityAndApiKeyScopes || !scopesEditable}
             >
               <legend className="text-xs font-medium text-gray-600 px-1">
                 Platform permissions
@@ -354,7 +368,7 @@ const EditUserScopes: FC<EditUserRolesProps> = (props) => {
                 label="Add scope"
                 buttonHierarchy="primary"
                 onClick={handleAddScope}
-                disabled={!canEdit || !hasDraftScope}
+                disabled={!scopesEditable || !hasDraftScope}
               />
               {identity?.userId === id && (
                 <span className="text-gray-500 text-sm">
@@ -431,7 +445,7 @@ const EditUserScopes: FC<EditUserRolesProps> = (props) => {
                               toggleFlag(scope.scope, ScopePermission.Read)
                             )
                           }
-                          disabled={!canEdit}
+                          disabled={!scopesEditable}
                           className="rounded border-gray-300"
                         />
                       </td>
@@ -445,7 +459,7 @@ const EditUserScopes: FC<EditUserRolesProps> = (props) => {
                               toggleFlag(scope.scope, ScopePermission.Write)
                             )
                           }
-                          disabled={!canEdit}
+                          disabled={!scopesEditable}
                           className="rounded border-gray-300"
                         />
                       </td>
@@ -459,7 +473,7 @@ const EditUserScopes: FC<EditUserRolesProps> = (props) => {
                               toggleFlag(scope.scope, ScopePermission.Create)
                             )
                           }
-                          disabled={!canEdit}
+                          disabled={!scopesEditable}
                           className="rounded border-gray-300"
                         />
                       </td>
@@ -473,7 +487,7 @@ const EditUserScopes: FC<EditUserRolesProps> = (props) => {
                               toggleFlag(scope.scope, ScopePermission.Delete)
                             )
                           }
-                          disabled={!canEdit}
+                          disabled={!scopesEditable}
                           className="rounded border-gray-300"
                         />
                       </td>
@@ -483,7 +497,7 @@ const EditUserScopes: FC<EditUserRolesProps> = (props) => {
                           onClick={() =>
                             handleRemoveScope(scope.entityType, scope.entityId)
                           }
-                          disabled={!canEdit}
+                          disabled={!scopesEditable}
                           className="p-1.5 rounded hover:bg-red-50 text-gray-500 hover:text-red-600 disabled:opacity-40"
                           aria-label="Remove scope"
                         >
@@ -500,7 +514,7 @@ const EditUserScopes: FC<EditUserRolesProps> = (props) => {
             <p className="text-red-500 text-xs italic mt-2">{errors['entityScopes']}</p>
           )}
         </div>
-      </div>
+      </fieldset>
     </div>
   )
 }

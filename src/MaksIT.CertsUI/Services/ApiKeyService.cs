@@ -127,11 +127,15 @@ public class ApiKeyService(
   /// <remarks>
   /// Last update: 02/03/2026
   /// </remarks>
-  private Result CreateApiKeyRBAC(JwtTokenData jwtTokenData, CreateApiKeyRequest requestData) => RBACWrapperJwtToken(
-    jwtTokenData,
-    (jwtTokenData) => {
-        return Result.Ok();
-    });
+  private Result CreateApiKeyRBAC(JwtTokenData jwtTokenData, CreateApiKeyRequest requestData) {
+    var globalAdminCheck = RbacHelpers.EnsureActorMayAssignGlobalAdmin(jwtTokenData, requestData.IsGlobalAdmin);
+    if (!globalAdminCheck.IsSuccess)
+      return globalAdminCheck;
+
+    return RBACWrapperJwtToken(
+      jwtTokenData,
+      (_) => Result.Ok());
+  }
 
   /// <summary>
   /// Performs RBAC (Role-Based Access Control) checks to determine if the current user is authorized to patch (update) the specified API key.
@@ -156,6 +160,10 @@ public class ApiKeyService(
   /// Last update: 02/03/2026
   /// </remarks>
   private Result<ApiKey?> PatchApiKeyRBAC(JwtTokenData jwtTokenData, Guid apiKeyId, PatchApiKeyRequest requestData) {
+    var globalAdminPatchCheck = RbacHelpers.EnsureActorMayPatchGlobalAdminFlag(
+      jwtTokenData, requestData, nameof(PatchApiKeyRequest.IsGlobalAdmin));
+    if (!globalAdminPatchCheck.IsSuccess)
+      return Result<ApiKey?>.Forbidden(null, "Only a global admin can assign or remove the global admin flag.");
 
     var apiKeyResult = _apiKeyDomainService.ReadAPIKey(apiKeyId);
 

@@ -1,20 +1,20 @@
 import { FC, useCallback, useEffect, useState } from 'react'
 import { getData, patchData } from '../../../axiosConfig'
 import { ApiRoutes, GetApiRoute } from '../../../AppMap'
-import { UserResponse } from '../../../models/identity/user/UserResponse'
-import { useFormState } from '../../../hooks/useFormState'
-import { PatchUserEnableTwoFactorRequest, PatchUserRequest } from '../../../models/identity/user/PatchUserRequest'
-import type { PatchUserEntityScopeRequest } from '../../../models/identity/user/PatchUserEntityScopeRequest'
-import { ButtonComponent, CheckBoxComponent, TextBoxComponent } from '../../../components/editors'
+import { UserResponse } from '../../../models/user/UserResponse'
+import { useFormState } from '@maks-it.com/webui-core'
+import { PatchUserEnableTwoFactorRequest, PatchUserRequest, createPatchUserRequestSchema } from '../../../models/user/PatchUserRequest'
+import type { PatchUserEntityScopeRequest } from '../../../models/user/PatchUserEntityScopeRequest'
+import { ButtonComponent, CheckBoxComponent, TextBoxComponent } from '@maks-it.com/webui-components'
 import { ChangePassword } from './ChangePassword'
 import { EnableTwoFactor } from './EnableTwoFactor'
-import { FormContent, FormContainer, FormFooter, FormHeader } from '../../../components/FormLayout'
+import { FormContent, FormContainer, FormFooter, FormHeader } from '@maks-it.com/webui-components'
 import { useAppDispatch, useAppSelector } from '../../../redux/hooks'
 import { refreshJwt } from '../../../redux/slices/identitySlice'
-import { addToast } from '../../../components/Toast/addToast'
+import { addToast } from '@maks-it.com/webui-components'
 import { EditUserScopes, EntityScopeFormProps, EntityScopeFormPropsSchema } from '../../shared/EditScopes'
 import z, { array, boolean, object, ZodType, string } from 'zod'
-import { deepCopy, deepDelta, deltaHasOperations, ENTITY_SCOPES_ARRAY_POLICY } from '../../../functions'
+import { deepCopy, deepDelta, deltaHasOperations, ENTITY_SCOPES_ARRAY_POLICY } from '@maks-it.com/webui-core'
 
 
 // Form state interface and validation
@@ -198,7 +198,15 @@ const EditUser: FC<EditUserProps> = (props) => {
       return
     }
 
-    patchData<PatchUserRequest, UserResponse>(GetApiRoute(ApiRoutes.identityPatch).route.replace('{userId}', userId), delta)
+    const validated = createPatchUserRequestSchema(identity?.isGlobalAdmin ?? false).safeParse(delta)
+    if (!validated.success) {
+      validated.error.issues.forEach(error => {
+        addToast(error.message, 'error')
+      })
+      return
+    }
+
+    patchData<PatchUserRequest, UserResponse>(GetApiRoute(ApiRoutes.identityPatch).route.replace('{userId}', userId), validated.data)
       .then((response) => {
         if (!response.ok || !response.payload) return
 
@@ -278,6 +286,7 @@ const EditUser: FC<EditUserProps> = (props) => {
             colspan={12}
             id={formState.id}
             entityScopes={formState.entityScopes}
+            targetIsGlobalAdmin={formState.isGlobalAdmin}
             onChange={(entityScopes) => handleInputChange('entityScopes', entityScopes)}
           />
           <CheckBoxComponent
