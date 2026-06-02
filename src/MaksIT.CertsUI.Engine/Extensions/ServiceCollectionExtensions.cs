@@ -1,5 +1,6 @@
 using FluentMigrator.Runner;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using MaksIT.CertsUI.Engine;
 using MaksIT.CertsUI.Engine.DomainServices;
 using MaksIT.CertsUI.Engine.FluentMigrations;
@@ -23,6 +24,8 @@ public static class ServiceCollectionExtensions {
   public static void AddCertsEngine(this IServiceCollection services, ICertsEngineConfiguration certsEngineConfiguration) {
 
     services.AddSingleton<ICertsEngineConfiguration>(certsEngineConfiguration);
+
+    services.TryAddSingleton<IDatabaseStartupObserver, NoOpDatabaseStartupObserver>();
 
     if (string.IsNullOrWhiteSpace(certsEngineConfiguration.ConnectionString))
       throw new ArgumentException("Certs engine connection string is required for FluentMigrator (empty string uses connectionless/preview mode and will not create tables).", nameof(certsEngineConfiguration));
@@ -72,16 +75,16 @@ public static class ServiceCollectionExtensions {
       var logger = sp.GetRequiredService<ILogger<IdentityDomainService>>();
       var identityPersistenceService = sp.GetRequiredService<IIdentityPersistenceService>();
       var userAuthorizationPersistenceService = sp.GetRequiredService<IUserAuthorizationPersistenceService>();
-      var vaultEngineConfiguration = sp.GetRequiredService<ICertsEngineConfiguration>();
-      var adminUser = vaultEngineConfiguration.Admin;
-      var jwtSettingsConfiguration = vaultEngineConfiguration.JwtSettingsConfiguration;
-      var twoFactorSettingsConfiguration = vaultEngineConfiguration.TwoFactorSettingsConfiguration;
+      var certsEngineConfiguration = sp.GetRequiredService<ICertsEngineConfiguration>();
+      var adminUser = certsEngineConfiguration.Admin;
+      var jwtSettingsConfiguration = certsEngineConfiguration.JwtSettingsConfiguration;
+      var twoFactorSettingsConfiguration = certsEngineConfiguration.TwoFactorSettingsConfiguration;
 
       return new IdentityDomainService(
         logger,
         identityPersistenceService,
         userAuthorizationPersistenceService,
-        vaultEngineConfiguration,
+        certsEngineConfiguration,
         adminUser,
         jwtSettingsConfiguration,
         twoFactorSettingsConfiguration);

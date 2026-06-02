@@ -3,6 +3,7 @@ using MaksIT.Core.Logging;
 using MaksIT.Core.Webapi.Middlewares;
 using MaksIT.CertsUI.Engine.DomainServices;
 using MaksIT.CertsUI.Engine.Extensions;
+using MaksIT.CertsUI.Engine.Infrastructure;
 using MaksIT.CertsUI;
 using MaksIT.CertsUI.Authorization.Filters;
 using MaksIT.CertsUI.Engine.RuntimeCoordination;
@@ -89,6 +90,10 @@ builder.Services.AddHostedService<AutoRenewal>();
 // Single process-wide lease holder id (see IRuntimeInstanceId) — must stay Singleton for app_runtime_leases coherence.
 builder.Services.AddSingleton<IRuntimeInstanceId, RuntimeInstanceIdProvider>();
 
+// Startup phase tracking (migrations, bootstrap) for probes and /health/startup.
+builder.Services.AddSingleton<CertsStartupState>();
+builder.Services.AddSingleton<IDatabaseStartupObserver>(sp => sp.GetRequiredService<CertsStartupState>());
+
 // Register engine services (same bound instance as Configuration:CertsEngineConfiguration)
 builder.Services.AddCertsEngine(engineCfg);
 
@@ -127,7 +132,13 @@ builder.Services.AddHealthChecks()
 var app = builder.Build();
 
 // FluentMigrator must complete before any IHostedService starts; bootstrap uses app_runtime_leases.
+var startupState = app.Services.GetRequiredService<CertsStartupState>();
 await app.Services.EnsureCertsEngineMigratedAsync();
+var migrationSnapshot = startupState.GetSnapshot();
+app.Logger.LogInformation(
+  "Database startup finished in {ElapsedMs} ms (phase={Phase}).",
+  (int)migrationSnapshot.TotalElapsed.TotalMilliseconds,
+  migrationSnapshot.CurrentPhase);
 
 app.UseMiddleware<ErrorHandlingMiddleware>();
 
@@ -150,7 +161,10 @@ app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthC
   Predicate = r => r.Tags.Contains("live")
 });
 
-app.MapGet("/health/ready", async (CancellationToken ct) => {
+app.MapGet("/health/ready", async (CertsStartupState startup, CancellationToken ct) => {
+  if (!startup.IsApplicationReady)
+    return Results.StatusCode(503);
+
   try {
     await using var conn = new NpgsqlConnection(certsConnectionString);
     await conn.OpenAsync(ct);
@@ -162,5 +176,7 @@ app.MapGet("/health/ready", async (CancellationToken ct) => {
     return Results.StatusCode(503);
   }
 });
+
+app.MapGet("/health/startup", (CertsStartupState startup) => Results.Json(startup.GetSnapshot()));
 
 await app.RunAsync();

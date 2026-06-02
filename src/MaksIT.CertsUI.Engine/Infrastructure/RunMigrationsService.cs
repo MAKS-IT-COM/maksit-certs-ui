@@ -15,7 +15,8 @@ namespace MaksIT.CertsUI.Engine.Infrastructure;
 public sealed class RunMigrationsService(
   IMigrationRunner migrationRunner,
   ILogger<RunMigrationsService> logger,
-  ICertsEngineConfiguration config
+  ICertsEngineConfiguration config,
+  IDatabaseStartupObserver startupObserver
 ) : IRunMigrationsService {
 
   public async Task RunAsync(CancellationToken cancellationToken = default) {
@@ -33,11 +34,44 @@ public sealed class RunMigrationsService(
       .Count(t => t.GetCustomAttribute<MigrationAttribute>(inherit: false) is not null);
     logger.LogInformation("FluentMigrator discovered {MigrationCount} migration type(s) in {Assembly}.", migrationTypeCount, typeof(BaselineCertsSchema).Assembly.GetName().Name);
 
-    await PostgresStartupWait.WaitUntilReadyAsync(config.ConnectionString, logger, cancellationToken).ConfigureAwait(false);
-    await EnsureDatabaseExistsAsync(cancellationToken).ConfigureAwait(false);
-    await PostgresStartupWait.MigrateUpWithRetryAsync(migrationRunner, logger, cancellationToken).ConfigureAwait(false);
-    await CoordinationTableProvisioner.EnsureAsync(config.ConnectionString, cancellationToken).ConfigureAwait(false);
-    await VerifyCoreSchemaAsync(cancellationToken).ConfigureAwait(false);
+    var maintenanceConnectionString = BuildMaintenanceConnectionString(config.ConnectionString);
+
+    await DatabaseStartupPhaseRunner.RunAsync(
+      startupObserver,
+      DatabaseStartupPhases.PostgresMaintenanceReady,
+      ct => PostgresStartupWait.WaitUntilReadyAsync(maintenanceConnectionString, logger, ct),
+      cancellationToken).ConfigureAwait(false);
+
+    await DatabaseStartupPhaseRunner.RunAsync(
+      startupObserver,
+      DatabaseStartupPhases.DatabaseEnsured,
+      EnsureDatabaseExistsAsync,
+      cancellationToken).ConfigureAwait(false);
+
+    await DatabaseStartupPhaseRunner.RunAsync(
+      startupObserver,
+      DatabaseStartupPhases.PostgresApplicationReady,
+      ct => PostgresStartupWait.WaitUntilReadyAsync(config.ConnectionString, logger, ct),
+      cancellationToken).ConfigureAwait(false);
+
+    await DatabaseStartupPhaseRunner.RunAsync(
+      startupObserver,
+      DatabaseStartupPhases.MigrationsComplete,
+      ct => PostgresStartupWait.MigrateUpWithRetryAsync(migrationRunner, logger, ct),
+      cancellationToken).ConfigureAwait(false);
+
+    await DatabaseStartupPhaseRunner.RunAsync(
+      startupObserver,
+      DatabaseStartupPhases.CoordinationTablesReady,
+      ct => CoordinationTableProvisioner.EnsureAsync(config.ConnectionString, ct),
+      cancellationToken).ConfigureAwait(false);
+
+    await DatabaseStartupPhaseRunner.RunAsync(
+      startupObserver,
+      DatabaseStartupPhases.SchemaVerified,
+      VerifyCoreSchemaAsync,
+      cancellationToken).ConfigureAwait(false);
+
     logger.LogInformation("Certs database migrations completed.");
   }
 
@@ -66,13 +100,20 @@ public sealed class RunMigrationsService(
       "Confirm Database= in the connection string, role CREATE privileges, and that FluentMigrator committed (non-empty connection string).");
   }
 
+  private static string BuildMaintenanceConnectionString(string connectionString) {
+    var builder = new NpgsqlConnectionStringBuilder(connectionString) {
+      Database = "postgres",
+    };
+    return builder.ConnectionString;
+  }
+
   private async Task EnsureDatabaseExistsAsync(CancellationToken cancellationToken) {
     var builder = new NpgsqlConnectionStringBuilder(config.ConnectionString);
     var database = builder.Database?.Trim();
-    if (string.IsNullOrEmpty(database)) return;
+    if (string.IsNullOrEmpty(database))
+      return;
 
-    builder.Database = "postgres";
-    var postgresCs = builder.ConnectionString;
+    var postgresCs = BuildMaintenanceConnectionString(config.ConnectionString);
 
     try {
       await using var conn = new NpgsqlConnection(postgresCs);

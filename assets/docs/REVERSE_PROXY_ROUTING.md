@@ -58,6 +58,10 @@ If authentication succeeds but API calls fail, confirm traffic reaches the **sam
 
 ---
 
+## Related docs
+
+- [User and API key RBAC](./USER_AND_API_KEY_RBAC.md) · [RBAC reference](./RBAC_REFERENCE.md) · [LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md](./LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md)
+
 ## Related files
 
 - [`src/docker-compose.yml`](../../src/docker-compose.yml), [`src/docker-compose.override.yml`](../../src/docker-compose.override.yml)

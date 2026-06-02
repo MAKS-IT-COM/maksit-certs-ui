@@ -38,11 +38,24 @@ This is implemented as an optimistic single-statement `INSERT ... ON CONFLICT ..
 
 ## Kubernetes behavior
 
-- `server` can run with `replicaCount >= 2` when your storage/network setup allows it.
-- Server readiness and liveness probes are wired to:
-  - `GET /health/ready` (DB roundtrip check),
-  - `GET /health/live` (process liveness).
-- Helm now sets `POD_NAME` from `metadata.name` for stable per-pod identity.
+- Set `components.server.replicaCount >= 2` with **shared external PostgreSQL** (the Helm chart does not deploy Postgres).
+- Set **`certsServerSecrets.certsEngineConfiguration.connectionString`**, **`adminUsername`** / **`adminPassword`**, **`jwtSecret`**, and **`passwordPepper`** (or an existing Secret with `appsecrets.json`).
+- Probes: `GET /health/live` (process up), `GET /health/ready` (PostgreSQL + migrations + bootstrap coordination complete), `GET /health/startup` (JSON phase timings for debugging).
+- Server pods use a **startupProbe** on `/health/ready` so slow first boot (FluentMigrator, admin bootstrap) does not fail liveness/readiness prematurely.
+- Helm sets `POD_NAME` from `metadata.name` for stable per-pod identity.
+- No application-data PVC is required (ACME sessions, HTTP-01 tokens, and identity state live in PostgreSQL).
+
+## Startup sequence
+
+1. **PostgreSQL** — accept connections on maintenance DB (`postgres`), then create app database if missing.
+2. **FluentMigrator** — `MigrateUp` with retries while Postgres is still initializing.
+3. **Coordination DDL** — `app_runtime_leases`.
+4. **Schema sync** — optional add-only column sync when `AutoSyncSchema` is enabled.
+5. **Bootstrap coordination** — one replica acquires the `certs-ui-bootstrap` lease and seeds the global admin; followers wait until an admin exists.
+
+**Docker Compose (local dev):** bundled `postgres` service with `pg_isready` healthcheck; `server` starts only after `service_healthy`. Connection string comes from mounted `appsecrets.json`, not Helm values.
+
+Phase timings are tracked in **`CertsStartupState`** and exposed at **`GET /health/startup`**.
 
 ## Current non-goals and boundaries
 
@@ -67,6 +80,13 @@ This is implemented as an optimistic single-statement `INSERT ... ON CONFLICT ..
 - `src/MaksIT.CertsUI.Engine/FluentMigrations/20260425130000_AcmeChallengesAndRuntimeLeases.cs`
 - `src/MaksIT.CertsUI.Engine/Infrastructure/SchemaSyncService.cs`
 
+### Startup tracking
+
+- `src/MaksIT.CertsUI/Infrastructure/CertsStartupState.cs`
+- `src/MaksIT.CertsUI.Engine/Infrastructure/IDatabaseStartupObserver.cs`
+- `src/MaksIT.CertsUI.Engine/Infrastructure/DatabaseStartupPhaseRunner.cs`
+- `src/MaksIT.CertsUI.Engine/Infrastructure/RunMigrationsService.cs`
+
 ### Runtime usage in app flows
 
 - `src/MaksIT.CertsUI.Engine/DomainServices/CertsFlowDomainService.cs`
@@ -87,3 +107,6 @@ This is implemented as an optimistic single-statement `INSERT ... ON CONFLICT ..
 
 - `src/MaksIT.CertsUI.Tests/Services/CertsFlowServiceTests.cs`
 
+## Related docs
+
+- [ARCHITECTURE_LAYERING.md](./ARCHITECTURE_LAYERING.md) · [USER_AND_API_KEY_RBAC.md](./USER_AND_API_KEY_RBAC.md) · [REVERSE_PROXY_ROUTING.md](./REVERSE_PROXY_ROUTING.md)

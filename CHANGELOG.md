@@ -4,6 +4,42 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.1] - 2026-06-02
+
+**Release status:** **3.3.4** is the last published release. **3.5.1** is a patch on **3.5.0** (startup health, Helm secrets alignment, RBAC docs, Web UI token refresh).
+
+### Breaking
+
+- **Helm secrets (`certsServerSecrets`):** Renamed **`authSecret`** → **`jwtSecret`**, **`authPepper`** → **`passwordPepper`**. Bootstrap admin username moved from ConfigMap to secrets as **`adminUsername`** (removed **`certsServerConfig.configuration.certsEngineConfiguration.admin.username`**). Update custom values and external secret templates before upgrade.
+
+### Added
+
+- **`GET /health/startup`:** JSON snapshot of phased database and bootstrap startup (`CertsStartupState`, `IDatabaseStartupObserver`, `DatabaseStartupPhaseRunner`).
+- **Web UI:** **`webUiAuthRefresh.ts`** — single in-flight JWT refresh shared by axios (and **`resolveWebUiAccessToken`** for future SignalR hubs).
+- **Docs:** **`assets/docs/RBAC_REFERENCE.md`**, **`assets/docs/USER_AND_API_KEY_RBAC.md`**; README RBAC overview and table-of-contents links.
+- **E2E:** **`src/e2e-tests/README.md`** — PowerShell API-key E2E credentials and compose URL guidance (replaces **`MaksIT.CertsUI.Client.Tests/README.E2E.md`**).
+
+### Changed
+
+- **`GET /health/ready`:** Returns **HTTP 503** until bootstrap coordination completes (`CertsStartupState.IsApplicationReady`), then checks PostgreSQL as before.
+- **`RunMigrationsService`:** Reports phased startup; waits on maintenance database **`postgres`** before **`EnsureDatabaseExists`** and on the application database before **`MigrateUp`**.
+- **`SchemaSyncService`:** Reports **`schema_sync`** phase via **`IDatabaseStartupObserver`** (no-op timing when **`AutoSyncSchema`** is false).
+- **`InitializationHostedService`:** Records bootstrap coordination phase success/failure in **`CertsStartupState`**.
+- **`CertsEngineConfiguration.ConnectionString`:** **`required`** in host configuration (no empty default).
+- **`IdentityDomainService`:** Configuration field and error messages use **`CertsEngineConfiguration`** naming (not Vault-era **`VaultEngineConfiguration`**).
+- **Helm:** Server **`startupProbe`** on **`/health/ready`** (up to ~5 minutes); readiness **`initialDelaySeconds`** reduced to **5**; **`NOTES.txt`** documents **`/health/startup`** and external Postgres.
+- **README / Compose examples:** Admin username in **`appsecrets.json`** only; JWT/pepper placeholder names aligned with Helm.
+- **Dependencies:** linq2db **6.3.0**, Microsoft.Extensions.\* **10.0.8**, Npgsql **10.0.3**, Swashbuckle **10.2.1**, Testcontainers.PostgreSql **4.12.0**, **Microsoft.NET.Test.Sdk** **18.6.0**, PowerShell **System.Management.Automation** **7.6.2**.
+
+### Removed
+
+- **`MaksIT.CertsUI.Client.Tests`:** **`CertsUiApiKeyE2ETests`** and **`README.E2E.md`** (API-key E2E remains under **`src/e2e-tests/`** and PowerShell scripts).
+
+### Upgrade notes (from 3.5.0)
+
+- **Helm:** Rename secret keys in **`certsServerSecrets`** and set **`adminUsername`**; remove admin username from non-secret ConfigMap overrides if you duplicated it there.
+- **Probes:** Use **`/health/startup`** for startup diagnostics; keep load balancers on **`/health/ready`** (503 until the cluster has a bootstrapped user).
+
 ## [3.5.0] - 2026-05-24
 
 **Release status:** **3.3.4** is the last published release. **3.5.0** consolidates all changes since **3.3.4** (HA, Engine/Vault alignment, client libraries, Web UI shared packages).

@@ -46,7 +46,7 @@ flowchart TB
 |:----:|-------|------|
 | 1 | Host | Call **one** app service; `Result` → `ToActionResult()` (or `Content` for ACME token). |
 | 2 | Host | Route + `MaksIT.Models` (or host models). |
-| 3 | Host | **`App Service`**: **`Mappers/`** · Request → domain / engine inputs; orchestration; then **`IDomainService`** *or* (thin search) **`I*QueryService`**—see **Response** for **`Mappers/`** → Response DTOs. **JWT** (and similar) is enforced at the **controller**; extra filters or tenancy rules belong in the app service when you add them. |
+| 3 | Host | **`App Service`**: **`Mappers/`** · Request → domain / engine inputs; orchestration; then **`IDomainService`** *or* (thin search) **`I*QueryService`**—see **Response** for **`Mappers/`** → Response DTOs. **`CertsUIAuthorizationFilter`** (JWT or **`X-API-KEY`**) runs on the **controller**; RBAC and tenancy rules live in app **`Services/`** — see [USER_AND_API_KEY_RBAC.md](./USER_AND_API_KEY_RBAC.md). |
 | 5 | Engine | **`IDomainService`**: rules + orchestration; may call Engine **`Services/`** (HTTP). |
 | 6 | Engine | **`IPersistenceService`** *or* **`IQueryService`** (one style per hop). |
 | 7 | Engine | Linq2Db + **`Dto/`**; **persist mappers** for row / JSON columns. |
@@ -133,7 +133,7 @@ flowchart TB
 
 ### Pattern B: Thin search
 
-Use when **only filtering + paging + projection** are needed and **no extra engine rules** apply. **This repo:** **`IdentityService.SearchUsersAsync`** and **`ApiKeyService.Search…`** (JWT on the **controller**; predicate built in the app service).
+Use when **only filtering + paging + projection** are needed and **no extra engine rules** apply. **This repo:** **`IdentityService.SearchUsers`** and **`ApiKeyService.Search…`** (`GetActingJwtTokenData` on the **controller**; RBAC predicate built in the app service).
 
 ```text
 Controller → App Service → IQueryService (impl: PostgreSQL → Linq2Db Dto → map → Query/) → Result back up
@@ -271,6 +271,17 @@ Each row fits the **spine** above; only **persist vs query** and **skipped** ste
 | Registration cache | `CacheController` | `CacheService` | `IRegistrationCacheDomainService` |
 | Accounts / certs | `AccountController` | `AccountService` | `ICertsFlowService` → `ICertsFlowDomainService` |
 
+### Authorization (filters)
+
+| Route prefix | Filter | Principal |
+|--------------|--------|-----------|
+| `/api/identity/...` (except login, refresh) | `CertsUIAuthorizationFilter` | JWT **or** `X-API-KEY` → `GetActingJwtTokenData()` on admin actions |
+| `/api/apikey/...` | `CertsUIAuthorizationFilter` | JWT **or** `X-API-KEY` |
+| `/api/account/...`, `/api/certs/...`, `/api/cache/...`, `/api/agent/...`, `/api/debug/...` | `CertsUIAuthorizationFilter` | JWT **or** `X-API-KEY` (`CertsUIAuthorizationData`) |
+| `/.well-known/acme-challenge/...` | *(none)* | Public HTTP-01 |
+
+See [USER_AND_API_KEY_RBAC.md](./USER_AND_API_KEY_RBAC.md) and [RBAC_REFERENCE.md](./RBAC_REFERENCE.md).
+
 ### Other
 
 | Area | Entry | Notes |
@@ -338,7 +349,10 @@ Avoid **Scoped** inside **Singleton** without `IServiceScopeFactory`; use scoped
 
 ## Related docs
 
+- [USER_AND_API_KEY_RBAC.md](./USER_AND_API_KEY_RBAC.md)  
+- [RBAC_REFERENCE.md](./RBAC_REFERENCE.md)  
 - [HA_ARCHITECTURE.md](./HA_ARCHITECTURE.md)  
 - [LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md](./LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md)  
 - [REVERSE_PROXY_ROUTING.md](./REVERSE_PROXY_ROUTING.md)  
-- [PATCH_DELTA_REFERENCE.md](./PATCH_DELTA_REFERENCE.md)
+- [PATCH_DELTA_REFERENCE.md](./PATCH_DELTA_REFERENCE.md)  
+- [POWERSHELL_CLIENT_MODULE.md](./POWERSHELL_CLIENT_MODULE.md)

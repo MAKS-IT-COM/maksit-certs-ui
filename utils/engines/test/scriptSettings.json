@@ -12,6 +12,7 @@
       "enabled": true,
       "projects": [
         "..\\..\\..\\src\\MaksIT.CertsUI.Engine.Tests",
+        "..\\..\\..\\src\\MaksIT.CertsUI.Client.Tests",
         "..\\..\\..\\src\\MaksIT.CertsUI.Tests"
       ]
     },

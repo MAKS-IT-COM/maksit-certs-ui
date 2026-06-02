@@ -28,7 +28,7 @@ With **`IfNotPresent`** (default), **`rollme`** is omitted; the node may keep a 
 
 Pod annotation **certs-ui.io/image** is the resolved `registry/repository:tag` for debugging.
 
-Optional per workload under **`components.<name>`**: **`replicaCount`** (default **1**; stateless **client** / **reverseproxy** are safe to raise on an HA cluster), **`livenessProbe`**, **`readinessProbe`**, **`resources`** (standard Kubernetes container fields). Omit a key to leave it unset.
+Optional per workload under **`components.<name>`**: **`replicaCount`** (default **1**; stateless **client** / **reverseproxy** are safe to raise on an HA cluster), **`livenessProbe`**, **`startupProbe`**, **`readinessProbe`**, **`resources`** (standard Kubernetes container fields). Omit a key to leave it unset.
 
 When **`replicaCount` > 1**, the chart creates a **PodDisruptionBudget** (`minAvailable: 1`) for that component.
 
@@ -42,6 +42,13 @@ When **`replicaCount` > 1**, the chart creates a **PodDisruptionBudget** (`minAv
 Root keys `certsServerConfig`, `certsServerSecrets`, `certsClientRuntime` feed templated `configMapFile` / `secretsFile` content when `tpl: true`.
 
 Use `existingConfigMap` / `existingSecret` to mount resources created outside the chart. With `keep: true`, existing objects are not replaced on upgrade if already present.
+
+------------------------------------------------------------
+## Data and database
+
+PostgreSQL: **external** — set **`certsServerSecrets.certsEngineConfiguration.connectionString`** (or mount **`existingSecret`** with the same **`appsecrets.json`** shape). The app waits via in-process **`PostgresStartupWait`** during migrations and bootstrap. Local dev: **`docker-compose`** **`postgres`** service (not part of this chart).
+
+Health while starting: **`GET /health/startup`** (JSON phase snapshot); traffic should use **`GET /health/ready`** (503 until bootstrap completes). See **`assets/docs/HA_ARCHITECTURE.md`**.
 
 ------------------------------------------------------------
 ## Uninstall

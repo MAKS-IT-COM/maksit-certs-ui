@@ -7,14 +7,30 @@ namespace MaksIT.CertsUI.Engine.Infrastructure;
 /// Syncs the database schema to match DTOs: add missing tables and columns only (no DROP).
 /// Runs after FluentMigrator so baseline tables exist; this adds any missing columns (and optionally missing tables).
 /// </summary>
-public class SchemaSyncService(ICertsEngineConfiguration config, ILogger<SchemaSyncService> logger) : ISchemaSyncService {
+public class SchemaSyncService(
+  ICertsEngineConfiguration config,
+  ILogger<SchemaSyncService> logger,
+  IDatabaseStartupObserver startupObserver
+) : ISchemaSyncService {
   private readonly ICertsEngineConfiguration _config = config;
   private readonly ILogger<SchemaSyncService> _logger = logger;
+  private readonly IDatabaseStartupObserver _startupObserver = startupObserver;
 
   public async Task SyncSchemaAsync(CancellationToken cancellationToken = default) {
-    if (!_config.AutoSyncSchema)
+    if (!_config.AutoSyncSchema) {
+      _startupObserver.OnPhaseStarted(DatabaseStartupPhases.SchemaSync);
+      _startupObserver.OnPhaseCompleted(DatabaseStartupPhases.SchemaSync, TimeSpan.Zero);
       return;
+    }
 
+    await DatabaseStartupPhaseRunner.RunAsync(
+      _startupObserver,
+      DatabaseStartupPhases.SchemaSync,
+      RunSyncCoreAsync,
+      cancellationToken).ConfigureAwait(false);
+  }
+
+  private async Task RunSyncCoreAsync(CancellationToken cancellationToken) {
     _logger.LogInformation("Schema sync (add-only) starting...");
 
     var desired = GetDesiredSchema();

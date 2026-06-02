@@ -1,24 +1,6 @@
-# MaksIT.CertsUI.Client API key E2E
+# CertsUI API key E2E (PowerShell)
 
-This project contains E2E tests in `CertsUiApiKeyE2ETests` that execute against a **running** CertsUI deployment using API key auth.
-
-## Environment variables
-
-- `CERTSUI_E2E_BASE_URL` (for example: `http://localhost:8080`)
-- `CERTSUI_E2E_API_KEY` (API key with access to the endpoints under test)
-- `CERTSUI_E2E_EXPECT_MIN_DISTINCT_INSTANCES` (optional) — **PowerShell E2E** defaults to `1` (Docker Compose); set to `2`+ for HA. **dotnet test** defaults to `2`.
-
-## Run (dotnet test)
-
-```powershell
-$env:CERTSUI_E2E_BASE_URL = "http://localhost:8080"
-$env:CERTSUI_E2E_API_KEY = "<api-key>"
-dotnet test .\src\MaksIT.CertsUI.Client.Tests\MaksIT.CertsUI.Client.Tests.csproj --filter "Category=E2E"
-```
-
-If env vars are missing, the E2E tests exit early and do not call the API.
-
-## PowerShell E2E script (`src/e2e-tests/Test-CertsUiApiKeyE2E.ps1`)
+End-to-end tests run against a **running** CertsUI deployment via [`MaksIT.CertsUI.Client.PowerShell`](../MaksIT.CertsUI.Client.PowerShell/) cmdlets. They are **not** part of CI (`utils/engines/test/scriptSettings.json`); run them manually after compose, Helm, or k3s deploy.
 
 Cmdlet reference and `Import-Module` paths: [assets/docs/POWERSHELL_CLIENT_MODULE.md](../../assets/docs/POWERSHELL_CLIENT_MODULE.md).
 
@@ -26,7 +8,7 @@ Requires **latest PowerShell 7** with a **.NET 10** host (install from [PowerShe
 
 **Docker Compose + YARP on `http://localhost:8080`:** use `http://localhost:8080` as the base URL (no `/api` suffix).
 
-### Credentials (PowerShell E2E script)
+## Credentials
 
 Uses **one** environment variable: **`CERTSUI_E2E_CREDENTIALS`** — UTF-8 text, Base64-encoded.
 
@@ -54,8 +36,6 @@ Or only for the **current process**:
 $env:CERTSUI_E2E_CREDENTIALS = '<paste-base64-here>'
 ```
 
-**dotnet test** still uses separate `CERTSUI_E2E_BASE_URL` and `CERTSUI_E2E_API_KEY` (see above).
-
 ### JWT credentials (optional)
 
 Identity admin scenarios use the **global admin API key** from `CERTSUI_E2E_CREDENTIALS` (`X-API-KEY`) when the server supports it. Optionally set **`CERTSUI_E2E_JWT_CREDENTIALS`** — same encoding, payload `<adminUsername><US><password>` — for JWT-only probes (e.g. scoped-user login).
@@ -66,7 +46,7 @@ $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("admin$us" + 'yo
 [Environment]::SetEnvironmentVariable('CERTSUI_E2E_JWT_CREDENTIALS', $b64, 'User')
 ```
 
-Then:
+## Run
 
 ```powershell
 pwsh -File .\src\e2e-tests\Test-CertsUiApiKeyE2E.ps1
@@ -74,7 +54,23 @@ pwsh -File .\src\e2e-tests\Test-CertsUiApiKeyE2E.ps1
 
 Or run `src\e2e-tests\Test-CertsUiApiKeyE2E.bat` after credentials are set.
 
-### Registered scenarios (all use cmdlets)
+Filter scenarios:
+
+```powershell
+pwsh -File .\src\e2e-tests\Test-CertsUiApiKeyE2E.ps1 -Scenario Health
+pwsh -File .\src\e2e-tests\Test-CertsUiApiKeyE2E.ps1 -Scenario AccountReadPatch
+```
+
+## Environment variables
+
+| Variable | Purpose |
+|----------|---------|
+| `CERTSUI_E2E_CREDENTIALS` | Required — Base64 `<baseUrl><US><apiKey>` |
+| `CERTSUI_E2E_JWT_CREDENTIALS` | Optional — Base64 `<adminUser><US><password>` |
+| `CERTSUI_E2E_EXPECT_MIN_DISTINCT_INSTANCES` | Optional — `MultiReplica` defaults to **1** (Docker Compose); set **2**+ for HA |
+| `CERTSUI_E2E_ACCOUNT_ID` | Optional — `AccountReadPatch` target account (else first account) |
+
+## Registered scenarios
 
 | Id | Cmdlets |
 |----|---------|
@@ -84,8 +80,10 @@ Or run `src\e2e-tests\Test-CertsUiApiKeyE2E.bat` after credentials are set.
 | `AccountReadPatch` | `Get-CertsUIAccounts`, `Get-CertsUIAccount`, `Invoke-CertsUIPatchAccount` |
 | `IdentityConfigurations` | Global admin API key: users/API keys (all scope configs), PATCH remove all scopes, global-admin create probe |
 
-Optional: `CERTSUI_E2E_ACCOUNT_ID` for `AccountReadPatch` (otherwise the first account is used). `AccountReadPatch` skips when there are no accounts.
+`AccountReadPatch` skips when there are no accounts.
 
 **Docker Compose:** no extra env needed for `MultiReplica` (single server container). For k8s with multiple pods: `$env:CERTSUI_E2E_EXPECT_MIN_DISTINCT_INSTANCES = '2'`.
 
-Filter: `pwsh -File .\src\e2e-tests\Test-CertsUiApiKeyE2E.ps1 -Scenario AccountReadPatch`
+## Unit tests (mock HTTP only)
+
+[`MaksIT.CertsUI.Client.Tests`](../MaksIT.CertsUI.Client.Tests/) exercises `CertsUIClient` with `FakeHttpMessageHandler` — no live server. Included in CI via `dotnet test` on that project.

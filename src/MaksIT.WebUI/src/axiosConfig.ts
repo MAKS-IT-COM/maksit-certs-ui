@@ -2,7 +2,8 @@ import { createWebUiHttpClient, readIdentity, type ApiResponse } from '@maks-it.
 import { addToast } from '@maks-it.com/webui-components'
 import { ApiRoutes, GetApiRoute } from './apiRoutes'
 import { store } from './redux/store'
-import { refreshJwt, clearIdentity } from './redux/slices/identitySlice'
+import { clearIdentity } from './redux/slices/identitySlice'
+import { refreshWebUiAccessToken } from './webUiAuthRefresh'
 import { hideLoader, showLoader } from './redux/slices/loaderSlice'
 
 const {
@@ -21,7 +22,7 @@ const {
 } = createWebUiHttpClient({
   auth: {
     readIdentity,
-    refreshToken: () => store.dispatch(refreshJwt()),
+    refreshToken: refreshWebUiAccessToken,
     clearIdentity: () => {
       store.dispatch(clearIdentity())
     },

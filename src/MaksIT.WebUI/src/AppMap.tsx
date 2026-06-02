@@ -53,7 +53,7 @@ const LayoutWrapper: FC<LayoutWrapperProps> = (props) => {
     }
     footer={
       {
-        children: <p>{import.meta.env.VITE_APP_VERSION} - &copy; {new Date().getFullYear()} <a
+        children: <p>v{import.meta.env.VITE_APP_VERSION} - &copy; {new Date().getFullYear()} <a
             href={import.meta.env.VITE_COMPANY_URL}
             target={'_blank'}
             rel={'noopener noreferrer'}>

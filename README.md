@@ -6,6 +6,10 @@ MaksIT.CertsUI is a powerful, container-native ACMEv2 client built to simplify a
 
 Designed for modern infrastructure, it combines a robust WebAPI, intuitive WebUI, and lightweight edge Agent to deliver fully automated certificate issuance, renewal, and deployment across Docker, Podman, and Kubernetes environments. MaksIT.CertsUI supports the HTTP-01 challenge and follows the official [Let’s Encrypt guidelines](https://letsencrypt.org/docs/) while implementing recommended security and operational best practices.
 
+Authorization is **scope-based RBAC** for **users** and **API keys** (organization-scoped **Identity** / **ApiKey** flags). **Global administrator** on a signed-in user (JWT) and on an API key are evaluated **separately**—a user being admin does not automatically grant the same to a key they create. Certificate and account endpoints today accept **any authenticated** principal; see the matrices for detail.
+
+Permission matrices and scope semantics are documented in the [RBAC reference](assets/docs/RBAC_REFERENCE.md); authentication mechanics and routes are in [User and API key RBAC](assets/docs/USER_AND_API_KEY_RBAC.md).
+
 ---
 
 
@@ -22,6 +26,8 @@ If you find this project useful, please consider supporting its development:
   - [Table of Contents](#table-of-contents)
   - [Changelog](#changelog)
   - [Contributing](#contributing)
+  - [User and API key RBAC](#user-and-api-key-rbac)
+  - [RBAC reference](#rbac-reference)
   - [Patch and delta reference](#patch-and-delta-reference)
   - [Login and refresh token architecture](#login-and-refresh-token-architecture)
   - [Reverse proxy routing (YARP)](#reverse-proxy-routing-yarp)
@@ -59,6 +65,35 @@ Version history and release notes live in [CHANGELOG.md](CHANGELOG.md).
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, pull request expectations, and security reporting.
+
+## User and API key RBAC
+
+How JWT and **`X-API-KEY`** principals are resolved, how **`CertsUIAuthorizationFilter`** differs from Vault’s route split, **`GetActingJwtTokenData`**, and where rules live in code: **[assets/docs/USER_AND_API_KEY_RBAC.md](assets/docs/USER_AND_API_KEY_RBAC.md)**.
+
+- [1. Two authentication mechanisms](assets/docs/USER_AND_API_KEY_RBAC.md#1-two-authentication-mechanisms)
+- [2. Two principal types (what RBAC sees)](assets/docs/USER_AND_API_KEY_RBAC.md#2-two-principal-types-what-rbac-sees)
+  - [2.1 Global administrator: user vs key](assets/docs/USER_AND_API_KEY_RBAC.md#21-global-administrator-user-vs-key-easy-to-confuse)
+  - [2.2 Loading API key authorization](assets/docs/USER_AND_API_KEY_RBAC.md#22-loading-api-key-authorization)
+- [3. Shared RBAC helpers (`ServiceBase`)](assets/docs/USER_AND_API_KEY_RBAC.md#3-shared-rbac-helpers-servicebase)
+- [4. Example: accounts and ACME](assets/docs/USER_AND_API_KEY_RBAC.md#4-example-accounts-and-acme-accountservice-certsflowservice)
+- [5. Identity and API key administration](assets/docs/USER_AND_API_KEY_RBAC.md#5-identity-and-api-key-administration-getactingjwttokendata)
+- [6. Troubleshooting](assets/docs/USER_AND_API_KEY_RBAC.md#6-troubleshooting)
+- [7. Code map](assets/docs/USER_AND_API_KEY_RBAC.md#7-code-map)
+
+## RBAC reference
+
+Scope flags, intended vs enforced rules, and permission matrices for Identity, API keys, and ACME endpoints: **[assets/docs/RBAC_REFERENCE.md](assets/docs/RBAC_REFERENCE.md)**.
+
+- [1. Scope model](assets/docs/RBAC_REFERENCE.md#1-scope-model)
+- [2. Shorthand columns (matrices below)](assets/docs/RBAC_REFERENCE.md#2-shorthand-columns-matrices-below)
+- [3. Global administrator](assets/docs/RBAC_REFERENCE.md#3-global-administrator)
+- [4. Identity (users)](assets/docs/RBAC_REFERENCE.md#4-identity-users)
+  - [4.1 Enforced in code today](assets/docs/RBAC_REFERENCE.md#41-enforced-in-code-today-source-of-truth)
+  - [4.2 Intended policy](assets/docs/RBAC_REFERENCE.md#42-intended-policy-target-behavior-align-crud-with-this)
+- [5. ACME, accounts, cache, and agent](assets/docs/RBAC_REFERENCE.md#5-acme-accounts-cache-and-agent)
+- [6. Managing API keys](assets/docs/RBAC_REFERENCE.md#6-managing-api-keys)
+- [7. Calling the API with an API key](assets/docs/RBAC_REFERENCE.md#7-calling-the-api-with-an-api-key)
+- [8. Comparison with MaksIT.Vault](assets/docs/RBAC_REFERENCE.md#8-comparison-with-maksitvault)
 
 ## Patch and delta reference
 
@@ -277,11 +312,12 @@ sudo tee /opt/Compose/MaksIT.CertsUI/secrets/appsecrets.json > /dev/null <<EOF
     "CertsEngineConfiguration": {
       "ConnectionString": "Host=postgres;Port=5432;Database=certsui;Username=certsui;Password=certsui;SslMode=Prefer",
       "Admin": {
+        "Username": "admin",
         "Password": "<your-admin-password>"
       },
       "JwtSettingsConfiguration": {
-        "JwtSecret": "<your-auth-secret>",
-        "PasswordPepper": "<your-pepper>"
+        "JwtSecret": "<your-jwt-secret>",
+        "PasswordPepper": "<your-password-pepper>"
       },
       "Agent": {
         "AgentKey": "<your-agent-key>"
@@ -293,7 +329,7 @@ EOF
 ```
 
 **Note:**  
-Secrets use **`Configuration:CertsEngineConfiguration`** (same shape as [`src/helm/values.yaml`](src/helm/values.yaml) templated `appsecrets.json`). Set **`ConnectionString`** to the Compose Postgres service hostname (**`postgres`**) and credentials that match the **`postgres`** service below (**`certsui`** / **`certsui`** / database **`certsui`** by default, aligned with [`src/docker-compose.override.yml`](src/docker-compose.override.yml)). Legacy **`ConnectionStrings:Certs`** is still accepted if **`ConnectionString`** is empty. Replace `<your-admin-password>`, `<your-auth-secret>`, `<your-pepper>`, and `<your-agent-key>` with secure values. Ensure `<your-agent-key>` matches your edge agent deployment.
+Secrets use **`Configuration:CertsEngineConfiguration`** (same shape as [`src/helm/values.yaml`](src/helm/values.yaml) templated `appsecrets.json`). Set **`ConnectionString`** to the Compose Postgres service hostname (**`postgres`**) and credentials that match the **`postgres`** service below (**`certsui`** / **`certsui`** / database **`certsui`** by default, aligned with [`src/docker-compose.override.yml`](src/docker-compose.override.yml)). Legacy **`ConnectionStrings:Certs`** is still accepted if **`ConnectionString`** is empty. Replace `<your-admin-password>`, `<your-jwt-secret>`, `<your-password-pepper>`, and `<your-agent-key>` with secure values. Ensure `<your-agent-key>` matches your edge agent deployment.
 
 **2. Create the file  `/opt/Compose/MaksIT.CertsUI/configMap/appsettings.json` with this command:**
 
@@ -310,9 +346,6 @@ sudo tee /opt/Compose/MaksIT.CertsUI/configMap/appsettings.json <<EOF
   "Configuration": {
     "CertsEngineConfiguration": {
       "AutoSyncSchema": true,
-      "Admin": {
-        "Username": "admin"
-      },
       "JwtSettingsConfiguration": {
         "JwtSecret": "",
         "Issuer": "<your-issuer>",
@@ -506,11 +539,12 @@ Set-Content -Path 'C:\Compose\MaksIT.CertsUI\secrets\appsecrets.json' -Value @'
     "CertsEngineConfiguration": {
       "ConnectionString": "Host=postgres;Port=5432;Database=certsui;Username=certsui;Password=certsui;SslMode=Prefer",
       "Admin": {
+        "Username": "admin",
         "Password": "<your-admin-password>"
       },
       "JwtSettingsConfiguration": {
-        "JwtSecret": "<your-auth-secret>",
-        "PasswordPepper": "<your-pepper>"
+        "JwtSecret": "<your-jwt-secret>",
+        "PasswordPepper": "<your-password-pepper>"
       },
       "Agent": {
         "AgentKey": "<your-agent-key>"
@@ -539,9 +573,6 @@ Set-Content -Path 'C:\Compose\MaksIT.CertsUI\configMap\appsettings.json' -Value 
   "Configuration": {
     "CertsEngineConfiguration": {
       "AutoSyncSchema": true,
-      "Admin": {
-        "Username": "admin"
-      },
       "JwtSettingsConfiguration": {
         "JwtSecret": "",
         "Issuer": "<your-issuer>",
@@ -718,11 +749,12 @@ Replace the placeholder values with your actual secrets. This secret contains th
     "CertsEngineConfiguration": {
       "ConnectionString": "Host=<postgres-host>;Port=5432;Database=certsui;Username=certsui;Password=certsui;SslMode=Prefer",
       "Admin": {
+        "Username": "admin",
         "Password": "<your-admin-password>"
       },
       "JwtSettingsConfiguration": {
-        "JwtSecret": "<your-auth-secret>",
-        "PasswordPepper": "<your-pepper>"
+        "JwtSecret": "<your-jwt-secret>",
+        "PasswordPepper": "<your-password-pepper>"
       },
       "Agent": {
         "AgentKey": "<your-agent-key>"
@@ -738,10 +770,13 @@ kubectl create secret generic certs-ui-server-secrets \
     "Configuration": {
       "CertsEngineConfiguration": {
         "ConnectionString": "Host=<postgres-host>;Port=5432;Database=certsui;Username=certsui;Password=certsui;SslMode=Prefer",
-        "Admin": { "Password": "<your-admin-password>" },
+        "Admin": {
+          "Username": "admin",
+          "Password": "<your-admin-password>"
+        },
         "JwtSettingsConfiguration": {
-          "JwtSecret": "<your-auth-secret>",
-          "PasswordPepper": "<your-pepper>"
+          "JwtSecret": "<your-jwt-secret>",
+          "PasswordPepper": "<your-password-pepper>"
         },
         "Agent": { "AgentKey": "<your-agent-key>" }
       }
@@ -769,9 +804,6 @@ Edit the values as needed for your environment. This configmap contains applicat
   "Configuration": {
     "CertsEngineConfiguration": {
       "AutoSyncSchema": true,
-      "Admin": {
-        "Username": "admin"
-      },
       "JwtSettingsConfiguration": {
         "JwtSecret": "",
         "Issuer": "<your-issuer>",
@@ -809,7 +841,6 @@ kubectl create configmap certs-ui-server-configmap \
     "Configuration": {
       "CertsEngineConfiguration": {
         "AutoSyncSchema": true,
-        "Admin": { "Username": "admin" },
         "JwtSettingsConfiguration": {
           "JwtSecret": "",
           "Issuer": "<your-issuer>",
@@ -934,53 +965,44 @@ helm uninstall certs-ui -n certs-ui
 
 ## Run E2E Against k3s Ingress (PowerShell)
 
-Use the API-key E2E tests to validate health, authorization, and multi-replica routing behavior through your ingress.
+Use the PowerShell API-key E2E suite to validate health, authorization, and multi-replica routing through your ingress. Details: [`src/e2e-tests/README.md`](src/e2e-tests/README.md). E2E is **not** run in CI.
 
-- **dotnet test:** [`src/MaksIT.CertsUI.Client.Tests/README.E2E.md`](src/MaksIT.CertsUI.Client.Tests/README.E2E.md)
 - **PowerShell module + scenarios:** [`src/e2e-tests/`](src/e2e-tests/) — [`MaksIT.CertsUI.Client.PowerShell`](src/MaksIT.CertsUI.Client.PowerShell/) cmdlets; run `Test-CertsUiApiKeyE2E.ps1` or `Test-CertsUiApiKeyE2E.bat`
+- **Client unit tests (mock HTTP):** `dotnet test src/MaksIT.CertsUI.Client.Tests`
 
 ### 1) Create a read-capable API key
 
-Create the API key in the WebUI (or API) and copy the plaintext key once. The E2E flow expects this key in `X-API-KEY`.
+Create the API key in the WebUI (or API) and copy the plaintext key once. Encode it into `CERTSUI_E2E_CREDENTIALS` (see e2e README).
 
-### 2) Set E2E environment variables
+### 2) Set credentials and optional HA env
 
 ```powershell
-$env:CERTSUI_E2E_BASE_URL = "https://certs-ui.<your-domain>"
-$env:CERTSUI_E2E_API_KEY = "<paste-api-key>"
-$env:CERTSUI_E2E_EXPECT_MIN_DISTINCT_INSTANCES = "2"
+# See src/e2e-tests/README.md for Base64 encoding of <baseUrl><US><apiKey>
+[Environment]::SetEnvironmentVariable('CERTSUI_E2E_CREDENTIALS', '<base64>', 'User')
+$env:CERTSUI_E2E_EXPECT_MIN_DISTINCT_INSTANCES = '2'   # k8s HA only
 ```
 
 Notes:
-- `CERTSUI_E2E_BASE_URL` must be the public ingress URL (no `/api` suffix).
-- **PowerShell E2E:** `MultiReplica` defaults to **1** instance (Docker Compose). Set `CERTSUI_E2E_EXPECT_MIN_DISTINCT_INSTANCES=2` for k8s HA.
-- **dotnet test E2E:** `CERTSUI_E2E_EXPECT_MIN_DISTINCT_INSTANCES` defaults to `2` if omitted.
+- Base URL must be the public ingress URL (no `/api` suffix).
+- `MultiReplica` defaults to **1** instance (Docker Compose). Set `CERTSUI_E2E_EXPECT_MIN_DISTINCT_INSTANCES=2` for k8s HA.
 - For HA runs, ensure ingress session affinity is disabled (or not sticky).
 
 ### 3) Run the API-key E2E suite
-
-**dotnet test:**
-
-```powershell
-dotnet test .\src\MaksIT.CertsUI.Client.Tests\MaksIT.CertsUI.Client.Tests.csproj --filter "Category=E2E"
-```
-
-**PowerShell scenarios** (set `CERTSUI_E2E_CREDENTIALS` — same encoding as Vault `VAULT_E2E_CREDENTIALS`):
 
 ```powershell
 pwsh -File .\src\e2e-tests\Test-CertsUiApiKeyE2E.ps1
 # or: .\src\e2e-tests\Test-CertsUiApiKeyE2E.bat
 ```
 
-See [README.E2E.md](src/MaksIT.CertsUI.Client.Tests/README.E2E.md) for credential encoding and scenario filters (`-Scenario Health`, etc.).
+Scenario filters: `pwsh -File .\src\e2e-tests\Test-CertsUiApiKeyE2E.ps1 -Scenario MultiReplica`
 
-### 4) Optional: run only the replica-distribution assertion
+### 4) Optional: run only the replica-distribution scenario
 
 ```powershell
-dotnet test .\src\MaksIT.CertsUI.Client.Tests\MaksIT.CertsUI.Client.Tests.csproj --filter "FullyQualifiedName~ApiKey_StickyLessRequests_RuntimeInstanceId_ObservesMultipleReplicas"
+pwsh -File .\src\e2e-tests\Test-CertsUiApiKeyE2E.ps1 -Scenario MultiReplica
 ```
 
-If this test reports fewer instances than expected, check:
+If this scenario reports fewer instances than expected, check:
 - `components.server.replicaCount` in Helm values;
 - ingress/load-balancer session affinity settings;
 - rollout completion (`kubectl -n certs-ui get pods -l app.kubernetes.io/component=server`).

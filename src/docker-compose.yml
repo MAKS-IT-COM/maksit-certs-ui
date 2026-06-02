@@ -1,5 +1,5 @@
-# Naming: maksit-certs-ui-<role> for containers and local images (parallel to maksit-vault-* in the Vault repo).
-# DOCKER_REGISTRY is optional (e.g. cr.example.com/). YARP upstreams: docker-compose.override.yml sets ReverseProxy__* env (Compose DNS: client / server); Kubernetes uses Helm-injected <fullname>-client|server.
+# Naming: maksit-certs-ui-<role> for containers and local images (unique prefix per product).
+# DOCKER_REGISTRY is optional (e.g. cr.example.com/). YARP upstreams: docker-compose.override.yml sets ReverseProxy__* env (Compose DNS: client / server); Kubernetes uses Helm <fullname>-client|server.
 name: maksit-certs-ui
 
 services:

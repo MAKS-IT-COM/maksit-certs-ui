@@ -1,7 +1,7 @@
-# See docker-compose.yml header for maksit-certs-ui-* container/image naming (no clash with maksit-vault-*).
-# Postgres + pgAdmin layout mirrors maksit-vault/src/docker-compose.override.yml (local dev).
+# See docker-compose.yml header for maksit-certs-ui-* container/image naming.
+# Postgres + pgAdmin are for local Compose only (Helm uses external PostgreSQL — see certsServerSecrets.certsEngineConfiguration.connectionString).
 #
-# WebUI client: @maks-it.com/webui-* packages are installed from npm during docker build.
+# WebUI client: @maks-it.com/webui-* from npm; MaksIT.WebUI/Dockerfile runs npm install && npm run dev.
 networks:
   maksit-certs-ui-network:
     driver: bridge
@@ -40,7 +40,8 @@ services:
     networks:
       - maksit-certs-ui-network
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   postgres:
     restart: unless-stopped
@@ -55,6 +56,12 @@ services:
       - D:/Compose/MaksIT.CertsUI/postgresql/data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U certsui -d certsui"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
 
   # pgAdmin: mount servers.json (see repo src/postgresql/servers.json.example). Store password for user certsui in pgAdmin or use PassFile.
   pgadmin:

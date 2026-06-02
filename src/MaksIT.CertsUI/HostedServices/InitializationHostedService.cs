@@ -1,9 +1,10 @@
-using Microsoft.Extensions.Hosting;
+using System.Diagnostics;
 using MaksIT.CertsUI.Engine;
 using MaksIT.CertsUI.Engine.DomainServices;
 using MaksIT.CertsUI.Engine.Infrastructure;
 using MaksIT.CertsUI.Engine.Persistence.Services;
 using MaksIT.CertsUI.Engine.RuntimeCoordination;
+using MaksIT.CertsUI.Infrastructure;
 
 namespace MaksIT.CertsUI.HostedServices;
 
@@ -11,7 +12,8 @@ public sealed class InitializationHostedService(
   ILogger<InitializationHostedService> logger,
   IServiceProvider serviceProvider,
   IRuntimeLeaseService leaseService,
-  IRuntimeInstanceId runtimeInstance
+  IRuntimeInstanceId runtimeInstance,
+  CertsStartupState startupState
 ) : IHostedService {
 
   private static readonly TimeSpan BootstrapLeaseTtl = TimeSpan.FromMinutes(5);
@@ -20,6 +22,8 @@ public sealed class InitializationHostedService(
   private readonly IServiceProvider _serviceProvider = serviceProvider;
   private readonly IRuntimeLeaseService _leaseService = leaseService;
   private readonly IRuntimeInstanceId _runtimeInstance = runtimeInstance;
+  private readonly CertsStartupState _startupState = startupState;
+  private readonly Stopwatch _bootstrapStopwatch = Stopwatch.StartNew();
 
   public async Task StartAsync(CancellationToken cancellationToken) {
     await Initialize(cancellationToken);
@@ -31,6 +35,7 @@ public sealed class InitializationHostedService(
 
   private async Task Initialize(CancellationToken cancellationToken) {
     const int delayMilliseconds = 2000;
+    ((IDatabaseStartupObserver)_startupState).OnPhaseStarted(CertsApplicationStartupPhases.BootstrapCoordination);
     while (!cancellationToken.IsCancellationRequested) {
       try {
         _logger.LogInformation("Running startup coordination (Postgres bootstrap lease)...");
@@ -58,7 +63,7 @@ public sealed class InitializationHostedService(
               _logger.LogWarning("Bootstrap lease release: {Messages}", string.Join("; ", released.Messages ?? []));
           }
 
-          _logger.LogInformation("Startup coordination completed (this instance held the bootstrap lease).");
+          CompleteBootstrapCoordination("this instance held the bootstrap lease");
           return;
         }
 
@@ -66,7 +71,7 @@ public sealed class InitializationHostedService(
           var userAuthFollower = followerScope.ServiceProvider.GetRequiredService<IUserAuthorizationPersistenceService>();
           while (!cancellationToken.IsCancellationRequested) {
             if (await IsClusterIdentityReadyAsync(userAuthFollower, cancellationToken).ConfigureAwait(false)) {
-              _logger.LogInformation("Startup coordination completed (another instance bootstrapped identity).");
+              CompleteBootstrapCoordination("another instance bootstrapped identity");
               return;
             }
 
@@ -86,6 +91,7 @@ public sealed class InitializationHostedService(
           _logger.LogInformation(ex, "Startup coordination aborted while stopping host.");
           throw new OperationCanceledException("Host stopped during startup coordination.", ex, cancellationToken);
         }
+        ((IDatabaseStartupObserver)_startupState).OnPhaseFailed(CertsApplicationStartupPhases.BootstrapCoordination, _bootstrapStopwatch.Elapsed, ex);
         _logger.LogError(ex, "Startup coordination failed. Retrying...");
         try {
           await Task.Delay(delayMilliseconds, cancellationToken).ConfigureAwait(false);
@@ -96,6 +102,16 @@ public sealed class InitializationHostedService(
         }
       }
     }
+  }
+
+  private void CompleteBootstrapCoordination(string reason) {
+    _startupState.MarkBootstrapCoordinationComplete(_bootstrapStopwatch.Elapsed);
+    var snapshot = _startupState.GetSnapshot();
+    _logger.LogInformation(
+      "Startup coordination completed ({Reason}). Application ready after {TotalMs} ms (phase={Phase}).",
+      reason,
+      (int)snapshot.TotalElapsed.TotalMilliseconds,
+      snapshot.CurrentPhase);
   }
 
   private static Task<bool> IsClusterIdentityReadyAsync(

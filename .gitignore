@@ -193,7 +193,6 @@ ClientBin/
 *.pfx
 *.publishsettings
 node_modules/
-dist/
 orleans.codegen.cs
 .directory
 
@@ -262,7 +261,6 @@ paket-files/
 __pycache__/
 *.pyc
 
-# SonarQube
-.scannerwork/
-.sonarlint/
-src/MaksIT.WebUI/public/pdf.worker.min.mjs
+# Custom
+dist/
+![Uu]tils/**

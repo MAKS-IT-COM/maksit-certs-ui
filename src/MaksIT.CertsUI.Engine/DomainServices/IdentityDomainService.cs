@@ -48,7 +48,7 @@ public class IdentityDomainService(
   ILogger<IdentityDomainService> logger,
   IIdentityPersistenceService identityPersistenceService,
   IUserAuthorizationPersistenceService userAuthorizationPersistenceService,
-  ICertsEngineConfiguration vaultEngineConfiguration,
+  ICertsEngineConfiguration certsEngineConfiguration,
   IAdminUser adminUser,
   IJwtSettingsConfiguration jwtSettingsConfiguration,
   ITwoFactorSettingsConfiguration twoFactorSettingsConfiguration
@@ -57,7 +57,7 @@ public class IdentityDomainService(
   private readonly ILogger<IdentityDomainService> _logger = logger;
   private readonly IIdentityPersistenceService _identityPersistenceService = identityPersistenceService;
   private readonly IUserAuthorizationPersistenceService _userAuthorizationPersistenceService = userAuthorizationPersistenceService;
-  private readonly ICertsEngineConfiguration _vaultEngineConfiguration = vaultEngineConfiguration;
+  private readonly ICertsEngineConfiguration _certsEngineConfiguration = certsEngineConfiguration;
   private readonly IAdminUser _adminUser = adminUser;
   private readonly IJwtSettingsConfiguration _jwtSettingsConfiguration = jwtSettingsConfiguration;
   private readonly ITwoFactorSettingsConfiguration _twoFactorSettingsConfiguration = twoFactorSettingsConfiguration;
@@ -85,9 +85,9 @@ public class IdentityDomainService(
     }
 
     // Use the same pepper as login so hashed password matches validation; require it to be set (e.g. from appsecrets.json).
-    var pepper = _vaultEngineConfiguration.JwtSettingsConfiguration?.PasswordPepper;
+    var pepper = _certsEngineConfiguration.JwtSettingsConfiguration?.PasswordPepper;
     if (string.IsNullOrWhiteSpace(pepper)) {
-      return Result<User?>.BadRequest(null, "PasswordPepper is not set. Set Configuration:VaultEngineConfiguration:JwtSettingsConfiguration:PasswordPepper in appsecrets.json (or config) so bootstrap and login use the same pepper.");
+      return Result<User?>.BadRequest(null, "PasswordPepper is not set. Set Configuration:CertsEngineConfiguration:JwtSettingsConfiguration:PasswordPepper in appsecrets.json (or config) so bootstrap and login use the same pepper.");
     }
 
     var usernameTrimmed = (_adminUser.Username ?? "").Trim();
@@ -151,7 +151,7 @@ public class IdentityDomainService(
       return Result<JwtToken?>.Unauthorized(null, "User is not active.");
     }
 
-    var pepper = _vaultEngineConfiguration.JwtSettingsConfiguration?.PasswordPepper;
+    var pepper = _certsEngineConfiguration.JwtSettingsConfiguration?.PasswordPepper;
     if (string.IsNullOrWhiteSpace(pepper)) {
       _logger.LogWarning("Login failed: PasswordPepper is not set (user '{Username}')", user.Username);
       return Result<JwtToken?>.Unauthorized(null, "Invalid username or password.");
@@ -280,7 +280,7 @@ public class IdentityDomainService(
     if (user.TwoFactorEnabled)
       return Result<List<string>?>.BadRequest(null, "Two-factor authentication is already enabled.");
 
-    var pepper = _vaultEngineConfiguration.JwtSettingsConfiguration.PasswordPepper;
+    var pepper = _certsEngineConfiguration.JwtSettingsConfiguration.PasswordPepper;
     if (string.IsNullOrWhiteSpace(pepper))
       return Result<List<string>?>.InternalServerError(null, "Password pepper is not configured.");
 

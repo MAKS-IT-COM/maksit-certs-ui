@@ -16,6 +16,7 @@ public sealed class WebApiTestFixture : IDisposable
         {
             CertsEngineConfiguration = new CertsEngineConfiguration
             {
+                ConnectionString = "Host=127.0.0.1;Port=5432;Database=certsui_test;Username=test;Password=test",
                 Admin = new AdminUser
                 {
                     Username = "admin",

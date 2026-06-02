@@ -4,6 +4,8 @@ This document describes how authentication (login), token refresh, and logout wo
 
 **Audience:** Backend (C# / ASP.NET) and Frontend (TypeScript / React) developers.
 
+**See also:** [User and API key RBAC](./USER_AND_API_KEY_RBAC.md) — how JWT identity relates to `X-API-KEY` principals, global admin on user vs on key, and `CertsUIAuthorizationFilter` on protected routes.
+
 **MaksIT.CertsUI** persists users and refresh tokens in **PostgreSQL**. Shared **MaksIT.Models** types may include optional **2FA** fields; behavior follows this WebAPI and WebUI implementation.
 
 ---

@@ -220,6 +220,7 @@ Item exists; fields change; no `collectionItemOperation` on the item (or only ne
 ## 6. Related docs
 
 - **MaksIT.Core:** `PatchOperation`, `PatchRequestModelBase` (README / XML).
+- [User and API key RBAC](./USER_AND_API_KEY_RBAC.md) · [RBAC reference](./RBAC_REFERENCE.md)
 
 ---
 

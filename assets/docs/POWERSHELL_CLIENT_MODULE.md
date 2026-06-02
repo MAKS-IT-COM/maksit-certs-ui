@@ -2,7 +2,7 @@
 
 PowerShell module that exposes the **MaksIT CertsUI API** via custom cmdlets, built on **MaksIT.CertsUI.Client** (C# / .NET).
 
-**Source:** `src/MaksIT.CertsUI.Client.PowerShell/` · **E2E:** [README.E2E.md](../../src/MaksIT.CertsUI.Client.Tests/README.E2E.md)
+**Source:** `src/MaksIT.CertsUI.Client.PowerShell/` · **Auth & routes:** [USER_AND_API_KEY_RBAC.md](./USER_AND_API_KEY_RBAC.md) · **Permission matrices:** [RBAC_REFERENCE.md](./RBAC_REFERENCE.md) · **E2E:** [src/e2e-tests/README.md](../../src/e2e-tests/README.md) · **Repo entry:** [README.md](../../README.md)
 
 ---
 
@@ -66,7 +66,7 @@ PowerShell module that exposes the **MaksIT CertsUI API** via custom cmdlets, bu
 |--------|-------------|
 | `Connect-CertsUI` | Set base URL and API key for the session |
 | `Disconnect-CertsUI` | Clear session |
-| `Test-CertsUIHealth` | `GET /health/live` and `/health/ready` |
+| `Test-CertsUIHealth` | `GET /health/live` and `/health/ready` (ready returns 503 until migrations and bootstrap finish) |
 | `Get-CertsUIAccounts` | `GET /api/accounts` |
 | `Get-CertsUIAccount` | `GET /api/account/{id}` |
 | `Get-CertsUIRuntimeInstanceId` | `GET /api/debug/runtime-instance-id` |
@@ -76,4 +76,4 @@ PowerShell module that exposes the **MaksIT CertsUI API** via custom cmdlets, bu
 
 ## E2E scenarios
 
-PowerShell scenarios under [`src/e2e-tests/`](../src/e2e-tests/) build this module and run registered tests. See [README.E2E.md](../../src/MaksIT.CertsUI.Client.Tests/README.E2E.md).
+PowerShell scenarios under [`src/e2e-tests/`](../src/e2e-tests/) build this module and run registered tests. See [src/e2e-tests/README.md](../../src/e2e-tests/README.md).

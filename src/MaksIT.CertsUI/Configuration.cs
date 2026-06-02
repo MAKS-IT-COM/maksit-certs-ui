@@ -56,8 +56,7 @@ public class Agent {
 
 public class CertsEngineConfiguration : ICertsEngineConfiguration {
 
-  /// <summary>Npgsql connection string; optional when using legacy <c>ConnectionStrings:Certs</c> (resolved in <c>Program.cs</c>).</summary>
-  public string ConnectionString { get; set; } = "";
+  public required string ConnectionString { get; set; }
 
   /// <summary>When true, add-only schema sync after FluentMigrator (ADD COLUMN only, never DROP legacy/renamed columns). Set explicitly in appsettings/Helm (deserialization defaults missing bools to false).</summary>
   public bool AutoSyncSchema { get; set; }

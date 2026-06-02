@@ -16,7 +16,7 @@ Large or architectural changes are best discussed first (see [Contact](#contact)
 
 **Where the rules live:** layering, folder responsibilities, persistence vs host boundaries, DI lifetimes, and an AI/contributor checklist are documented in **[assets/docs/ARCHITECTURE_LAYERING.md](assets/docs/ARCHITECTURE_LAYERING.md)**. Read that before adding new Engine persistence, services, or cross-project dependencies.
 
-**Summary:** `MaksIT.CertsUI.Engine` holds domain, PostgreSQL persistence (Linq2Db), migrations, and ACME engine code; it returns `MaksIT.Results` types, not HTTP responses. `MaksIT.CertsUI` is the web host (controllers, app services, ProblemDetails). Topic-specific design notes also live under [assets/docs/](assets/docs/) (HA, auth, proxy, etc.).
+**Summary:** `MaksIT.CertsUI.Engine` holds domain, PostgreSQL persistence (Linq2Db), migrations, and ACME engine code; it returns `MaksIT.Results` types, not HTTP responses. `MaksIT.CertsUI` is the web host (controllers, app services, ProblemDetails). Topic-specific design notes also live under [assets/docs/](assets/docs/) (HA, auth, RBAC, proxy, etc.). For authorization work, read [USER_AND_API_KEY_RBAC.md](assets/docs/USER_AND_API_KEY_RBAC.md) and [RBAC_REFERENCE.md](assets/docs/RBAC_REFERENCE.md) before changing filters or identity/API-key services.
 
 ## Development setup
 
@@ -40,7 +40,7 @@ Use `Debug` while iterating locally if you prefer.
 
 Follow [README.md](README.md) for Podman Compose, Docker Compose, or Kubernetes (Helm). That is the supported way to exercise the WebAPI, WebUI, and reverse proxy together.
 
-**Automated tests:** from the repo root, `dotnet test src/MaksIT.CertsUI.Engine.Tests` and `dotnet test src/MaksIT.CertsUI.Tests` (the latter may require a reachable PostgreSQL when integration tests run). For UI-only or deployment changes, manual verification through the WebUI and compose or cluster setup still applies.
+**Automated tests:** CI runs `utils/engines/test` (Engine, Client, and main test projects). From the repo root: `dotnet test src/MaksIT.CertsUI.Engine.Tests`, `dotnet test src/MaksIT.CertsUI.Client.Tests` (mock HTTP only), and `dotnet test src/MaksIT.CertsUI.Tests` (Testcontainers PostgreSQL for integration tests). **E2E** against a live deployment is manual only: [`src/e2e-tests/README.md`](src/e2e-tests/README.md). For UI-only or deployment changes, manual verification through the WebUI and compose or cluster setup still applies.
 
 ## Pull requests
 
