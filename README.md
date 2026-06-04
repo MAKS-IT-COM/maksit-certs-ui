@@ -6,9 +6,9 @@ MaksIT.CertsUI is a powerful, container-native ACMEv2 client built to simplify a
 
 Designed for modern infrastructure, it combines a robust WebAPI, intuitive WebUI, and lightweight edge Agent to deliver fully automated certificate issuance, renewal, and deployment across Docker, Podman, and Kubernetes environments. MaksIT.CertsUI supports the HTTP-01 challenge and follows the official [Let’s Encrypt guidelines](https://letsencrypt.org/docs/) while implementing recommended security and operational best practices.
 
-Authorization is **scope-based RBAC** for **users** and **API keys** (organization-scoped **Identity** / **ApiKey** flags). **Global administrator** on a signed-in user (JWT) and on an API key are evaluated **separately**—a user being admin does not automatically grant the same to a key they create. Certificate and account endpoints today accept **any authenticated** principal; see the matrices for detail.
+Authorization is **scope-based RBAC** for **users** and **API keys** (organization-scoped **Identity** / **ApiKey** flags). **Global administrator** on a signed-in user (JWT) and on an API key are evaluated **separately**—a user being admin does not automatically grant the same to a key they create. Certificate and account endpoints today accept **any authenticated** principal; enforcement is in **`src/MaksIT.CertsUI/`** (authorization filter, identity, and API-key services). Contributors: **AGENTS.md** → **maksit-auth-rbac**.
 
-Permission matrices and scope semantics are documented in the [RBAC reference](assets/docs/RBAC_REFERENCE.md); authentication mechanics and routes are in [User and API key RBAC](assets/docs/USER_AND_API_KEY_RBAC.md).
+Contributors and AI agents: architecture skill index in **[AGENTS.md](AGENTS.md)** (homelab `common/maksit-*` skills via `.cursor/maksit-skills.json`). **Source code** is authoritative when docs and behavior differ.
 
 ---
 
@@ -26,12 +26,7 @@ If you find this project useful, please consider supporting its development:
   - [Table of Contents](#table-of-contents)
   - [Changelog](#changelog)
   - [Contributing](#contributing)
-  - [User and API key RBAC](#user-and-api-key-rbac)
-  - [RBAC reference](#rbac-reference)
-  - [Patch and delta reference](#patch-and-delta-reference)
-  - [Login and refresh token architecture](#login-and-refresh-token-architecture)
-  - [Reverse proxy routing (YARP)](#reverse-proxy-routing-yarp)
-  - [High availability architecture](#high-availability-architecture)
+  - [Architecture and documentation](#architecture-and-documentation)
   - [Architecture](#architecture)
     - [Current Limitations](#current-limitations)
     - [Architecture Scheme](#architecture-scheme)
@@ -66,81 +61,19 @@ Version history and release notes live in [CHANGELOG.md](CHANGELOG.md).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, pull request expectations, and security reporting.
 
-## User and API key RBAC
+## Architecture and documentation
 
-How JWT and **`X-API-KEY`** principals are resolved, how **`CertsUIAuthorizationFilter`** differs from Vault’s route split, **`GetActingJwtTokenData`**, and where rules live in code: **[assets/docs/USER_AND_API_KEY_RBAC.md](assets/docs/USER_AND_API_KEY_RBAC.md)**.
+**Contributors / AI agents:** skill index in **[AGENTS.md](AGENTS.md)** (homelab `common/maksit-*` skills — layering, RBAC, HA, Helm, etc.). **Operators:** runbooks and behavior below, [CHANGELOG.md](CHANGELOG.md), and Helm **`NOTES.txt`** after install.
 
-- [1. Two authentication mechanisms](assets/docs/USER_AND_API_KEY_RBAC.md#1-two-authentication-mechanisms)
-- [2. Two principal types (what RBAC sees)](assets/docs/USER_AND_API_KEY_RBAC.md#2-two-principal-types-what-rbac-sees)
-  - [2.1 Global administrator: user vs key](assets/docs/USER_AND_API_KEY_RBAC.md#21-global-administrator-user-vs-key-easy-to-confuse)
-  - [2.2 Loading API key authorization](assets/docs/USER_AND_API_KEY_RBAC.md#22-loading-api-key-authorization)
-- [3. Shared RBAC helpers (`ServiceBase`)](assets/docs/USER_AND_API_KEY_RBAC.md#3-shared-rbac-helpers-servicebase)
-- [4. Example: accounts and ACME](assets/docs/USER_AND_API_KEY_RBAC.md#4-example-accounts-and-acme-accountservice-certsflowservice)
-- [5. Identity and API key administration](assets/docs/USER_AND_API_KEY_RBAC.md#5-identity-and-api-key-administration-getactingjwttokendata)
-- [6. Troubleshooting](assets/docs/USER_AND_API_KEY_RBAC.md#6-troubleshooting)
-- [7. Code map](assets/docs/USER_AND_API_KEY_RBAC.md#7-code-map)
+**Server health endpoints:**
 
-## RBAC reference
+| Path | Use |
+|------|-----|
+| `GET /health/live` | Liveness — process up |
+| `GET /health/ready` | Readiness and load balancers — **503** until bootstrap coordination completes, then PostgreSQL check |
+| `GET /health/startup` | Startup diagnostics — JSON phase snapshot (migrations, schema sync, bootstrap) |
 
-Scope flags, intended vs enforced rules, and permission matrices for Identity, API keys, and ACME endpoints: **[assets/docs/RBAC_REFERENCE.md](assets/docs/RBAC_REFERENCE.md)**.
-
-- [1. Scope model](assets/docs/RBAC_REFERENCE.md#1-scope-model)
-- [2. Shorthand columns (matrices below)](assets/docs/RBAC_REFERENCE.md#2-shorthand-columns-matrices-below)
-- [3. Global administrator](assets/docs/RBAC_REFERENCE.md#3-global-administrator)
-- [4. Identity (users)](assets/docs/RBAC_REFERENCE.md#4-identity-users)
-  - [4.1 Enforced in code today](assets/docs/RBAC_REFERENCE.md#41-enforced-in-code-today-source-of-truth)
-  - [4.2 Intended policy](assets/docs/RBAC_REFERENCE.md#42-intended-policy-target-behavior-align-crud-with-this)
-- [5. ACME, accounts, cache, and agent](assets/docs/RBAC_REFERENCE.md#5-acme-accounts-cache-and-agent)
-- [6. Managing API keys](assets/docs/RBAC_REFERENCE.md#6-managing-api-keys)
-- [7. Calling the API with an API key](assets/docs/RBAC_REFERENCE.md#7-calling-the-api-with-an-api-key)
-- [8. Comparison with MaksIT.Vault](assets/docs/RBAC_REFERENCE.md#8-comparison-with-maksitvault)
-
-## Patch and delta reference
-
-How PATCH payloads (deltas) are built and applied is documented in **[assets/docs/PATCH_DELTA_REFERENCE.md](assets/docs/PATCH_DELTA_REFERENCE.md)**. It matches the **MaksIT.Core** contract; this repo focuses on **account** PATCH and **`hostnames`** in the WebUI.
-
-- [TL;DR (start here)](assets/docs/PATCH_DELTA_REFERENCE.md#tldr-start-here)
-- [1. Core contract (MaksIT.Core)](assets/docs/PATCH_DELTA_REFERENCE.md#1-core-contract-maksitcore)
-- [2. Backend (BE) rules](assets/docs/PATCH_DELTA_REFERENCE.md#2-backend-be-rules)
-- [3. Frontend (FE) rules](assets/docs/PATCH_DELTA_REFERENCE.md#3-frontend-fe-rules)
-- [4. Payload examples](assets/docs/PATCH_DELTA_REFERENCE.md#4-payload-examples)
-- [5. Quick reference](assets/docs/PATCH_DELTA_REFERENCE.md#5-quick-reference)
-- [6. Related docs](assets/docs/PATCH_DELTA_REFERENCE.md#6-related-docs)
-- [7. Current implementation vs reference](assets/docs/PATCH_DELTA_REFERENCE.md#7-current-implementation-vs-reference-maksit-certsui)
-
-## Login and refresh token architecture
-
-How login, JWT access tokens, refresh tokens, axios interceptors, and logout interact is documented in **[assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md)**. **Certs WebAPI** persists users in PostgreSQL; **2FA** follows whatever this repo’s backend and WebUI implement (shared models may carry optional fields).
-
-- [1. Overview](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md#1-overview)
-- [2. Token model](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md#2-token-model)
-- [3. Backend flow](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md#3-backend-flow)
-- [4. Frontend flow](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md#4-frontend-flow)
-- [5. API summary](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md#5-api-summary)
-- [6. Sequence overview](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md#6-sequence-overview)
-- [7. Security notes](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md#7-security-notes)
-- [8. Key files reference](assets/docs/LOGIN_AND_REFRESH_TOKEN_ARCHITECTURE.md#8-key-files-reference)
-
-## Reverse proxy routing (YARP)
-
-How the **YARP** edge splits **ACME challenge**, **Swagger**, **WebAPI**, and **WebUI** traffic is documented in **[assets/docs/REVERSE_PROXY_ROUTING.md](assets/docs/REVERSE_PROXY_ROUTING.md)**, including **`/.well-known/acme-challenge/`** for HTTP-01.
-
-- [Route table](assets/docs/REVERSE_PROXY_ROUTING.md#route-table)
-- [HTTP-01 (Let’s Encrypt)](assets/docs/REVERSE_PROXY_ROUTING.md#http-01-lets-encrypt)
-- [Kubernetes (Helm)](assets/docs/REVERSE_PROXY_ROUTING.md#kubernetes-helm)
-- [Automation and clients](assets/docs/REVERSE_PROXY_ROUTING.md#automation-and-clients)
-- [Direct vs proxied ports (local dev)](assets/docs/REVERSE_PROXY_ROUTING.md#direct-vs-proxied-ports-local-dev)
-- [Related files](assets/docs/REVERSE_PROXY_ROUTING.md#related-files)
-
-## High availability architecture
-
-High-availability behavior for ACME coordination, challenge coherence, leases, background services, and Kubernetes probes is documented in **[assets/docs/HA_ARCHITECTURE.md](assets/docs/HA_ARCHITECTURE.md)**.
-
-- [Goals and runtime model](assets/docs/HA_ARCHITECTURE.md#goals)
-- [Lease design](assets/docs/HA_ARCHITECTURE.md#lease-design)
-- [HTTP-01 coherence design](assets/docs/HA_ARCHITECTURE.md#http-01-coherence-design)
-- [Kubernetes behavior](assets/docs/HA_ARCHITECTURE.md#kubernetes-behavior)
-- [Files involved](assets/docs/HA_ARCHITECTURE.md#files-involved)
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup.
 
 ---
 
@@ -723,7 +656,7 @@ The Helm chart in [`src/helm`](src/helm) deploys **server**, **client**, and **r
 3. **Verify** that pods in the `certs-ui` namespace can reach the database host and port (DNS, network policies, TLS/`SslMode` as required).
 4. **Configure** `certsServerSecrets.certsEngineConfiguration.connectionString` in your values overlay or Secret (see [step 2](#2-prepare-namespace-secrets-and-configmap) and [`src/helm/values.yaml`](src/helm/values.yaml)). The chart default is an empty placeholder until you set it.
 
-For **high availability** (`components.server.replicaCount` > 1), use a **shared** PostgreSQL deployment that every server replica can reach. The application stores users, refresh tokens, ACME sessions, HTTP-01 challenge tokens, and runtime leases in PostgreSQL—not on server PVCs. See [High availability architecture](#high-availability-architecture) and [`assets/docs/HA_ARCHITECTURE.md`](assets/docs/HA_ARCHITECTURE.md). A single PostgreSQL instance is acceptable for development or single-replica clusters if it meets your availability and backup needs.
+For **high availability** (`components.server.replicaCount` > 1), use a **shared** PostgreSQL deployment that every server replica can reach. The application stores users, refresh tokens, ACME sessions, HTTP-01 challenge tokens, and runtime leases in PostgreSQL—not on server PVCs. Server replicas are **symmetric** (no elected primary); short-lived Postgres leases (`certs-ui-bootstrap`, `certs-ui-renewal-sweep`) coordinate bootstrap and renewal sweeps — see Helm **`NOTES.txt`** after install and [Health endpoints](#architecture-and-documentation) above. A single PostgreSQL instance is acceptable for development or single-replica clusters if it meets your availability and backup needs.
 
 Unlike Docker/Podman Compose in this repo (which includes a `postgres` service in `docker-compose`), the Kubernetes chart expects you to operate the database separately.
 

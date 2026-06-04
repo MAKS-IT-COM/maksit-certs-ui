@@ -14,9 +14,9 @@
     <PackageReference Include="FluentMigrator.Runner.Postgres" Version="8.0.1" />
     <PackageReference Include="linq2db" Version="6.3.0" />
     <PackageReference Include="linq2db.PostgreSQL" Version="6.3.0" />
-    <PackageReference Include="MaksIT.Core" Version="1.6.5" />
+    <PackageReference Include="MaksIT.Core" Version="1.6.7" />
     <PackageReference Include="MaksIT.Dapr" Version="2.0.0" />
-    <PackageReference Include="MaksIT.Results" Version="2.0.1" />
+    <PackageReference Include="MaksIT.Results" Version="2.0.2" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />

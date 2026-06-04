@@ -1,0 +1,23 @@
+---
+description: Load MaksIT agent skills from homelab common/
+globs: "**/*.{cs,csproj,slnx,ts,tsx,json,md,ps1,yml,yaml}"
+alwaysApply: true
+---
+
+# MaksIT skills (maksit-certs-ui)
+
+Complementary skills (no precedence). Read each `SKILL.md` when relevant:
+
+1. `E:\Users\maksym\source\repos\private\homelab\ai\skills\common\csharp\SKILL.md`
+2. `E:\Users\maksym\source\repos\private\homelab\ai\skills\common\maksit-layering\SKILL.md`
+3. `E:\Users\maksym\source\repos\private\homelab\ai\skills\common\maksit-auth-rbac\SKILL.md`
+4. `E:\Users\maksym\source\repos\private\homelab\ai\skills\common\maksit-identity-tokens\SKILL.md`
+5. `E:\Users\maksym\source\repos\private\homelab\ai\skills\common\maksit-patch\SKILL.md`
+6. `E:\Users\maksym\source\repos\private\homelab\ai\skills\common\maksit-ha\SKILL.md`
+7. `E:\Users\maksym\source\repos\private\homelab\ai\skills\common\maksit-reverse-proxy\SKILL.md`
+8. `E:\Users\maksym\source\repos\private\homelab\ai\skills\common\react-typescript\SKILL.md`
+9. `E:\Users\maksym\source\repos\private\homelab\ai\skills\common\helm\SKILL.md`
+10. `E:\Users\maksym\source\repos\private\homelab\ai\skills\common\maksit-repo-maintenance\SKILL.md`
+11. `E:\Users\maksym\source\repos\private\homelab\ai\skills\local-ollama\SKILL.md` — local Ollama offload (`@local-ollama`)
+
+Manifest: `.cursor/maksit-skills.json`.

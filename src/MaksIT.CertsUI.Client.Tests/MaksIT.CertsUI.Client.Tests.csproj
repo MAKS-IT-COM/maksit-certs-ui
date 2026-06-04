@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="MaksIT.Core" Version="1.6.5" />
+    <PackageReference Include="MaksIT.Core" Version="1.6.7" />
     <ProjectReference Include="..\MaksIT.CertsUI.Client\MaksIT.CertsUI.Client.csproj" />
     <ProjectReference Include="..\MaksIT.CertsUI.Contracts\MaksIT.CertsUI.Contracts.csproj" />
   </ItemGroup>

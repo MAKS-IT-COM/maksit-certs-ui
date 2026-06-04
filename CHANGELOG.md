@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.2] - 2026-06-04
+
+**Release status:** **3.3.4** is the last published release. **3.5.2** is a patch on **3.5.1** (documentation consolidation, dependency bumps).
+
+### Changed
+
+- **Documentation:** Removed **`assets/docs/`** topic guides (layering, HA, auth, RBAC, proxy, patch, PowerShell); README and CONTRIBUTING point contributors at **[AGENTS.md](AGENTS.md)** (homelab `common/maksit-*` skills); operator-facing health and HA notes stay in README and Helm **`NOTES.txt`**.
+- **Helm:** **`NOTES.txt`** health probe note is self-contained (no link to removed HA doc).
+- **Dependencies:** **MaksIT.Core** **1.6.7**, **MaksIT.Results** **2.0.2** (host, Engine, Client.Tests).
+
 ## [3.5.1] - 2026-06-02
 
 **Release status:** **3.3.4** is the last published release. **3.5.1** is a patch on **3.5.0** (startup health, Helm secrets alignment, RBAC docs, Web UI token refresh).

@@ -48,7 +48,7 @@ Use `existingConfigMap` / `existingSecret` to mount resources created outside th
 
 PostgreSQL: **external** — set **`certsServerSecrets.certsEngineConfiguration.connectionString`** (or mount **`existingSecret`** with the same **`appsecrets.json`** shape). The app waits via in-process **`PostgresStartupWait`** during migrations and bootstrap. Local dev: **`docker-compose`** **`postgres`** service (not part of this chart).
 
-Health while starting: **`GET /health/startup`** (JSON phase snapshot); traffic should use **`GET /health/ready`** (503 until bootstrap completes). See **`assets/docs/HA_ARCHITECTURE.md`**.
+Health while starting: **`GET /health/startup`** (JSON phase snapshot); traffic should use **`GET /health/ready`** (503 until bootstrap completes). Server **`startupProbe`** defaults to **`/health/ready`** (see chart **`values.yaml`**).
 
 ------------------------------------------------------------
 ## Uninstall

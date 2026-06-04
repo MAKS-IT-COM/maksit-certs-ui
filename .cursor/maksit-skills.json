@@ -1,0 +1,17 @@
+{
+  "$schema": "homelab-maksit-skills-manifest-v2",
+  "sharedSkillsRoot": "E:\\Users\\maksym\\source\\repos\\private\\homelab\\ai\\skills",
+  "sharedSkills": [
+    "common/csharp",
+    "common/maksit-layering",
+    "common/maksit-auth-rbac",
+    "common/maksit-identity-tokens",
+    "common/maksit-patch",
+    "common/maksit-ha",
+    "common/maksit-reverse-proxy",
+    "common/react-typescript",
+    "common/helm",
+    "common/maksit-repo-maintenance",
+    "local-ollama"
+  ]
+}

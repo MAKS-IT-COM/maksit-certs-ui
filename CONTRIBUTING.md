@@ -14,9 +14,9 @@ Large or architectural changes are best discussed first (see [Contact](#contact)
 
 ## Architecture and code layout
 
-**Where the rules live:** layering, folder responsibilities, persistence vs host boundaries, DI lifetimes, and an AI/contributor checklist are documented in **[assets/docs/ARCHITECTURE_LAYERING.md](assets/docs/ARCHITECTURE_LAYERING.md)**. Read that before adding new Engine persistence, services, or cross-project dependencies.
+**Canonical (contributors / AI agents):** [AGENTS.md](AGENTS.md) — homelab shared skills via `.cursor/maksit-skills.json`.
 
-**Summary:** `MaksIT.CertsUI.Engine` holds domain, PostgreSQL persistence (Linq2Db), migrations, and ACME engine code; it returns `MaksIT.Results` types, not HTTP responses. `MaksIT.CertsUI` is the web host (controllers, app services, ProblemDetails). Topic-specific design notes also live under [assets/docs/](assets/docs/) (HA, auth, RBAC, proxy, etc.). For authorization work, read [USER_AND_API_KEY_RBAC.md](assets/docs/USER_AND_API_KEY_RBAC.md) and [RBAC_REFERENCE.md](assets/docs/RBAC_REFERENCE.md) before changing filters or identity/API-key services.
+**Summary:** `MaksIT.CertsUI.Engine` holds domain, PostgreSQL persistence (Linq2Db), migrations, and ACME engine code; it returns `MaksIT.Results` types, not HTTP responses. `MaksIT.CertsUI` is the web host (controllers, app services, ProblemDetails). Before changing filters or identity/API-key services, read **maksit-auth-rbac** and **maksit-layering** (listed in AGENTS.md).
 
 ## Development setup
 
