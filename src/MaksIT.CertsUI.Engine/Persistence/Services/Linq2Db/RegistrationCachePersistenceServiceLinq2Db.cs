@@ -19,15 +19,12 @@ public sealed class RegistrationCachePersistenceServiceLinq2Db(
 ) : IRegistrationCachePersistenceService
 {
 
-  private readonly ILogger<RegistrationCachePersistenceServiceLinq2Db> _logger = logger;
-  private readonly ICertsUIDataConnectionFactory _connectionFactory = connectionFactory;
-
   public Task<Result<RegistrationCache[]?>> LoadAllAsync(CancellationToken cancellationToken = default)
   {
     cancellationToken.ThrowIfCancellationRequested();
     try
     {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
       var rows = db.GetTable<RegistrationCacheDto>().ToList();
 
       var caches = new List<RegistrationCache>();
@@ -35,14 +32,14 @@ public sealed class RegistrationCachePersistenceServiceLinq2Db(
       {
         if (string.IsNullOrWhiteSpace(row.PayloadJson))
         {
-          _logger.LogWarning("Registration cache row is empty for account {AccountId}", row.Id);
+          logger.LogWarning("Registration cache row is empty for account {AccountId}", row.Id);
           continue;
         }
 
         var cache = row.PayloadJson.ToObject<RegistrationCache>();
         if (cache == null)
         {
-          _logger.LogWarning("Could not deserialize registration cache for account {AccountId}", row.Id);
+          logger.LogWarning("Could not deserialize registration cache for account {AccountId}", row.Id);
           continue;
         }
 
@@ -54,8 +51,8 @@ public sealed class RegistrationCachePersistenceServiceLinq2Db(
     }
     catch (Exception ex)
     {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error loading all registration caches.");
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error loading all registration caches.");
       return Task.FromResult(Result<RegistrationCache[]?>.InternalServerError(null, ["An error occurred while loading registration caches.", .. ex.ExtractMessages()]));
     }
   }
@@ -65,7 +62,7 @@ public sealed class RegistrationCachePersistenceServiceLinq2Db(
     cancellationToken.ThrowIfCancellationRequested();
     try
     {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
       var row = db.GetTable<RegistrationCacheDto>().FirstOrDefault(r => r.Id == accountId);
       if (row == null)
         return Task.FromResult(Result<RegistrationCache?>.NotFound(null, $"Registration cache not found for account {accountId}."));
@@ -82,8 +79,8 @@ public sealed class RegistrationCachePersistenceServiceLinq2Db(
     }
     catch (Exception ex)
     {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error loading registration cache for account {AccountId}", accountId);
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error loading registration cache for account {AccountId}", accountId);
       return Task.FromResult(Result<RegistrationCache?>.InternalServerError(null, ["An error occurred while loading the registration cache.", .. ex.ExtractMessages()]));
     }
   }
@@ -95,7 +92,7 @@ public sealed class RegistrationCachePersistenceServiceLinq2Db(
 
     try
     {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
       cache.AccountId = accountId;
       var json = cache.ToJson();
       var row = db.GetTable<RegistrationCacheDto>().FirstOrDefault(r => r.Id == accountId);
@@ -123,7 +120,7 @@ public sealed class RegistrationCachePersistenceServiceLinq2Db(
 
         if (updated == 0)
         {
-          _logger.LogWarning(
+          logger.LogWarning(
             "Optimistic concurrency conflict for registration cache {AccountId}. Expected version {ExpectedVersion}.",
             accountId, expectedVersion);
           return Task.FromResult(Result.Conflict($"Registration cache was modified concurrently for account {accountId}. Reload and retry."));
@@ -136,8 +133,8 @@ public sealed class RegistrationCachePersistenceServiceLinq2Db(
     }
     catch (Exception ex)
     {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error saving registration cache for account {AccountId}", accountId);
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error saving registration cache for account {AccountId}", accountId);
       return Task.FromResult(Result.InternalServerError(["An error occurred while saving the registration cache.", .. ex.ExtractMessages()]));
     }
   }
@@ -147,14 +144,14 @@ public sealed class RegistrationCachePersistenceServiceLinq2Db(
     cancellationToken.ThrowIfCancellationRequested();
     try
     {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
       db.Execute("DELETE FROM registration_caches");
       return Task.FromResult(Result.Ok());
     }
     catch (Exception ex)
     {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error deleting all registration caches.");
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error deleting all registration caches.");
       return Task.FromResult(Result.InternalServerError(["An error occurred while deleting registration caches.", .. ex.ExtractMessages()]));
     }
   }
@@ -164,21 +161,21 @@ public sealed class RegistrationCachePersistenceServiceLinq2Db(
     cancellationToken.ThrowIfCancellationRequested();
     try
     {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
       var deleted = db.GetTable<RegistrationCacheDto>().Where(r => r.Id == accountId).Delete();
       if (deleted == 0)
       {
-        _logger.LogWarning("Registration cache not found for account {AccountId}", accountId);
+        logger.LogWarning("Registration cache not found for account {AccountId}", accountId);
         return Task.FromResult(Result.Ok());
       }
 
-      _logger.LogInformation("Registration cache deleted for account {AccountId}", accountId);
+      logger.LogInformation("Registration cache deleted for account {AccountId}", accountId);
       return Task.FromResult(Result.Ok());
     }
     catch (Exception ex)
     {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error deleting registration cache for account {AccountId}", accountId);
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error deleting registration cache for account {AccountId}", accountId);
       return Task.FromResult(Result.InternalServerError(["An error occurred while deleting the registration cache.", .. ex.ExtractMessages()]));
     }
   }

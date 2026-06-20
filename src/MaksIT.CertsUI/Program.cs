@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Options;
 using MaksIT.Core.Logging;
 using MaksIT.Core.Webapi.Middlewares;
 using MaksIT.CertsUI.Engine.DomainServices;
@@ -6,7 +5,6 @@ using MaksIT.CertsUI.Engine.Extensions;
 using MaksIT.CertsUI.Engine.Infrastructure;
 using MaksIT.CertsUI;
 using MaksIT.CertsUI.Authorization.Filters;
-using MaksIT.CertsUI.Engine.RuntimeCoordination;
 using MaksIT.CertsUI.Extensions;
 using MaksIT.CertsUI.HostedServices;
 using MaksIT.CertsUI.Infrastructure;
@@ -85,10 +83,6 @@ builder.Services.AddScoped<CertsUIAuthorizationFilter>();
 // Hosted services: coordination/bootstrap lease, then renewal sweeps (each uses short-lived Postgres leases — symmetric pods).
 builder.Services.AddHostedService<InitializationHostedService>();
 builder.Services.AddHostedService<AutoRenewal>();
-
-// Engine identity/JWT/2FA settings are consumed via ICertsEngineConfiguration (registered in AddCertsEngine), same pattern as MaksIT.Vault.
-// Single process-wide lease holder id (see IRuntimeInstanceId) — must stay Singleton for app_runtime_leases coherence.
-builder.Services.AddSingleton<IRuntimeInstanceId, RuntimeInstanceIdProvider>();
 
 // Startup phase tracking (migrations, bootstrap) for probes and /health/startup.
 builder.Services.AddSingleton<CertsStartupState>();

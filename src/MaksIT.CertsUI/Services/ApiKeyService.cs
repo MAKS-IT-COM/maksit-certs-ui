@@ -49,19 +49,12 @@ public interface IApiKeyService {
 public class ApiKeyService(
     ILogger<ApiKeyService> logger,
     IOptions<Configuration> appSettings,
-    IIdentityDomainService identityDomainService,
     IApiKeyQueryService apiKeyQueryService,
     IApiKeyEntityScopeQueryService apiKeyEntityScopeQueryService,
     IApiKeyDomainService apiKeyDomainService,
     ITrngClient trngClient,
     ApiKeyToResponseMapper apiKeyToResponseMapper
 ) : ServiceBase<ApiKeyResponse, ApiKey, SearchAPIKeyResponse, ApiKeyQueryResult>(logger, appSettings), IApiKeyService {
-  private readonly IIdentityDomainService _identityDomainService = identityDomainService;
-  private readonly IApiKeyQueryService _apiKeyQueryService = apiKeyQueryService;
-  private readonly IApiKeyEntityScopeQueryService _apiKeyEntityScopeQueryService = apiKeyEntityScopeQueryService;
-  private readonly IApiKeyDomainService _apiKeyDomainService = apiKeyDomainService;
-  private readonly ITrngClient _trngClient = trngClient;
-  private readonly ApiKeyToResponseMapper _apiKeyToResponseMapper = apiKeyToResponseMapper;
 
   #region API Keys RBAC
 
@@ -85,25 +78,19 @@ public class ApiKeyService(
   /// Last update: 02/03/2026
   /// </remarks>
   private Result<ApiKey?> ReadApiKeyRBAC(JwtTokenData jwtTokenData, Guid apiKeyId) {
-    var apiKeyResult = _apiKeyDomainService.ReadAPIKey(apiKeyId);
+    var apiKeyResult = apiKeyDomainService.ReadAPIKey(apiKeyId);
 
     if (!apiKeyResult.IsSuccess || apiKeyResult.Value == null)
       return apiKeyResult.ToResultOfType<ApiKey?>(_ => null);
 
     var apiKey = apiKeyResult.Value;
-    var authResult = _apiKeyDomainService.ReadApiKeyAuthorization(apiKey.Id);
+    var authResult = apiKeyDomainService.ReadApiKeyAuthorization(apiKey.Id);
     var authorization = authResult.IsSuccess ? authResult.Value : null;
 
     return RBACWrapperJwtToken(
         jwtTokenData,
         apiKey,
-        userRules: (_) => {
-          
-
-         
-            return Result<ApiKey?>.Ok(apiKey);
-         
-        }
+        userRules: (_) => Result<ApiKey?>.Ok(apiKey)
     );
   }
 
@@ -165,21 +152,20 @@ public class ApiKeyService(
     if (!globalAdminPatchCheck.IsSuccess)
       return Result<ApiKey?>.Forbidden(null, "Only a global admin can assign or remove the global admin flag.");
 
-    var apiKeyResult = _apiKeyDomainService.ReadAPIKey(apiKeyId);
+    var apiKeyResult = apiKeyDomainService.ReadAPIKey(apiKeyId);
 
     if (!apiKeyResult.IsSuccess || apiKeyResult.Value == null)
       return apiKeyResult.ToResultOfType<ApiKey?>(_ => null);
 
     var apiKey = apiKeyResult.Value;
-    var authResult = _apiKeyDomainService.ReadApiKeyAuthorization(apiKey.Id);
+    var authResult = apiKeyDomainService.ReadApiKeyAuthorization(apiKey.Id);
     var authorization = authResult.IsSuccess ? authResult.Value : null;
 
     return RBACWrapperJwtToken(
       jwtTokenData,
       apiKey,
-      (_) => {
-        return Result<ApiKey?>.Ok(apiKey);
-      });
+      (_) => Result<ApiKey?>.Ok(apiKey)
+    );
   }
 
   /// <summary>
@@ -202,20 +188,18 @@ public class ApiKeyService(
   /// Last update: 02/03/2026
   /// </remarks>
   private Result DeleteApiKeyRBAC(JwtTokenData jwtTokenData, Guid apiKeyId) {
-    var apiKeyResult = _apiKeyDomainService.ReadAPIKey(apiKeyId);
+    var apiKeyResult = apiKeyDomainService.ReadAPIKey(apiKeyId);
     if (!apiKeyResult.IsSuccess || apiKeyResult.Value == null)
       return apiKeyResult;
 
     var apiKey = apiKeyResult.Value;
-    var authResult = _apiKeyDomainService.ReadApiKeyAuthorization(apiKey.Id);
+    var authResult = apiKeyDomainService.ReadApiKeyAuthorization(apiKey.Id);
     var authorization = authResult.IsSuccess ? authResult.Value : null;
 
     return RBACWrapperJwtToken(
       jwtTokenData,
       apiKey,
-      (_) => {
-          return apiKeyResult;
-      }
+      (_) => apiKeyResult
     ).ToResult();
   }
   #endregion
@@ -253,14 +237,14 @@ public class ApiKeyService(
     var skip = (requestData.PageNumber - 1) * requestData.PageSize;
     var take = requestData.PageSize;
 
-    var apiKeyResult = _apiKeyQueryService.Search(apiKeyPredicate, skip, take);
+    var apiKeyResult = apiKeyQueryService.Search(apiKeyPredicate, skip, take);
 
     if (!apiKeyResult.IsSuccess || apiKeyResult.Value == null)
       return apiKeyResult.ToResultOfType<PagedResponse<SearchAPIKeyResponse>?>(_ => null);
 
     var apiKeys = apiKeyResult.Value;
 
-    var apiKeysCountResult = _apiKeyQueryService.Count(apiKeyPredicate);
+    var apiKeysCountResult = apiKeyQueryService.Count(apiKeyPredicate);
 
     if (!apiKeysCountResult.IsSuccess || apiKeysCountResult.Value == null)
       return apiKeysCountResult.ToResultOfType<PagedResponse<SearchAPIKeyResponse>?>(_ => null);
@@ -301,7 +285,7 @@ public class ApiKeyService(
         .Except(visibleOrgIds)
         .Any();
 
-    var apiKeysResult = _apiKeyQueryService.Search(accessScope, 0, 50000);
+    var apiKeysResult = apiKeyQueryService.Search(accessScope, 0, 50000);
     var allowedApiKeyIds = new HashSet<Guid>();
     if (apiKeysResult.IsSuccess && apiKeysResult.Value != null && apiKeysResult.Value.Count > 0)
       allowedApiKeyIds = apiKeysResult.Value.Select(k => k.Id).ToHashSet();
@@ -315,18 +299,18 @@ public class ApiKeyService(
     var skip = (requestData.PageNumber - 1) * requestData.PageSize;
     var take = requestData.PageSize;
 
-    var scopesResult = _apiKeyEntityScopeQueryService.Search(predicate, skip, take);
+    var scopesResult = apiKeyEntityScopeQueryService.Search(predicate, skip, take);
     if (!scopesResult.IsSuccess || scopesResult.Value == null)
       return scopesResult.ToResultOfType<PagedResponse<SearchApiKeyEntityScopeResponse>?>(_ => null);
 
     var scopes = scopesResult.Value;
-    var countResult = _apiKeyEntityScopeQueryService.Count(predicate);
+    var countResult = apiKeyEntityScopeQueryService.Count(predicate);
     if (!countResult.IsSuccess || countResult.Value == null)
       return countResult.ToResultOfType<PagedResponse<SearchApiKeyEntityScopeResponse>?>(_ => null);
 
     var totalCount = countResult.Value ?? 0;
     var pagedResponse = new PagedResponse<SearchApiKeyEntityScopeResponse>(
-        scopes.Select(_apiKeyToResponseMapper.MapToSearchResponse),
+        scopes.Select(apiKeyToResponseMapper.MapToSearchResponse),
         totalCount,
         requestData.PageNumber,
         requestData.PageSize
@@ -344,7 +328,7 @@ public class ApiKeyService(
       return apiKeyResult.ToResultOfType<ApiKeyResponse?>(_ => null);
 
     var apiKey = apiKeyResult.Value;
-    var authResult = _apiKeyDomainService.ReadApiKeyAuthorization(apiKey.Id);
+    var authResult = apiKeyDomainService.ReadApiKeyAuthorization(apiKey.Id);
     var authorization = authResult.IsSuccess ? authResult.Value : null;
     var response = MapToResponse(apiKey, authorization);
 
@@ -360,7 +344,7 @@ public class ApiKeyService(
     if (!rbacResult.IsSuccess)
       return rbacResult.ToResultOfType<ApiKeyResponse?>(null);
 
-    var trngResult = await _trngClient.GetRandomBytesBase64Async(32);
+    var trngResult = await trngClient.GetRandomBytesBase64Async(32);
     if (!trngResult.IsSuccess || trngResult.Value == null)
       return trngResult.ToResultOfType<ApiKeyResponse?>(_ => null);
 
@@ -382,7 +366,7 @@ public class ApiKeyService(
       authorization.SetEntityScopes(entityScopes);
     }
 
-    var writeKeyResult = await _apiKeyDomainService.WriteAPIKeyAsync(newApiKey, authorization);
+    var writeKeyResult = await apiKeyDomainService.WriteAPIKeyAsync(newApiKey, authorization);
     if (!writeKeyResult.IsSuccess || writeKeyResult.Value == null)
       return writeKeyResult.ToResultOfType<ApiKeyResponse?>(_ => null);
 
@@ -403,7 +387,7 @@ public class ApiKeyService(
       return rbac.ToResultOfType<ApiKeyResponse?>(_ => null);
 
     var apiKey = rbac.Value;
-    var authResult = _apiKeyDomainService.ReadApiKeyAuthorization(apiKey.Id);
+    var authResult = apiKeyDomainService.ReadApiKeyAuthorization(apiKey.Id);
     var authorization = authResult.IsSuccess && authResult.Value != null ? authResult.Value : new ApiKeyAuthorization(apiKey.Id);
 
     // 1) Patch API key master data (description, expiry)
@@ -416,7 +400,7 @@ public class ApiKeyService(
     if (!authPatchResult.IsSuccess)
       return authPatchResult;
 
-    var upsertKeyResult = await _apiKeyDomainService.WriteAPIKeyAsync(apiKey, authorization);
+    var upsertKeyResult = await apiKeyDomainService.WriteAPIKeyAsync(apiKey, authorization);
     if (!upsertKeyResult.IsSuccess || upsertKeyResult.Value == null)
       return upsertKeyResult.ToResultOfType<ApiKeyResponse?>(_ => null);
 
@@ -530,7 +514,7 @@ public class ApiKeyService(
     if (!rbacResult.IsSuccess)
       return rbacResult;
 
-    var deleteResult = await _apiKeyDomainService.DeleteAPIKeyAsync(id);
+    var deleteResult = await apiKeyDomainService.DeleteAPIKeyAsync(id);
     return deleteResult;
   }
 
@@ -539,17 +523,17 @@ public class ApiKeyService(
   #region Map to Response
 
   protected ApiKeyResponse MapToResponse(ApiKey domain, ApiKeyAuthorization? authorization) =>
-    _apiKeyToResponseMapper.MapToResponse(domain, authorization);
+    apiKeyToResponseMapper.MapToResponse(domain, authorization);
 
   protected override ApiKeyResponse MapToResponse(ApiKey domain) =>
-    _apiKeyToResponseMapper.MapToResponse(domain, null);
+    apiKeyToResponseMapper.MapToResponse(domain, null);
 
   #endregion
 
   #region Map QueryResult to SerchResponse
 
   protected override SearchAPIKeyResponse MapToSearchResponse(ApiKeyQueryResult queryResult) =>
-    _apiKeyToResponseMapper.MapToSearchResponse(queryResult);
+    apiKeyToResponseMapper.MapToSearchResponse(queryResult);
 
   #endregion
 }

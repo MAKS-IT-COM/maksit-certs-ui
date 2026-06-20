@@ -6,8 +6,7 @@ namespace MaksIT.CertsUI.Engine.Persistence.Mappers;
 /// <summary>
 /// Maps between User / UserAuthorization and UserDto. Used by identity and user-authorization persistence.
 /// </summary>
-public class UserMapper(string passwordPepper) {
-  private readonly string _passwordPepper = passwordPepper ?? string.Empty;
+public class UserMapper(string? passwordPepper) {
 
   public User MapToDomain(UserDto dto) {
     ArgumentNullException.ThrowIfNull(dto);
@@ -23,7 +22,7 @@ public class UserMapper(string passwordPepper) {
     .SetMobileNumber(dto.MobileNumber)
     .SetIsActive(dto.IsActive)
     .SetTwoFactorSharedKey(dto.TwoFactorSharedKey)
-    .SetTwoFactorRecoveryCodes([.. dto.TwoFactorRecoveryCodes.Select(rc => new TwoFactorRecoveryCode(rc.Id, rc.Salt, _passwordPepper, rc.Hash, rc.IsUsed))])
+    .SetTwoFactorRecoveryCodes([.. dto.TwoFactorRecoveryCodes.Select(rc => new TwoFactorRecoveryCode(rc.Id, rc.Salt, passwordPepper ?? string.Empty, rc.Hash, rc.IsUsed))])
     .SetTokens([.. dto.JwtTokens.Select(jwt => new JwtToken(jwt.Id, jwt.Token, jwt.IssuedAt, jwt.ExpiresAt, jwt.RefreshToken, jwt.RefreshTokenExpiresAt).SetIsRevoked(jwt.IsRevoked))]);
   }
 

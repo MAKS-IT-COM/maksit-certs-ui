@@ -14,8 +14,6 @@ public class APIKeyController(
   IApiKeyService apiKeyService
 ) : ControllerBase {
 
-  private readonly IApiKeyService _apiKeyService = apiKeyService;
-
   #region Search
   [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpPost("search")]
@@ -27,7 +25,7 @@ public class APIKeyController(
 
     var jwtTokenData = jwtTokenDataResult.Value;
 
-    var result = _apiKeyService.SearchApiKeys(jwtTokenData, requestData);
+    var result = apiKeyService.SearchApiKeys(jwtTokenData, requestData);
     return result.ToActionResult();
   }
 
@@ -41,7 +39,7 @@ public class APIKeyController(
 
     var jwtTokenData = jwtTokenDataResult.Value;
 
-    var result = _apiKeyService.SearchApiKeyEntityScopes(jwtTokenData, requestData);
+    var result = apiKeyService.SearchApiKeyEntityScopes(jwtTokenData, requestData);
     return result.ToActionResult();
   }
 
@@ -58,7 +56,7 @@ public class APIKeyController(
 
     var jwtTokenData = jwtTokenDataResult.Value;
 
-    var result = _apiKeyService.ReadAPIKey(jwtTokenData, apiKeyId);
+    var result = apiKeyService.ReadAPIKey(jwtTokenData, apiKeyId);
     return result.ToActionResult();
   }
   #endregion
@@ -74,7 +72,7 @@ public class APIKeyController(
 
     var jwtTokenData = jwtTokenDataResult.Value;
 
-    var result = await _apiKeyService.CreateAPIKeyAsync(jwtTokenData, request);
+    var result = await apiKeyService.CreateAPIKeyAsync(jwtTokenData, request);
     return result.ToActionResult();
   }
   #endregion
@@ -90,7 +88,7 @@ public class APIKeyController(
 
     var jwtTokenData = jwtTokenDataResult.Value;
 
-    var result = await _apiKeyService.PatchAPIKeyAsync(jwtTokenData, apiKeyId, request);
+    var result = await apiKeyService.PatchAPIKeyAsync(jwtTokenData, apiKeyId, request);
     return result.ToActionResult();
   }
   #endregion
@@ -106,7 +104,7 @@ public class APIKeyController(
 
     var jwtTokenData = jwtTokenDataResult.Value;
 
-    var result = await _apiKeyService.DeleteAPIKeyAsync(jwtTokenData, apiKeyId);
+    var result = await apiKeyService.DeleteAPIKeyAsync(jwtTokenData, apiKeyId);
     return result.ToActionResult();
   }
   #endregion

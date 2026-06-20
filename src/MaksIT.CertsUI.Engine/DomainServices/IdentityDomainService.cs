@@ -54,44 +54,36 @@ public class IdentityDomainService(
   ITwoFactorSettingsConfiguration twoFactorSettingsConfiguration
 ) : IIdentityDomainService {
 
-  private readonly ILogger<IdentityDomainService> _logger = logger;
-  private readonly IIdentityPersistenceService _identityPersistenceService = identityPersistenceService;
-  private readonly IUserAuthorizationPersistenceService _userAuthorizationPersistenceService = userAuthorizationPersistenceService;
-  private readonly ICertsEngineConfiguration _certsEngineConfiguration = certsEngineConfiguration;
-  private readonly IAdminUser _adminUser = adminUser;
-  private readonly IJwtSettingsConfiguration _jwtSettingsConfiguration = jwtSettingsConfiguration;
-  private readonly ITwoFactorSettingsConfiguration _twoFactorSettingsConfiguration = twoFactorSettingsConfiguration;
-
   #region Read
   public Result<User?> ReadUserById(Guid userId) =>
-  _identityPersistenceService.ReadById(userId);
+  identityPersistenceService.ReadById(userId);
 
   public Result<User?> ReadUserByUsername(string usenrame) =>
-    _identityPersistenceService.ReadByUsername(usenrame);
+    identityPersistenceService.ReadByUsername(usenrame);
 
   public Result<UserAuthorization?> ReadUserAuthorization(Guid userId) =>
-    _userAuthorizationPersistenceService.ReadByUserId(userId);
+    userAuthorizationPersistenceService.ReadByUserId(userId);
   #endregion
 
   #region First boot Initialize
   public async Task<Result<User?>> InitializeAdminAsync() {
-    var adminUserIdsResult = _userAuthorizationPersistenceService.ReadGlobalAdminUserIds();
+    var adminUserIdsResult = userAuthorizationPersistenceService.ReadGlobalAdminUserIds();
     if (adminUserIdsResult.IsSuccess && adminUserIdsResult.Value != null && adminUserIdsResult.Value.Count > 0) {
       var firstId = adminUserIdsResult.Value[0];
-      var existing = _identityPersistenceService.ReadById(firstId);
+      var existing = identityPersistenceService.ReadById(firstId);
       if (existing.IsSuccess && existing.Value != null)
         return existing;
       return Result<User?>.BadRequest(null, "Global admin is referenced but the user record is missing.");
     }
 
     // Use the same pepper as login so hashed password matches validation; require it to be set (e.g. from appsecrets.json).
-    var pepper = _certsEngineConfiguration.JwtSettingsConfiguration?.PasswordPepper;
+    var pepper = certsEngineConfiguration.JwtSettingsConfiguration?.PasswordPepper;
     if (string.IsNullOrWhiteSpace(pepper)) {
       return Result<User?>.BadRequest(null, "PasswordPepper is not set. Set Configuration:CertsEngineConfiguration:JwtSettingsConfiguration:PasswordPepper in appsecrets.json (or config) so bootstrap and login use the same pepper.");
     }
 
-    var usernameTrimmed = (_adminUser.Username ?? "").Trim();
-    var passwordTrimmed = (_adminUser.Password ?? "").Trim();
+    var usernameTrimmed = (adminUser.Username ?? "").Trim();
+    var passwordTrimmed = (adminUser.Password ?? "").Trim();
     if (string.IsNullOrWhiteSpace(usernameTrimmed) || string.IsNullOrWhiteSpace(passwordTrimmed)) {
       return Result<User?>.BadRequest(null, "Admin Username and Password must be set in configuration.");
     }
@@ -100,7 +92,7 @@ public class IdentityDomainService(
       .SetIsActive(true);
 
     var authorization = new UserAuthorization(user.Id).SetIsGlobalAdmin(true);
-    var upsertResult = _identityPersistenceService.Write(user, authorization);
+    var upsertResult = identityPersistenceService.Write(user, authorization);
     if (!upsertResult.IsSuccess || upsertResult.Value == null)
       return upsertResult.ToResultOfType<User?>(_ => null);
 
@@ -117,19 +109,19 @@ public class IdentityDomainService(
   public Task<Result<User?>> WriteUserAsync(User user, UserAuthorization? authorization) {
     var authToApply = authorization;
     if (authToApply == null) {
-      var authResult = _userAuthorizationPersistenceService.ReadByUserId(user.Id);
+      var authResult = userAuthorizationPersistenceService.ReadByUserId(user.Id);
       authToApply = authResult.IsSuccess ? authResult.Value : null;
     }
-    return Task.FromResult(_identityPersistenceService.Write(user, authToApply));
+    return Task.FromResult(identityPersistenceService.Write(user, authToApply));
   }
 
   public Task<Result> WriteUserAuthorizationAsync(UserAuthorization authorization) =>
-    Task.FromResult(_userAuthorizationPersistenceService.Write(authorization));
+    Task.FromResult(userAuthorizationPersistenceService.Write(authorization));
   #endregion
 
   #region Delete
   public Task<Result> DeleteUserAsync(Guid userId) =>
-    Task.FromResult(_identityPersistenceService.DeleteById(userId));
+    Task.FromResult(identityPersistenceService.DeleteById(userId));
   #endregion
 
   #region Login/Refresh/Logout
@@ -137,30 +129,30 @@ public class IdentityDomainService(
     var usernameTrimmed = username?.Trim() ?? "";
     var passwordTrimmed = password?.Trim() ?? "";
 
-    var userResult = _identityPersistenceService.ReadByUsername(usernameTrimmed);
+    var userResult = identityPersistenceService.ReadByUsername(usernameTrimmed);
 
     if(!userResult.IsSuccess || userResult.Value == null) {
-      _logger.LogWarning("Login failed: user not found for username '{Username}' (trimmed: '{Trimmed}')", username ?? "(null)", usernameTrimmed);
+      logger.LogWarning("Login failed: user not found for username '{Username}' (trimmed: '{Trimmed}')", username ?? "(null)", usernameTrimmed);
       return Result<JwtToken?>.Unauthorized(null, "Invalid username or password.");
     }
 
     var user = userResult.Value.RemoveRevokedTokens();
 
     if(!user.IsActive) {
-      _logger.LogWarning("Login failed: user '{Username}' is not active", user.Username);
+      logger.LogWarning("Login failed: user '{Username}' is not active", user.Username);
       return Result<JwtToken?>.Unauthorized(null, "User is not active.");
     }
 
-    var pepper = _certsEngineConfiguration.JwtSettingsConfiguration?.PasswordPepper;
+    var pepper = certsEngineConfiguration.JwtSettingsConfiguration?.PasswordPepper;
     if (string.IsNullOrWhiteSpace(pepper)) {
-      _logger.LogWarning("Login failed: PasswordPepper is not set (user '{Username}')", user.Username);
+      logger.LogWarning("Login failed: PasswordPepper is not set (user '{Username}')", user.Username);
       return Result<JwtToken?>.Unauthorized(null, "Invalid username or password.");
     }
 
     var validateHashResult = user.ValidatePassword(passwordTrimmed, pepper);
 
     if (!validateHashResult.IsSuccess) {
-      _logger.LogWarning("Login failed: password validation failed for user '{Username}' (pepper length: {PepperLen}, password length: {PasswordLen})", user.Username, pepper?.Length ?? 0, passwordTrimmed.Length);
+      logger.LogWarning("Login failed: password validation failed for user '{Username}' (pepper length: {PepperLen}, password length: {PasswordLen})", user.Username, pepper?.Length ?? 0, passwordTrimmed.Length);
       return Result<JwtToken?>.Unauthorized(null, "Invalid username or password.");
     }
 
@@ -181,7 +173,7 @@ public class IdentityDomainService(
 
     user.SetLastLogin();
 
-    var authResult = _userAuthorizationPersistenceService.ReadByUserId(user.Id);
+    var authResult = userAuthorizationPersistenceService.ReadByUserId(user.Id);
     var aclEntries = authResult.IsSuccess && authResult.Value != null
       ? authResult.Value.GetAclEntries()
       : [];
@@ -190,7 +182,7 @@ public class IdentityDomainService(
     if (!jwtTokenResult.IsSuccess || jwtTokenResult.Value == null)
       return jwtTokenResult;
 
-    var writeUserResult = _identityPersistenceService.Write(user, authResult.IsSuccess ? authResult.Value : null);
+    var writeUserResult = identityPersistenceService.Write(user, authResult.IsSuccess ? authResult.Value : null);
     if (!writeUserResult.IsSuccess || writeUserResult.Value == null)
       return writeUserResult.ToResultOfType<JwtToken?>(_ => null);
 
@@ -198,7 +190,7 @@ public class IdentityDomainService(
   }
 
   public async Task<Result<JwtToken?>> RefreshTokenAsync(string refreshToken, bool? force = false) {
-    var userResult = _identityPersistenceService.ReadByRefreshToken(refreshToken);
+    var userResult = identityPersistenceService.ReadByRefreshToken(refreshToken);
     if (!userResult.IsSuccess || userResult.Value == null)
       return Result<JwtToken?>.Unauthorized(null, "Invalid refresh token.");
 
@@ -219,8 +211,8 @@ public class IdentityDomainService(
       user.SetLastLogin();
 
       // Update the user status in the database
-      var authForRefresh = _userAuthorizationPersistenceService.ReadByUserId(user.Id);
-      writeResult = _identityPersistenceService.Write(user, authForRefresh.IsSuccess ? authForRefresh.Value : null);
+      var authForRefresh = userAuthorizationPersistenceService.ReadByUserId(user.Id);
+      writeResult = identityPersistenceService.Write(user, authForRefresh.IsSuccess ? authForRefresh.Value : null);
       if (!writeResult.IsSuccess || writeResult.Value == null)
         return writeResult.ToResultOfType<JwtToken?>(_ => null);
 
@@ -230,14 +222,14 @@ public class IdentityDomainService(
     // If refresh token is expired, it cannot be used to get a new token; remove it and persist.
     if (DateTime.UtcNow > token.RefreshTokenExpiresAt) {
       user.RemoveToken(token.Id);
-      var authForRemove = _userAuthorizationPersistenceService.ReadByUserId(user.Id);
-      _identityPersistenceService.Write(user, authForRemove.IsSuccess ? authForRemove.Value : null);
+      var authForRemove = userAuthorizationPersistenceService.ReadByUserId(user.Id);
+      identityPersistenceService.Write(user, authForRemove.IsSuccess ? authForRemove.Value : null);
       return Result<JwtToken?>.Unauthorized(null, "Refresh token has expired.");
     }
 
     user.SetLastLogin();
 
-    var authResult = _userAuthorizationPersistenceService.ReadByUserId(user.Id);
+    var authResult = userAuthorizationPersistenceService.ReadByUserId(user.Id);
     var aclEntries = authResult.IsSuccess && authResult.Value != null
       ? authResult.Value.GetAclEntries()
       : [];
@@ -247,7 +239,7 @@ public class IdentityDomainService(
       return jwtTokenResult;
 
     // Update the user status in the database
-    writeResult = _identityPersistenceService.Write(user, authResult.IsSuccess ? authResult.Value : null);
+    writeResult = identityPersistenceService.Write(user, authResult.IsSuccess ? authResult.Value : null);
     if (!writeResult.IsSuccess || writeResult.Value == null)
       return writeResult.ToResultOfType<JwtToken?>(_ => null);
 
@@ -256,7 +248,7 @@ public class IdentityDomainService(
 
   /// <summary>Logs out by user id and access token from the JWT payload; removes the session or all sessions.</summary>
   public async Task<Result> LogoutAsync(Guid userId, string accessToken, bool allDevices = false) {
-    var userResult = _identityPersistenceService.ReadById(userId);
+    var userResult = identityPersistenceService.ReadById(userId);
     if (!userResult.IsSuccess || userResult.Value == null)
       return Result.Ok();
 
@@ -267,8 +259,8 @@ public class IdentityDomainService(
     else
       user.RemoveToken(accessToken);
 
-    var authResult = _userAuthorizationPersistenceService.ReadByUserId(user.Id);
-    _identityPersistenceService.Write(user, authResult.IsSuccess ? authResult.Value : null);
+    var authResult = userAuthorizationPersistenceService.ReadByUserId(user.Id);
+    identityPersistenceService.Write(user, authResult.IsSuccess ? authResult.Value : null);
     return Result.Ok();
   }
   #endregion
@@ -280,7 +272,7 @@ public class IdentityDomainService(
     if (user.TwoFactorEnabled)
       return Result<List<string>?>.BadRequest(null, "Two-factor authentication is already enabled.");
 
-    var pepper = _certsEngineConfiguration.JwtSettingsConfiguration.PasswordPepper;
+    var pepper = certsEngineConfiguration.JwtSettingsConfiguration.PasswordPepper;
     if (string.IsNullOrWhiteSpace(pepper))
       return Result<List<string>?>.InternalServerError(null, "Password pepper is not configured.");
 
@@ -317,7 +309,7 @@ public class IdentityDomainService(
     if (!user.TwoFactorEnabled || string.IsNullOrEmpty(user.TwoFactorSharedKey))
       return Result.BadRequest("Two-factor authentication is not enabled.");
 
-    if (!TotpGenerator.TryValidate(code, user.TwoFactorSharedKey!, _twoFactorSettingsConfiguration.TimeTolerance, out bool isValid, out string? errorMessage))
+    if (!TotpGenerator.TryValidate(code, user.TwoFactorSharedKey!, twoFactorSettingsConfiguration.TimeTolerance, out bool isValid, out string? errorMessage))
       return Result.InternalServerError(errorMessage);
 
     return isValid ? Result.Ok() : Result.Unauthorized("Invalid two-factor code.");
@@ -325,10 +317,10 @@ public class IdentityDomainService(
 
   private Result<JwtToken?> IssueJwtForUser(User user, IReadOnlyList<string> aclEntries) {
     if (!JwtGenerator.TryGenerateToken(new JWTTokenGenerateRequest {
-      Secret = _jwtSettingsConfiguration.JwtSecret,
-      Issuer = _jwtSettingsConfiguration.Issuer,
-      Audience = _jwtSettingsConfiguration.Audience,
-      Expiration = _jwtSettingsConfiguration.ExpiresIn,
+      Secret = jwtSettingsConfiguration.JwtSecret,
+      Issuer = jwtSettingsConfiguration.Issuer,
+      Audience = jwtSettingsConfiguration.Audience,
+      Expiration = jwtSettingsConfiguration.ExpiresIn,
       UserId = user.Id.ToString(),
       Username = user.Username,
       AclEntries = aclEntries?.ToList() ?? []
@@ -346,7 +338,7 @@ public class IdentityDomainService(
       claims.IssuedAt.Value,
       claims.ExpiresAt.Value,
       refreshToken,
-      claims.IssuedAt.Value.AddDays(_jwtSettingsConfiguration.RefreshTokenExpiresIn)
+      claims.IssuedAt.Value.AddDays(jwtSettingsConfiguration.RefreshTokenExpiresIn)
     );
 
     user.RecordIssuedToken(jwtToken);

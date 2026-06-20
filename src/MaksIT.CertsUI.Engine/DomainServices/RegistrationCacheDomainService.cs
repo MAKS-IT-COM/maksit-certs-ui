@@ -52,27 +52,34 @@ public sealed class RegistrationCacheDomainService(
   IRegistrationCachePersistenceService registrationCachePersistence
 ) : IRegistrationCacheDomainService {
 
-  private readonly ILogger<RegistrationCacheDomainService> _logger = logger;
-  private readonly IRegistrationCachePersistenceService _persistence = registrationCachePersistence;
+  #region Read
 
   public Task<Result<RegistrationCache[]?>> LoadAllAsync(CancellationToken cancellationToken = default) =>
-    _persistence.LoadAllAsync(cancellationToken);
+    registrationCachePersistence.LoadAllAsync(cancellationToken);
 
   public Task<Result<RegistrationCache?>> LoadAsync(Guid accountId, CancellationToken cancellationToken = default) =>
-    _persistence.LoadAsync(accountId, cancellationToken);
+    registrationCachePersistence.LoadAsync(accountId, cancellationToken);
+
+  #endregion
+
+  #region Write
 
   public Task<Result> SaveAsync(Guid accountId, RegistrationCache cache, CancellationToken cancellationToken = default) =>
-    _persistence.SaveAsync(accountId, cache, cancellationToken);
+    registrationCachePersistence.SaveAsync(accountId, cache, cancellationToken);
 
   public Task<Result> DeleteAllAsync(CancellationToken cancellationToken = default) =>
-    _persistence.DeleteAllAsync(cancellationToken);
+    registrationCachePersistence.DeleteAllAsync(cancellationToken);
 
   public Task<Result> DeleteAsync(Guid accountId, CancellationToken cancellationToken = default) =>
-    _persistence.DeleteAsync(accountId, cancellationToken);
+    registrationCachePersistence.DeleteAsync(accountId, cancellationToken);
+
+  #endregion
+
+  #region Zip import/export
 
   public async Task<Result<byte[]?>> DownloadCacheZipAsync(CancellationToken cancellationToken = default) {
     try {
-      var allResult = await _persistence.LoadAllAsync(cancellationToken).ConfigureAwait(false);
+      var allResult = await registrationCachePersistence.LoadAllAsync(cancellationToken).ConfigureAwait(false);
       if (!allResult.IsSuccess || allResult.Value == null)
         return Result<byte[]?>.InternalServerError(null, allResult.Messages?.ToArray() ?? ["Could not load registration caches."]);
 
@@ -91,22 +98,22 @@ public sealed class RegistrationCacheDomainService(
         }
       }
       var zipBytes = ms.ToArray();
-      _logger.LogInformation("Exported {Count} registration caches to zip.", rows.Length);
+      logger.LogInformation("Exported {Count} registration caches to zip.", rows.Length);
       return Result<byte[]?>.Ok(zipBytes);
     }
     catch (Exception ex) {
       var message = "Error creating registration cache zip.";
-      _logger.LogError(ex, message);
+      logger.LogError(ex, message);
       return Result<byte[]?>.InternalServerError(null, [message, .. ex.ExtractMessages()]);
     }
   }
 
   public async Task<Result<byte[]?>> DownloadAccountCacheZipAsync(Guid accountId, CancellationToken cancellationToken = default) {
     try {
-      var readResult = await _persistence.LoadAsync(accountId, cancellationToken).ConfigureAwait(false);
+      var readResult = await registrationCachePersistence.LoadAsync(accountId, cancellationToken).ConfigureAwait(false);
       if (!readResult.IsSuccess || readResult.Value == null) {
         var message = $"Registration cache not found for account {accountId}.";
-        _logger.LogWarning(message);
+        logger.LogWarning(message);
         return Result<byte[]?>.NotFound(null, message);
       }
       var row = readResult.Value;
@@ -118,12 +125,12 @@ public sealed class RegistrationCacheDomainService(
         writer.Write(row.ToJson());
       }
       var zipBytes = ms.ToArray();
-      _logger.LogInformation("Account registration cache zipped for {AccountId}", accountId);
+      logger.LogInformation("Account registration cache zipped for {AccountId}", accountId);
       return Result<byte[]?>.Ok(zipBytes);
     }
     catch (Exception ex) {
       var message = "Error creating account registration cache zip.";
-      _logger.LogError(ex, message);
+      logger.LogError(ex, message);
       return Result<byte[]?>.InternalServerError(null, [message, .. ex.ExtractMessages()]);
     }
   }
@@ -136,7 +143,7 @@ public sealed class RegistrationCacheDomainService(
     }
     catch (Exception ex) {
       var message = "Error reading or importing registration cache zip.";
-      _logger.LogError(ex, message);
+      logger.LogError(ex, message);
       return Task.FromResult(Result.InternalServerError([message, .. ex.ExtractMessages()]));
     }
   }
@@ -153,10 +160,14 @@ public sealed class RegistrationCacheDomainService(
     }
     catch (Exception ex) {
       var message = "Error reading or importing account registration cache zip.";
-      _logger.LogError(ex, message);
+      logger.LogError(ex, message);
       return Result.InternalServerError([message, .. ex.ExtractMessages()]);
     }
   }
+
+  #endregion
+
+  #region Zip import helpers
 
   private async Task<Result> ImportZipEntriesAsync(IReadOnlyList<ZipArchiveEntry> entries, Guid? enforcedAccountId, CancellationToken cancellationToken) {
     var processedJsonEntries = 0;
@@ -183,7 +194,7 @@ public sealed class RegistrationCacheDomainService(
 
       var payload = json.ToObject<RegistrationCachePayloadDocument>();
       if (payload == null) {
-        _logger.LogWarning("Skipping zip entry {Name}: invalid JSON.", entry.FullName);
+        logger.LogWarning("Skipping zip entry {Name}: invalid JSON.", entry.FullName);
         return Result.BadRequest($"Cache entry '{entry.Name}' has invalid JSON.");
       }
 
@@ -202,7 +213,7 @@ public sealed class RegistrationCacheDomainService(
         AcmeRenewalNotBeforeUtcByHostname = payload.AcmeRenewalNotBeforeUtcByHostname
       };
 
-      var save = await _persistence.SaveAsync(id, cache, cancellationToken).ConfigureAwait(false);
+      var save = await registrationCachePersistence.SaveAsync(id, cache, cancellationToken).ConfigureAwait(false);
       if (!save.IsSuccess)
         return save;
     }
@@ -211,7 +222,9 @@ public sealed class RegistrationCacheDomainService(
       return Result.BadRequest($"Account upload requires exactly one JSON entry named '{enforcedAccountId}.json'. Found {processedJsonEntries}.");
 
     var message = $"Imported registration caches from zip ({processedJsonEntries} entries).";
-    _logger.LogInformation(message);
+    logger.LogInformation(message);
     return Result.Ok(message);
   }
+
+  #endregion
 }

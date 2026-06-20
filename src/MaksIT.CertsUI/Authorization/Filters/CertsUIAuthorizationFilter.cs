@@ -5,20 +5,13 @@ using MaksIT.CertsUI.Engine.DomainServices;
 
 
 namespace MaksIT.CertsUI.Authorization.Filters {
-  public class CertsUIAuthorizationFilter : JwtAuthorizationFilter {
+  public class CertsUIAuthorizationFilter(
+    IOptions<Configuration> configuration,
+    IApiKeyDomainService apiKeyDomainService,
+    IIdentityDomainService identityDomainService
+  ) : JwtAuthorizationFilter(configuration, identityDomainService) {
     private const string BearerTokenHeaderName = "Authorization"; // JWT header
     private const string ApiKeyHeaderName = "X-API-KEY";            // API Key header
-
-    private readonly IApiKeyDomainService _apiKeyDomainService;
-
-    public CertsUIAuthorizationFilter(
-      ILogger<CertsUIAuthorizationFilter> logger,
-      IOptions<Configuration> configuration,
-      IApiKeyDomainService apiKeyDomainService,
-      IIdentityDomainService identityDomainService
-    ) : base(logger, configuration, identityDomainService) {
-      _apiKeyDomainService = apiKeyDomainService;
-    }
 
     public override async Task OnAuthorizationAsync(AuthorizationFilterContext context) {
       var request = context.HttpContext.Request;
@@ -59,7 +52,7 @@ namespace MaksIT.CertsUI.Authorization.Filters {
         return Task.FromResult(Result<ApiKeyData?>.Forbidden(null, "Invalid API Key"));
       }
 
-      var apiKeyResult = _apiKeyDomainService.ReadAPIKey(apiKeyValue!);
+      var apiKeyResult = apiKeyDomainService.ReadAPIKey(apiKeyValue!);
       if (!apiKeyResult.IsSuccess || apiKeyResult.Value == null) {
         return Task.FromResult(Result<ApiKeyData?>.Forbidden(null, "Invalid API Key"));
       }
@@ -69,7 +62,7 @@ namespace MaksIT.CertsUI.Authorization.Filters {
         return Task.FromResult(Result<ApiKeyData?>.Forbidden(null, "API Key expired"));
       }
 
-      var authResult = _apiKeyDomainService.ReadApiKeyAuthorization(apiKey.Id);
+      var authResult = apiKeyDomainService.ReadApiKeyAuthorization(apiKey.Id);
       if (!authResult.IsSuccess || authResult.Value == null) {
         return Task.FromResult(authResult.ToResultOfType<ApiKeyData?>(_ => null));
       }

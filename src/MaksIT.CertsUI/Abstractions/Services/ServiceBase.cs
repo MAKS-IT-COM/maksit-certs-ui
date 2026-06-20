@@ -6,11 +6,10 @@ using Microsoft.Extensions.Options;
 
 namespace MaksIT.CertsUI.Abstractions.Services;
 
-public abstract class ServiceBase(ILogger logger, IOptions<Configuration> appSettings)
-{
+public abstract class ServiceBase(ILogger logger, IOptions<Configuration> appSettings) {
 
-  protected readonly ILogger _logger = logger;
-  protected readonly Configuration _appSettings = appSettings.Value;
+  protected ILogger Logger { get; } = logger;
+  protected Configuration AppSettings { get; } = appSettings.Value;
 
   protected Result UnsupportedPatchOperationResponse()
   {
@@ -33,12 +32,12 @@ public abstract class ServiceBase(ILogger logger, IOptions<Configuration> appSet
   }
   
   protected Result NoValidAuthorizationMethod() {
-    _logger.LogInformation("Access denied: No valid authorization method available.");
+    Logger.LogInformation("Access denied: No valid authorization method available.");
     return Result.Forbidden("No valid authorization method available.");
   }
 
   protected Result<T?> NoValidAuthorizationMethod<T>() {
-    _logger.LogInformation("Access denied: No valid authorization method available.");
+    Logger.LogInformation("Access denied: No valid authorization method available.");
     return Result<T?>.Forbidden(default, "No valid authorization method available.");
   }
 
@@ -65,7 +64,7 @@ public abstract class ServiceBase(ILogger logger, IOptions<Configuration> appSet
 
   protected Result RBACWrapperJwtToken(JwtTokenData jwtTokenData, Func<JwtTokenData, Result>? userRules) {
     if (jwtTokenData.IsGlobalAdmin) {
-      _logger.LogInformation($"Admin access granted for user {jwtTokenData.UserId}.");
+      Logger.LogInformation($"Admin access granted for user {jwtTokenData.UserId}.");
       return Result.Ok();
     }
 
@@ -73,19 +72,19 @@ public abstract class ServiceBase(ILogger logger, IOptions<Configuration> appSet
       return userRules(jwtTokenData);
     }
 
-    _logger.LogInformation($"Access denied: User {jwtTokenData.UserId} does not have access to resource.");
+    Logger.LogInformation($"Access denied: User {jwtTokenData.UserId} does not have access to resource.");
     return Result.Forbidden("User does not have access to resource.");
   }
 
   protected Result RBACWrapperApiKey(ApiKeyData apiKeyData, Func<ApiKeyData, Result>? apiKeyRules) {
     if (apiKeyData.IsGlobalAdmin) {
-      _logger.LogInformation($"Admin access granted via API key {apiKeyData.ApiKeyId}.");
+      Logger.LogInformation($"Admin access granted via API key {apiKeyData.ApiKeyId}.");
       return Result.Ok();
     }
     if (apiKeyRules != null) {
       return apiKeyRules(apiKeyData);
     }
-    _logger.LogInformation($"Access denied: API key {apiKeyData.ApiKeyId} does not have access to resource.");
+    Logger.LogInformation($"Access denied: API key {apiKeyData.ApiKeyId} does not have access to resource.");
     return Result.Forbidden("ApiKey does not have access to resource.");
   }
 
@@ -113,7 +112,7 @@ public abstract class ServiceBase(ILogger logger, IOptions<Configuration> appSet
       T resource,
       Func<T, Result<T?>>? userRules) {
     if (jwtTokenData.IsGlobalAdmin) {
-      _logger.LogInformation($"Admin access granted for user {jwtTokenData.UserId}.");
+      Logger.LogInformation($"Admin access granted for user {jwtTokenData.UserId}.");
       return Result<T?>.Ok(resource);
     }
 
@@ -121,7 +120,7 @@ public abstract class ServiceBase(ILogger logger, IOptions<Configuration> appSet
       return userRules(resource);
     }
 
-    _logger.LogInformation($"Access denied: User {jwtTokenData.UserId} does not have access to resources.");
+    Logger.LogInformation($"Access denied: User {jwtTokenData.UserId} does not have access to resources.");
     return Result<T?>.Forbidden(default, "User does not have access to resources.");
   }
 
@@ -130,7 +129,7 @@ public abstract class ServiceBase(ILogger logger, IOptions<Configuration> appSet
       T resource,
       Func<T, Result<T?>>? apiKeyRules) {
     if (apiKeyData.IsGlobalAdmin) {
-      _logger.LogInformation($"Admin access granted via API key {apiKeyData.ApiKeyId}.");
+      Logger.LogInformation($"Admin access granted via API key {apiKeyData.ApiKeyId}.");
       return Result<T?>.Ok(resource);
     }
 
@@ -138,7 +137,7 @@ public abstract class ServiceBase(ILogger logger, IOptions<Configuration> appSet
       return apiKeyRules(resource);
     }
 
-    _logger.LogInformation($"Access denied: API key {apiKeyData.ApiKeyId} does not have access to resources.");
+    Logger.LogInformation($"Access denied: API key {apiKeyData.ApiKeyId} does not have access to resources.");
     return Result<T?>.Forbidden(default, "ApiKey does not have access to resources.");
   }
 }

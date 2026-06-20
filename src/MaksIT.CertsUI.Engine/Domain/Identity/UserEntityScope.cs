@@ -27,8 +27,11 @@ namespace MaksIT.CertsUI.Engine.Domain.Identity {
     /// <param name="entityId">The unique identifier of the entity.</param>
     /// <param name="entityType">The type of the entity.</param>
     /// <param name="scope">The permission scope assigned to the user.</param>
+      /// <summary>
+    /// Initializes a new instance with a generated scope id and entity binding.
+    /// </summary>
     public UserEntityScope(Guid entityId, ScopeEntityType entityType, ScopePermission scope)
-        : base(CombGui.GenerateCombGuid()) {
+      : base(CombGui.GenerateCombGuid()) {
       EntityId = entityId;
       EntityType = entityType;
       Scope = scope;

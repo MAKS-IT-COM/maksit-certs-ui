@@ -13,8 +13,6 @@ public class AccountController(
   IAccountService accountService
 ) : ControllerBase {
 
-  private readonly IAccountService _accountService = accountService;
-
   #region Read
   [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpGet("accounts")]
@@ -26,7 +24,7 @@ public class AccountController(
 
     var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
 
-    var result = await _accountService.GetAccountsAsync(certsUIAuthorizationData);
+    var result = await accountService.GetAccountsAsync(certsUIAuthorizationData);
     return result.ToActionResult();
   }
 
@@ -40,7 +38,7 @@ public class AccountController(
 
     var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
 
-    var result = await _accountService.GetAccountAsync(certsUIAuthorizationData, accountId);
+    var result = await accountService.GetAccountAsync(certsUIAuthorizationData, accountId);
     return result.ToActionResult();
   }
 
@@ -57,7 +55,7 @@ public class AccountController(
 
     var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
 
-    var result = await _accountService.PostAccountAsync(certsUIAuthorizationData, requestData);
+    var result = await accountService.PostAccountAsync(certsUIAuthorizationData, requestData);
     return result.ToActionResult();
   }
 
@@ -74,7 +72,7 @@ public class AccountController(
 
     var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
 
-    var result = await _accountService.PatchAccountAsync(certsUIAuthorizationData, accountId, requestData);
+    var result = await accountService.PatchAccountAsync(certsUIAuthorizationData, accountId, requestData);
     return result.ToActionResult();
   }
 
@@ -91,7 +89,7 @@ public class AccountController(
 
     var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
 
-    var result = await _accountService.DeleteAccountAsync(certsUIAuthorizationData, accountId);
+    var result = await accountService.DeleteAccountAsync(certsUIAuthorizationData, accountId);
     return result.ToActionResult();
   }
 

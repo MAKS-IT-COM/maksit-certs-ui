@@ -20,13 +20,10 @@ public sealed class AcmeSessionPersistenceServiceLinq2Db(
 
   private static readonly TimeSpan SessionTtl = TimeSpan.FromHours(1);
 
-  private readonly ILogger<AcmeSessionPersistenceServiceLinq2Db> _logger = logger;
-  private readonly ICertsUIDataConnectionFactory _connectionFactory = connectionFactory;
-
   public Task<Result<State?>> LoadAsync(Guid sessionId, CancellationToken cancellationToken = default) {
     cancellationToken.ThrowIfCancellationRequested();
     try {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
       var now = DateTimeOffset.UtcNow;
       var row = db.GetTable<AcmeSessionDto>()
         .Where(x => x.SessionId == sessionId && x.ExpiresAtUtc > now)
@@ -39,13 +36,13 @@ public sealed class AcmeSessionPersistenceServiceLinq2Db(
         return Task.FromResult(Result<State?>.Ok(state));
       }
       catch (Exception ex) {
-        _logger.LogWarning(ex, "Failed to deserialize ACME session {SessionId}; returning empty.", sessionId);
+        logger.LogWarning(ex, "Failed to deserialize ACME session {SessionId}; returning empty.", sessionId);
         return Task.FromResult(Result<State?>.Ok(null));
       }
     }
     catch (Exception ex) {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error loading ACME session {SessionId}", sessionId);
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error loading ACME session {SessionId}", sessionId);
       return Task.FromResult(Result<State?>.InternalServerError(null, ["An error occurred while loading the ACME session.", .. ex.ExtractMessages()]));
     }
   }
@@ -60,7 +57,7 @@ public sealed class AcmeSessionPersistenceServiceLinq2Db(
       var expires = now.Add(SessionTtl);
       var accountScope = state.Cache?.AccountId;
 
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
       var existing = db.GetTable<AcmeSessionDto>()
         .Where(x => x.SessionId == sessionId)
         .FirstOrDefault();
@@ -84,15 +81,15 @@ public sealed class AcmeSessionPersistenceServiceLinq2Db(
 
       if (accountScope.HasValue) {
         var removed = DeleteOtherSessionsForSameAccount(db, accountScope.Value, sessionId);
-        if (removed > 0 && _logger.IsEnabled(LogLevel.Debug))
-          _logger.LogDebug("Removed {Count} other ACME session row(s) for account scope {AccountId}.", removed, accountScope.Value);
+        if (removed > 0 && logger.IsEnabled(LogLevel.Debug))
+          logger.LogDebug("Removed {Count} other ACME session row(s) for account scope {AccountId}.", removed, accountScope.Value);
       }
 
       return Task.FromResult(Result.Ok());
     }
     catch (Exception ex) {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error saving ACME session {SessionId}", sessionId);
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error saving ACME session {SessionId}", sessionId);
       return Task.FromResult(Result.InternalServerError(["An error occurred while saving the ACME session.", .. ex.ExtractMessages()]));
     }
   }
@@ -100,13 +97,13 @@ public sealed class AcmeSessionPersistenceServiceLinq2Db(
   public Task<Result<int>> DeleteExpiredAsync(CancellationToken cancellationToken = default) {
     cancellationToken.ThrowIfCancellationRequested();
     try {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
       var deleted = DeleteExpiredRows(db, DateTimeOffset.UtcNow);
       return Task.FromResult(Result<int>.Ok(deleted));
     }
     catch (Exception ex) {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error deleting expired ACME sessions.");
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error deleting expired ACME sessions.");
       return Task.FromResult(Result<int>.InternalServerError(0, ["Failed to delete expired ACME sessions.", .. ex.ExtractMessages()]));
     }
   }

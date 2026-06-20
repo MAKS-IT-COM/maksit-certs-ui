@@ -86,11 +86,6 @@ public class User : DomainDocumentBase<Guid> {
   /// <summary>
   /// Creates a new user (aggregate root). Use when registering a new identity.
   /// </summary>
-  /// <param name="username">Non-empty username.</param>
-  /// <param name="password">Non-empty password (will be hashed with pepper).</param>
-  /// <param name="pepper">Pepper for password hashing (from config, not stored).</param>
-  /// <exception cref="ArgumentNullException">If username, password, or pepper is null or whitespace.</exception>
-  /// <exception cref="InvalidOperationException">If password hashing fails.</exception>
   public User(string username, string password, string pepper) : this(CombGui.GenerateCombGuid(), username, password, pepper) { }
 
   /// <summary>
@@ -117,18 +112,13 @@ public class User : DomainDocumentBase<Guid> {
   /// <summary>
   /// Constructor for creating a User entity from a DTO, typically used when loading from a database or external source.
   /// </summary>
-  /// <param name="id"></param>
-  /// <param name="username"></param>
-  /// <param name="passwordSalt"></param>
-  /// <param name="passwordHash"></param>
-  /// <param name="createdAt"></param>
   public User(
     Guid id,
     string username,
     string passwordSalt,
     string passwordHash,
     DateTime createdAt
-) : base(id) {
+  ) : base(id) {
     Username = username;
     PasswordSalt = passwordSalt;
     PasswordHash = passwordHash;

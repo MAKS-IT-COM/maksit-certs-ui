@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.3] - 2026-06-20
+
+**Release status:** **3.3.4** is the last published release. **3.5.3** is a patch on **3.5.2** (shared HA runtime library, dependency bumps).
+
+### Changed
+
+- **HA runtime:** PostgreSQL lease acquire/release and per-replica instance id moved to **MaksIT.HAMode** **1.0.4** (`IRuntimeLeaseService`, `IRuntimeInstanceId`, `AddHAModePostgreSql`). Product-specific lease names remain in **`RuntimeLeaseNames`**; **`CoordinationTableProvisioner`** still ensures CertsUI coordination DDL before bootstrap.
+- **Dependencies:** Microsoft.Extensions.* **10.0.9**, Swashbuckle.AspNetCore **10.2.2**, System.Management.Automation **7.6.3** (PowerShell module).
+
+### Upgrade notes (from 3.5.2)
+
+- No configuration or Helm value changes. Behavior is unchanged; lease holder id and **`POD_NAME`** wiring are registered by **MaksIT.HAMode** via **`AddCertsEngine`**.
+
 ## [3.5.2] - 2026-06-04
 
 **Release status:** **3.3.4** is the last published release. **3.5.2** is a patch on **3.5.1** (documentation consolidation, dependency bumps).

@@ -17,8 +17,6 @@ public class IdentityController(
   IIdentityService identityService
 ) : ControllerBase {
 
-  private readonly IIdentityService _identityService = identityService;
-
   #region Search
   [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpPost("search")]
@@ -30,7 +28,7 @@ public class IdentityController(
 
     var jwtTokenData = jwtTokenDataResult.Value;
 
-    var result = _identityService.SearchUsers(jwtTokenData, requestData);
+    var result = identityService.SearchUsers(jwtTokenData, requestData);
     return result.ToActionResult();
   }
 
@@ -44,7 +42,7 @@ public class IdentityController(
 
     var jwtTokenData = jwtTokenDataResult.Value;
 
-    var result = _identityService.SearchUserEntityScopes(jwtTokenData, requestData);
+    var result = identityService.SearchUserEntityScopes(jwtTokenData, requestData);
     return result.ToActionResult();
   }
   #endregion
@@ -60,7 +58,7 @@ public class IdentityController(
 
     var jwtTokenData = jwtTokenDataResult.Value;
 
-    var result = _identityService.ReadUser(jwtTokenData, id);
+    var result = identityService.ReadUser(jwtTokenData, id);
     return result.ToActionResult();
   }
   #endregion
@@ -76,7 +74,7 @@ public class IdentityController(
 
     var jwtTokenData = jwtTokenDataResult.Value;
 
-    var result = await _identityService.PostUserAsync(jwtTokenData, requestData);
+    var result = await identityService.PostUserAsync(jwtTokenData, requestData);
     return result.ToActionResult();
   }
   #endregion
@@ -98,7 +96,7 @@ public class IdentityController(
 
     var jwtTokenData = jwtTokenDataResult.Value;
 
-    var result = await _identityService.PatchUserAsync(jwtTokenData, id, requestData);
+    var result = await identityService.PatchUserAsync(jwtTokenData, id, requestData);
     return result.ToActionResult();
   }
   #endregion
@@ -114,7 +112,7 @@ public class IdentityController(
 
     var jwtTokenData = jwtTokenDataResult.Value;
 
-    var result = await _identityService.DeleteUserAsync(jwtTokenData, id);
+    var result = await identityService.DeleteUserAsync(jwtTokenData, id);
     return result.ToActionResult();
   }
   #endregion
@@ -123,14 +121,14 @@ public class IdentityController(
   [HttpPost("login")]
   [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
   public async Task<IActionResult> Login([FromBody] LoginRequest requestData) {
-    var result = await _identityService.LoginAsync(requestData);
+    var result = await identityService.LoginAsync(requestData);
     return result.ToActionResult();
   }
 
   [HttpPost("refresh")]
   [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
   public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest requestData) {
-    var result = await _identityService.RefreshTokenAsync(requestData);
+    var result = await identityService.RefreshTokenAsync(requestData);
     return result.ToActionResult();
   }
 
@@ -144,7 +142,7 @@ public class IdentityController(
 
     var jwtTokenData = jwtTokenDataResult.Value;
 
-    var result = await _identityService.Logout(jwtTokenData, requetData);
+    var result = await identityService.Logout(jwtTokenData, requetData);
     return result.ToActionResult();
   }
   #endregion

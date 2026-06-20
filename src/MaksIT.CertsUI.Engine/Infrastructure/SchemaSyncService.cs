@@ -12,26 +12,23 @@ public class SchemaSyncService(
   ILogger<SchemaSyncService> logger,
   IDatabaseStartupObserver startupObserver
 ) : ISchemaSyncService {
-  private readonly ICertsEngineConfiguration _config = config;
-  private readonly ILogger<SchemaSyncService> _logger = logger;
-  private readonly IDatabaseStartupObserver _startupObserver = startupObserver;
 
   public async Task SyncSchemaAsync(CancellationToken cancellationToken = default) {
-    if (!_config.AutoSyncSchema) {
-      _startupObserver.OnPhaseStarted(DatabaseStartupPhases.SchemaSync);
-      _startupObserver.OnPhaseCompleted(DatabaseStartupPhases.SchemaSync, TimeSpan.Zero);
+    if (!config.AutoSyncSchema) {
+      startupObserver.OnPhaseStarted(DatabaseStartupPhases.SchemaSync);
+      startupObserver.OnPhaseCompleted(DatabaseStartupPhases.SchemaSync, TimeSpan.Zero);
       return;
     }
 
     await DatabaseStartupPhaseRunner.RunAsync(
-      _startupObserver,
+      startupObserver,
       DatabaseStartupPhases.SchemaSync,
       RunSyncCoreAsync,
       cancellationToken).ConfigureAwait(false);
   }
 
   private async Task RunSyncCoreAsync(CancellationToken cancellationToken) {
-    _logger.LogInformation("Schema sync (add-only) starting...");
+    logger.LogInformation("Schema sync (add-only) starting...");
 
     var desired = GetDesiredSchema();
 
@@ -39,11 +36,11 @@ public class SchemaSyncService(
 
     var ddl = BuildAddOnlyDdl(desired, current);
     if (ddl.Count == 0) {
-      _logger.LogInformation("Schema sync: no changes needed.");
+      logger.LogInformation("Schema sync: no changes needed.");
       return;
     }
 
-    await using var conn = new NpgsqlConnection(_config.ConnectionString);
+    await using var conn = new NpgsqlConnection(config.ConnectionString);
 
     await conn.OpenAsync(cancellationToken);
 
@@ -53,11 +50,11 @@ public class SchemaSyncService(
       foreach (var sql in ddl) {
         await using var cmd = new NpgsqlCommand(sql, conn, tx);
         await cmd.ExecuteNonQueryAsync(cancellationToken);
-        _logger.LogDebug("Executed: {Sql}", sql);
+        logger.LogDebug("Executed: {Sql}", sql);
       }
 
       await tx.CommitAsync(cancellationToken);
-      _logger.LogInformation("Schema sync completed. Applied {Count} DDL statement(s).", ddl.Count);
+      logger.LogInformation("Schema sync completed. Applied {Count} DDL statement(s).", ddl.Count);
     }
     catch {
       await tx.RollbackAsync(cancellationToken);
@@ -151,7 +148,7 @@ public class SchemaSyncService(
   private async Task<Dictionary<string, HashSet<string>>> GetCurrentSchemaAsync(CancellationToken ct) {
     var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
 
-    await using var conn = new NpgsqlConnection(_config.ConnectionString);
+    await using var conn = new NpgsqlConnection(config.ConnectionString);
 
     await conn.OpenAsync(ct);
 

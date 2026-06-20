@@ -12,15 +12,13 @@ using Microsoft.Extensions.Logging;
 namespace MaksIT.CertsUI.Engine.QueryServices.Linq2Db.Identity;
 
 public class UserEntityScopeQueryServiceLinq2Db(ILogger<UserEntityScopeQueryServiceLinq2Db> logger, ICertsUIDataConnectionFactory connectionFactory) : IUserEntityScopeQueryService {
-  private readonly ILogger<UserEntityScopeQueryServiceLinq2Db> _logger = logger;
-  private readonly ICertsUIDataConnectionFactory _connectionFactory = connectionFactory;
 
   public Result<List<UserEntityScopeQueryResult>?> Search(
     Expression<Func<UserEntityScopeDto, bool>>? predicate,
     int? skip,
     int? limit) {
     try {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
       var query = db.GetTable<UserEntityScopeDto>().AsQueryable();
 
       if (predicate != null)
@@ -46,14 +44,14 @@ public class UserEntityScopeQueryServiceLinq2Db(ILogger<UserEntityScopeQueryServ
       return Result<List<UserEntityScopeQueryResult>?>.Ok(results);
     }
     catch (Exception ex) {
-      _logger.LogError(ex, "Error occurred while searching user entity scopes.");
+      logger.LogError(ex, "Error occurred while searching user entity scopes.");
       return Result<List<UserEntityScopeQueryResult>?>.InternalServerError(null, [.. ex.ExtractMessages()]);
     }
   }
 
   public Result<int?> Count(Expression<Func<UserEntityScopeDto, bool>>? predicate) {
     try {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
       var query = db.GetTable<UserEntityScopeDto>().AsQueryable();
       if (predicate != null)
         query = query.Where(predicate);
@@ -62,7 +60,7 @@ public class UserEntityScopeQueryServiceLinq2Db(ILogger<UserEntityScopeQueryServ
       return Result<int?>.Ok(count);
     }
     catch (Exception ex) {
-      _logger.LogError(ex, "Error occurred while counting user entity scopes.");
+      logger.LogError(ex, "Error occurred while counting user entity scopes.");
       return Result<int?>.InternalServerError(null, [.. ex.ExtractMessages()]);
     }
   }

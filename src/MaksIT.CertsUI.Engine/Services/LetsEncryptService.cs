@@ -35,28 +35,16 @@ public interface ILetsEncryptService {
   Task<Result> RevokeCertificate(Guid sessionId, string subject, RevokeReason reason, CancellationToken cancellationToken = default);
 }
 
-public partial class LetsEncryptService : ILetsEncryptService {
+public partial class LetsEncryptService(
+  ILogger<LetsEncryptService> logger,
+  ICertsEngineConfiguration engineConfiguration,
+  HttpClient httpClient,
+  IAcmeSessionPersistenceService acmeSessionPersistence
+) : ILetsEncryptService {
   private const string DnsType = "dns";
   private const string DirectoryEndpoint = "directory";
   private const string ReplayNonceHeader = "Replay-Nonce";
   private const string AccountKeyMissingMessage = "Account key is not loaded; complete Init before this operation.";
-
-  private readonly ILogger<LetsEncryptService> _logger;
-  private readonly ICertsEngineConfiguration _engineConfiguration;
-  private readonly HttpClient _httpClient;
-  private readonly IAcmeSessionPersistenceService _acmeSessionPersistence;
-
-  public LetsEncryptService(
-      ILogger<LetsEncryptService> logger,
-      ICertsEngineConfiguration engineConfiguration,
-      HttpClient httpClient,
-      IAcmeSessionPersistenceService acmeSessionPersistence
-   ) {
-    _logger = logger;
-    _engineConfiguration = engineConfiguration;
-    _httpClient = httpClient;
-    _acmeSessionPersistence = acmeSessionPersistence;
-  }
 
   public Task<Result<RegistrationCache?>> GetRegistrationCacheAsync(Guid sessionId, CancellationToken cancellationToken = default) =>
     WithPersistedSessionAsync<RegistrationCache?>(sessionId, cancellationToken, async state => {
@@ -99,24 +87,24 @@ public partial class LetsEncryptService : ILetsEncryptService {
   public Task<Result> Init(Guid sessionId, Guid accountId, string description, string[] contacts, RegistrationCache? cache, CancellationToken cancellationToken = default) {
     if (sessionId == Guid.Empty) {
       const string message = "Invalid sessionId";
-      _logger.LogError(message);
+      logger.LogError(message);
       return Task.FromResult(Result.InternalServerError(message));
     }
 
     if (contacts == null || contacts.Length == 0) {
       const string message = "Contacts are null or empty";
-      _logger.LogError(message);
+      logger.LogError(message);
       return Task.FromResult(Result.InternalServerError(message));
     }
 
     return WithPersistedSessionAsync(sessionId, cancellationToken, async state => {
     if (state.Directory == null) {
       const string message = "State directory is null";
-      _logger.LogError(message);
+      logger.LogError(message);
       return Result.InternalServerError(message);
     }
 
-    _logger.LogInformation($"Executing {nameof(Init)}...");
+    logger.LogInformation($"Executing {nameof(Init)}...");
 
     try {
       var accountKey = new RSACryptoServiceProvider(4096);
@@ -181,7 +169,7 @@ public partial class LetsEncryptService : ILetsEncryptService {
 
         if (result.Result?.Status != "valid") {
           var accountStatusMessage = $"Account status is not valid, was: {result.Result?.Status} \r\n {result.ResponseText}";
-          _logger.LogError(accountStatusMessage);
+          logger.LogError(accountStatusMessage);
           return Result.InternalServerError(accountStatusMessage);
         }
 
@@ -214,7 +202,7 @@ public partial class LetsEncryptService : ILetsEncryptService {
   public Task<Result<string?>> GetTermsOfServiceUriAsync(Guid sessionId, CancellationToken cancellationToken = default) =>
     WithPersistedSessionAsync<string?>(sessionId, cancellationToken, async state => {
       try {
-        _logger.LogInformation($"Executing {nameof(GetTermsOfServiceUriAsync)}...");
+        logger.LogInformation($"Executing {nameof(GetTermsOfServiceUriAsync)}...");
 
         if (state.Directory?.Meta?.TermsOfService == null) {
           return Result<string?>.Ok(null);
@@ -232,7 +220,7 @@ public partial class LetsEncryptService : ILetsEncryptService {
   public Task<Result<Dictionary<string, string>?>> NewOrder(Guid sessionId, string[] hostnames, string challengeType, CancellationToken cancellationToken = default) =>
     WithPersistedSessionAsync<Dictionary<string, string>?>(sessionId, cancellationToken, async state => {
       try {
-        _logger.LogInformation($"Executing {nameof(NewOrder)}...");
+        logger.LogInformation($"Executing {nameof(NewOrder)}...");
 
         state.Challenges.Clear();
 
@@ -277,7 +265,7 @@ public partial class LetsEncryptService : ILetsEncryptService {
           return Result<Dictionary<string, string>?>.Ok(new Dictionary<string, string>());
 
         if (!StatusEquals(order.Result?.Status, OrderStatus.Pending)) {
-          _logger.LogError($"Created new order and expected status '{OrderStatus.Pending.GetDisplayName()}', but got: {order.Result?.Status} \r\n {order.Result}");
+          logger.LogError($"Created new order and expected status '{OrderStatus.Pending.GetDisplayName()}', but got: {order.Result?.Status} \r\n {order.Result}");
           return Result<Dictionary<string, string>?>.InternalServerError(null);
         }
 
@@ -319,7 +307,7 @@ public partial class LetsEncryptService : ILetsEncryptService {
             continue;
 
           if (!StatusEquals(challengeResponse.Result?.Status, OrderStatus.Pending)) {
-            _logger.LogError($"Expected authorization status '{OrderStatus.Pending.GetDisplayName()}', but got: {challengeResponse.Result?.Status} \r\n {challengeResponse.ResponseText}");
+            logger.LogError($"Expected authorization status '{OrderStatus.Pending.GetDisplayName()}', but got: {challengeResponse.Result?.Status} \r\n {challengeResponse.ResponseText}");
             return Result<Dictionary<string, string>?>.InternalServerError(null);
           }
 
@@ -327,7 +315,7 @@ public partial class LetsEncryptService : ILetsEncryptService {
             .FirstOrDefault(x => x?.Type == challengeType);
 
           if (challenge == null || challenge.Token == null) {
-            _logger.LogError("Challenge or token is null");
+            logger.LogError("Challenge or token is null");
             return Result<Dictionary<string, string>?>.InternalServerError(null);
           }
 
@@ -370,7 +358,7 @@ public partial class LetsEncryptService : ILetsEncryptService {
   public Task<Result> CompleteChallenges(Guid sessionId, CancellationToken cancellationToken = default) =>
     WithPersistedSessionAsync(sessionId, cancellationToken, async state => {
       try {
-        _logger.LogInformation($"Executing {nameof(CompleteChallenges)}...");
+        logger.LogInformation($"Executing {nameof(CompleteChallenges)}...");
 
         if (state.CurrentOrder?.Identifiers == null) {
           return Result.InternalServerError("Current order identifiers are null");
@@ -380,12 +368,12 @@ public partial class LetsEncryptService : ILetsEncryptService {
           var challenge = state.Challenges[index];
 
           if (challenge is null) {
-            _logger.LogError("Challenge entry is null");
+            logger.LogError("Challenge entry is null");
             return Result.InternalServerError("Challenge entry is null");
           }
 
           if (challenge.Url is null) {
-            _logger.LogError("Challenge URL is null");
+            logger.LogError("Challenge URL is null");
             return Result.InternalServerError("Challenge URL is null");
           }
 
@@ -433,7 +421,7 @@ public partial class LetsEncryptService : ILetsEncryptService {
 
   private async Task<Result> GetOrderCoreAsync(State state, string[] hostnames) {
     try {
-      _logger.LogInformation($"Executing {nameof(GetOrder)}");
+      logger.LogInformation($"Executing {nameof(GetOrder)}");
 
       if (state.Directory?.NewOrder is not { } newOrderUri)
         return Result.InternalServerError("Directory is not configured. Run ConfigureClient first.");
@@ -486,7 +474,7 @@ public partial class LetsEncryptService : ILetsEncryptService {
   public Task<Result> GetCertificate(Guid sessionId, string subject, CancellationToken cancellationToken = default) =>
     WithPersistedSessionAsync(sessionId, cancellationToken, async state => {
       try {
-      _logger.LogInformation($"Executing {nameof(GetCertificate)}...");
+      logger.LogInformation($"Executing {nameof(GetCertificate)}...");
 
       if (state.CurrentOrder?.Identifiers is not { } initialIdentifiers)
         return Result.InternalServerError();
@@ -636,7 +624,7 @@ public partial class LetsEncryptService : ILetsEncryptService {
       var pem = requestResult.Value;
 
       if (state.Cache == null) {
-        _logger.LogError($"{nameof(state.Cache)} is null");
+        logger.LogError($"{nameof(state.Cache)} is null");
         return Result.InternalServerError();
       }
 
@@ -671,17 +659,17 @@ public partial class LetsEncryptService : ILetsEncryptService {
   public Task<Result> RevokeCertificate(Guid sessionId, string subject, RevokeReason reason, CancellationToken cancellationToken = default) =>
     WithPersistedSessionAsync(sessionId, cancellationToken, async state => {
       try {
-        _logger.LogInformation($"Executing {nameof(RevokeCertificate)}...");
+        logger.LogInformation($"Executing {nameof(RevokeCertificate)}...");
 
         if (state.Cache?.CachedCerts == null || !state.Cache.CachedCerts.TryGetValue(subject, out var certificateCache) || certificateCache == null) {
-          _logger.LogError("Certificate not found in cache");
+          logger.LogError("Certificate not found in cache");
           return Result.InternalServerError("Certificate not found");
         }
 
         var certPem = certificateCache.Cert ?? string.Empty;
 
         if (string.IsNullOrEmpty(certPem)) {
-          _logger.LogError("Certificate PEM is null or empty");
+          logger.LogError("Certificate PEM is null or empty");
           return Result.InternalServerError("Certificate PEM is null or empty");
         }
 
@@ -725,7 +713,7 @@ public partial class LetsEncryptService : ILetsEncryptService {
 
         request.Content.Headers.ContentType = new MediaTypeHeaderValue(GetContentType(ContentType.JoseJson));
 
-        var response = await _httpClient.SendAsync(request);
+        var response = await httpClient.SendAsync(request);
 
         var responseText = await response.Content.ReadAsStringAsync();
 
@@ -736,7 +724,7 @@ public partial class LetsEncryptService : ILetsEncryptService {
             return Result.InternalServerError(responseText);
 
           state.Cache.CachedCerts.Remove(subject);
-          _logger.LogInformation("Certificate revoked successfully");
+          logger.LogInformation("Certificate revoked successfully");
 
           return Result.Ok();
         }
@@ -754,7 +742,7 @@ public partial class LetsEncryptService : ILetsEncryptService {
   #endregion
 
   private Uri AcmeDirectoryAbsoluteUri(bool isStaging) {
-    var configured = (isStaging ? _engineConfiguration.LetsEncryptStaging : _engineConfiguration.LetsEncryptProduction).Trim();
+    var configured = (isStaging ? engineConfiguration.LetsEncryptStaging : engineConfiguration.LetsEncryptProduction).Trim();
     if (string.IsNullOrWhiteSpace(configured))
       throw new InvalidOperationException("Let's Encrypt directory URL is empty.");
 

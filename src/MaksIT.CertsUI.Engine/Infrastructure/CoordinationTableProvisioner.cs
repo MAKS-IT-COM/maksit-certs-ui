@@ -4,7 +4,7 @@ namespace MaksIT.CertsUI.Engine.Infrastructure;
 
 /// <summary>
 /// Idempotent DDL for HA coordination tables in schema <c>public</c> (same shape as the AcmeChallengesAndRuntimeLeases migration). Used after FluentMigrator and again before bootstrap lease
-/// so <see cref="RuntimeLeaseServiceNpgsql"/> never runs against a missing <c>app_runtime_leases</c>.
+/// so <see cref="MaksIT.HAMode.PostgreSql.RuntimeLeaseServiceNpgsql"/> never runs against a missing <c>app_runtime_leases</c>.
 /// </summary>
 public static class CoordinationTableProvisioner {
 

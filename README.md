@@ -94,7 +94,19 @@ This solution provides automated, secure management of Let's Encrypt certificate
 - **Optional Dedicated Worker Split:**  
   ACME write coordination is implemented through PostgreSQL runtime leases in the main server process. A dedicated ACME worker deployment/chart split is optional and not implemented in this repository yet.
 
-The server component supports HA replicas with DB-backed coordination. See [High availability architecture](#high-availability-architecture) for details.
+The server component supports HA replicas with DB-backed coordination. See [High availability architecture](#high-availability-architecture) and [Kubernetes installation](#maksitcertsui-server-installation-on-kubernetes).
+
+### High availability architecture
+
+Symmetric **server** replicas share one PostgreSQL database. Runtime coordination uses **MaksIT.HAMode** (NuGet) for **`IRuntimeInstanceId`** (Kubernetes: **`POD_NAME`**) and **`IRuntimeLeaseService`** on **`app_runtime_leases`**. CertsUI-specific lease names live in **`RuntimeLeaseNames`** (`certs-ui-bootstrap`, `certs-ui-renewal-sweep`, `certs-ui-acme-writer`). ACME sessions, HTTP-01 tokens, and identity data are stored in PostgreSQL so any replica can serve traffic and **`/.well-known/acme-challenge/`** behind a load balancer.
+
+| Path | Use |
+|------|-----|
+| `GET /health/live` | Liveness |
+| `GET /health/ready` | Readiness — **503** until bootstrap coordination completes |
+| `GET /health/startup` | Startup phase timings (migrations, schema sync, bootstrap) |
+
+For Helm **`replicaCount`**, external Postgres, and homelab install order, see [Kubernetes installation](#maksitcertsui-server-installation-on-kubernetes).
 
 ### Architecture Scheme
 

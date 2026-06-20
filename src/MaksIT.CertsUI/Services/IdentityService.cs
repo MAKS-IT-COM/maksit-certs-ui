@@ -63,11 +63,6 @@ public class IdentityService(
   UserToResponseMapper userToResponseMapper
 ) : ServiceBase<UserResponse, User, SearchUserResponse, UserQueryResult>(logger, appSettings), IIdentityService {
 
-  private readonly IIdentityQueryService _identityQueryService = identityQueryService;
-  private readonly IUserEntityScopeQueryService _userEntityScopeQueryService = userEntityScopeQueryService;
-  private readonly IIdentityDomainService _identityDomainService = identityDomainService;
-  private readonly UserToResponseMapper _userToResponseMapper = userToResponseMapper;
-
   #region Identity RBAC
   /// <summary>
   /// Performs RBAC (Role-Based Access Control) checks to determine if the current user is authorized to read the specified user identity.
@@ -90,12 +85,12 @@ public class IdentityService(
   /// Last update: 02/03/2026
   /// </remarks>
   private Result<User?> ReadUserRBAC(JwtTokenData jwtTokenData, Guid userId) {
-    var targetIdentityResult = _identityDomainService.ReadUserById(userId);
+    var targetIdentityResult = identityDomainService.ReadUserById(userId);
     if (!targetIdentityResult.IsSuccess || targetIdentityResult.Value == null)
       return targetIdentityResult.ToResultOfType<User?>(_ => null);
 
     var targetIdentity = targetIdentityResult.Value;
-    var targetAuthResult = _identityDomainService.ReadUserAuthorization(userId);
+    var targetAuthResult = identityDomainService.ReadUserAuthorization(userId);
     var targetAuthorization = targetAuthResult.IsSuccess ? targetAuthResult.Value : null;
 
     return RBACWrapperJwtToken(
@@ -165,12 +160,12 @@ public class IdentityService(
     if (!globalAdminPatchCheck.IsSuccess)
       return Result<User?>.Forbidden(null, "Only a global admin can assign or remove the global admin flag.");
 
-    var targetIdentityResult = _identityDomainService.ReadUserById(userId);
+    var targetIdentityResult = identityDomainService.ReadUserById(userId);
     if (!targetIdentityResult.IsSuccess || targetIdentityResult.Value == null)
       return targetIdentityResult.ToResultOfType<User?>(_ => null);
 
     var targetIdentity = targetIdentityResult.Value;
-    var targetAuthResult = _identityDomainService.ReadUserAuthorization(userId);
+    var targetAuthResult = identityDomainService.ReadUserAuthorization(userId);
     var targetAuthorization = targetAuthResult.IsSuccess ? targetAuthResult.Value : null;
 
     return RBACWrapperJwtToken(
@@ -204,12 +199,12 @@ public class IdentityService(
   /// Last update: 02/03/2026
   /// </remarks>
   private Result DeleteUserRBAC(JwtTokenData jwtTokenData, Guid userId) {
-    var targetIdentityResult = _identityDomainService.ReadUserById(userId);
+    var targetIdentityResult = identityDomainService.ReadUserById(userId);
     if (!targetIdentityResult.IsSuccess || targetIdentityResult.Value == null)
       return targetIdentityResult;
 
     var targetIdentity = targetIdentityResult.Value;
-    var targetAuthResult = _identityDomainService.ReadUserAuthorization(userId);
+    var targetAuthResult = identityDomainService.ReadUserAuthorization(userId);
     var targetAuthorization = targetAuthResult.IsSuccess ? targetAuthResult.Value : null;
     var targetIsGlobalAdmin = targetAuthorization?.IsGlobalAdmin ?? false;
     var targetEntityScopes = targetAuthorization?.EntityScopes ?? [];
@@ -268,14 +263,14 @@ public class IdentityService(
     var skip = (requestData.PageNumber - 1) * requestData.PageSize;
     var take = requestData.PageSize;
 
-    var usersResult = _identityQueryService.Search(usersPredicate, skip, take);
+    var usersResult = identityQueryService.Search(usersPredicate, skip, take);
 
     if (!usersResult.IsSuccess || usersResult.Value == null)
       return usersResult.ToResultOfType<PagedResponse<SearchUserResponse>?>(_ => null);
 
     var users = usersResult.Value;
 
-    var usersCountResult = _identityQueryService.Count(usersPredicate);
+    var usersCountResult = identityQueryService.Count(usersPredicate);
 
     if (!usersCountResult.IsSuccess || usersCountResult.Value == null)
       return usersCountResult.ToResultOfType<PagedResponse<SearchUserResponse>?>(_ => null);
@@ -316,7 +311,7 @@ public class IdentityService(
           .Except(visibleOrgIds)
           .Any();
 
-    var usersResult = _identityQueryService.Search(accessScope, 0, 50000);
+    var usersResult = identityQueryService.Search(accessScope, 0, 50000);
     var allowedUserIds = new HashSet<Guid>();
     if (usersResult.IsSuccess && usersResult.Value != null && usersResult.Value.Count > 0)
       allowedUserIds = usersResult.Value.Select(u => u.Id).ToHashSet();
@@ -330,18 +325,18 @@ public class IdentityService(
     var skip = (requestData.PageNumber - 1) * requestData.PageSize;
     var take = requestData.PageSize;
 
-    var scopesResult = _userEntityScopeQueryService.Search(predicate, skip, take);
+    var scopesResult = userEntityScopeQueryService.Search(predicate, skip, take);
     if (!scopesResult.IsSuccess || scopesResult.Value == null)
       return scopesResult.ToResultOfType<PagedResponse<SearchUserEntityScopeResponse>?>(_ => null);
 
     var scopes = scopesResult.Value;
-    var countResult = _userEntityScopeQueryService.Count(predicate);
+    var countResult = userEntityScopeQueryService.Count(predicate);
     if (!countResult.IsSuccess || countResult.Value == null)
       return countResult.ToResultOfType<PagedResponse<SearchUserEntityScopeResponse>?>(_ => null);
 
     var totalCount = countResult.Value ?? 0;
     var pagedResponse = new PagedResponse<SearchUserEntityScopeResponse>(
-        scopes.Select(_userToResponseMapper.MapToSearchResponse),
+        scopes.Select(userToResponseMapper.MapToSearchResponse),
         totalCount,
         requestData.PageNumber,
         requestData.PageSize
@@ -361,7 +356,7 @@ public class IdentityService(
       return userResult.ToResultOfType<UserResponse?>(_ => null);
 
     var user = userResult.Value;
-    var authResult = _identityDomainService.ReadUserAuthorization(user.Id);
+    var authResult = identityDomainService.ReadUserAuthorization(user.Id);
     var authorization = authResult.IsSuccess ? authResult.Value : null;
     var response = MapToResponse(user, authorization);
 
@@ -380,18 +375,18 @@ public class IdentityService(
     if (!createResult.IsSuccess)
       return createResult.ToResultOfType<UserResponse?>(null);
 
-    var pepper = _appSettings.CertsEngineConfiguration.JwtSettingsConfiguration.PasswordPepper;
+    var pepper = AppSettings.CertsEngineConfiguration.JwtSettingsConfiguration.PasswordPepper;
     var newUser = new User(requestData.Username, requestData.Password, pepper)
       .SetEmail(requestData.Email)
       .SetMobileNumber(requestData.MobileNumber)
       .SetIsActive(true);
 
-    var sagaBuilder = new LocalSagaBuilder(_logger);
+    var sagaBuilder = new LocalSagaBuilder(Logger);
 
     sagaBuilder.AddStep(
       name: "Step1. Write user",
       execute: async (ctx, ct) => {
-        var result = await _identityDomainService.WriteUserAsync(newUser);
+        var result = await identityDomainService.WriteUserAsync(newUser);
         if (!result.IsSuccess || result.Value == null)
           return result.ToResultOfType<UserResponse?>(_ => null);
         var user = result.Value;
@@ -419,13 +414,13 @@ public class IdentityService(
             .ToList();
           authorization.SetEntityScopes(entityScopes);
         }
-        var authWriteResult = await _identityDomainService.WriteUserAuthorizationAsync(authorization);
+        var authWriteResult = await identityDomainService.WriteUserAuthorizationAsync(authorization);
         if (!authWriteResult.IsSuccess) {
           var err = authWriteResult.ToResultOfType<UserResponse?>(null);
           ctx.Set("finalUserResponse", err);
           return err;
         }
-        var userResult = _identityDomainService.ReadUserById(userId);
+        var userResult = identityDomainService.ReadUserById(userId);
         if (!userResult.IsSuccess || userResult.Value == null) {
           var err = userResult.ToResultOfType<UserResponse?>(_ => null);
           ctx.Set("finalUserResponse", err);
@@ -449,8 +444,8 @@ public class IdentityService(
     if (!finalResult.IsSuccess) {
       var createdUserId = sagaContext.Get<Guid>("createdUserId");
       if (createdUserId != Guid.Empty) {
-        _logger.LogWarning("PostUser saga failed after Step 1; compensating by deleting created user {UserId}", createdUserId);
-        await _identityDomainService.DeleteUserAsync(createdUserId);
+        Logger.LogWarning("PostUser saga failed after Step 1; compensating by deleting created user {UserId}", createdUserId);
+        await identityDomainService.DeleteUserAsync(createdUserId);
       }
     }
 
@@ -492,21 +487,21 @@ public class IdentityService(
       return authorizationResult;
 
     if (authorization == null) {
-      var upsertResult = await _identityDomainService.WriteUserAsync(user);
+      var upsertResult = await identityDomainService.WriteUserAsync(user);
       if (!upsertResult.IsSuccess || upsertResult.Value == null)
         return upsertResult.ToResultOfType<UserResponse?>(_ => null);
       user = upsertResult.Value;
       return Result<UserResponse?>.Ok(MapToResponse(user, null));
     }
 
-    var writeResult = await _identityDomainService.WriteUserAsync(user, authorization);
+    var writeResult = await identityDomainService.WriteUserAsync(user, authorization);
     if (!writeResult.IsSuccess || writeResult.Value == null)
       return writeResult.ToResultOfType<UserResponse?>(_ => null);
     user = writeResult.Value;
 
     if (twoFactorRecoveryCodes != null) {
       var userResponse = MapToResponse(user, authorization);
-      var twoFactorSettingsConfiguration = _appSettings.CertsEngineConfiguration.TwoFactorSettingsConfiguration;
+      var twoFactorSettingsConfiguration = AppSettings.CertsEngineConfiguration.TwoFactorSettingsConfiguration;
       if (!TotpGenerator.TryGenerateTotpAuthLink(
           twoFactorSettingsConfiguration.Label,
           user.Username,
@@ -518,7 +513,7 @@ public class IdentityService(
           out var authLink,
           out var errorMessage
       )) {
-        _logger.LogError(errorMessage);
+        Logger.LogError(errorMessage);
         return Result<UserResponse?>.InternalServerError(null, errorMessage);
       }
       userResponse.QrCodeUrl = authLink;
@@ -596,7 +591,7 @@ public class IdentityService(
         case PatchOperation.SetField:
           if (requestData.Password == null)
             return PatchFieldIsNotDefined<UserResponse?>(nameof(requestData.Password));
-          user.SetPassword(requestData.Password, _appSettings.CertsEngineConfiguration.JwtSettingsConfiguration.PasswordPepper);
+          user.SetPassword(requestData.Password, AppSettings.CertsEngineConfiguration.JwtSettingsConfiguration.PasswordPepper);
           break;
         default:
           return UnsupportedPatchOperationResponse<UserResponse?>();
@@ -613,7 +608,7 @@ public class IdentityService(
     twoFactorRecoveryCodes = null;
 
     if (requestData.TwoFactorEnabled == true) {
-      var enableTwoFactorAuthResult = _identityDomainService.EnableTwoFactorAuthForUser(user);
+      var enableTwoFactorAuthResult = identityDomainService.EnableTwoFactorAuthForUser(user);
       if (!enableTwoFactorAuthResult.IsSuccess)
         return enableTwoFactorAuthResult.ToResultOfType<UserResponse?>(_ => null);
 
@@ -634,7 +629,7 @@ public class IdentityService(
   private Result<UserResponse?> PatchUserAuthorization(User user, PatchUserRequest requestData, out UserAuthorization? authorization) {
     authorization = null;
 
-    var authResult = _identityDomainService.ReadUserAuthorization(user.Id);
+    var authResult = identityDomainService.ReadUserAuthorization(user.Id);
     if (authResult.IsSuccess && authResult.Value != null)
       authorization = authResult.Value;
 
@@ -711,7 +706,7 @@ public class IdentityService(
     if (!userResult.IsSuccess)
       return userResult;
 
-    var result = await _identityDomainService.DeleteUserAsync(id);
+    var result = await identityDomainService.DeleteUserAsync(id);
     return result;
   }
   #endregion
@@ -719,12 +714,12 @@ public class IdentityService(
   #region Login/Refresh/Logout
   public async Task<Result<LoginResponse?>> LoginAsync(LoginRequest requestData) {
     return await HandleTokenResponseAsync(() =>
-      _identityDomainService.LoginAsync(requestData.Username, requestData.Password, requestData.TwoFactorCode, requestData.TwoFactorRecoveryCode), _appSettings);
+      identityDomainService.LoginAsync(requestData.Username, requestData.Password, requestData.TwoFactorCode, requestData.TwoFactorRecoveryCode), AppSettings);
   }
 
   public async Task<Result<LoginResponse?>> RefreshTokenAsync(RefreshTokenRequest requestData) {
     return await HandleTokenResponseAsync(() =>
-      _identityDomainService.RefreshTokenAsync(requestData.RefreshToken, requestData.Force), _appSettings);
+      identityDomainService.RefreshTokenAsync(requestData.RefreshToken, requestData.Force), AppSettings);
   }
 
   private static async Task<Result<LoginResponse?>> HandleTokenResponseAsync(Func<Task<Result<JwtToken?>>> tokenOperation, Configuration appSettings) {
@@ -757,7 +752,7 @@ public class IdentityService(
   }
 
   public async Task<Result> Logout(JwtTokenData jwtTokenData, LogoutRequest requestData) {
-    var logoutResult = await _identityDomainService.LogoutAsync(jwtTokenData.UserId, jwtTokenData.Token, requestData.LogoutFromAllDevices);
+    var logoutResult = await identityDomainService.LogoutAsync(jwtTokenData.UserId, jwtTokenData.Token, requestData.LogoutFromAllDevices);
     return logoutResult;
   }
   #endregion
@@ -767,15 +762,15 @@ public class IdentityService(
   /// Maps User and optional UserAuthorization to API response. Authorization can be null for backward compatibility.
   /// </summary>
   protected UserResponse MapToResponse(User domain, UserAuthorization? authorization) =>
-    _userToResponseMapper.MapToResponse(domain, authorization);
+    userToResponseMapper.MapToResponse(domain, authorization);
 
   protected override UserResponse MapToResponse(User domain) =>
-    _userToResponseMapper.MapToResponse(domain, null);
+    userToResponseMapper.MapToResponse(domain, null);
 
   #endregion
 
   #region Map QueryResult to SerchResponse
   protected override SearchUserResponse MapToSearchResponse(UserQueryResult queryResult) =>
-    _userToResponseMapper.MapToSearchResponse(queryResult);
+    userToResponseMapper.MapToSearchResponse(queryResult);
   #endregion
 }

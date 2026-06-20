@@ -7,18 +7,12 @@ namespace MaksIT.CertsUI.Controllers;
 
 [ApiController]
 [Route(".well-known")]
-public class WellKnownController : ControllerBase {
-
-  private readonly ICertsFlowService _certsFlowService;
-
-  public WellKnownController(ICertsFlowService certsFlowService) {
-    _certsFlowService = certsFlowService;
-  }
+public class WellKnownController(ICertsFlowService certsFlowService) : ControllerBase {
 
 
   [HttpGet("acme-challenge/{fileName}")]
   public async Task<IActionResult> AcmeChallenge(string fileName, CancellationToken cancellationToken) {
-    var result = await _certsFlowService.AcmeChallengeAsync(fileName, cancellationToken);
+    var result = await certsFlowService.AcmeChallengeAsync(fileName, cancellationToken);
     if (!result.IsSuccess || result.Value == null)
       return NotFound();
 

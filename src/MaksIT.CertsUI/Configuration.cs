@@ -21,11 +21,11 @@ public class JwtSettingsConfiguration : IJwtSettingsConfiguration {
 
   public required string Audience { get; set; }
 
-  public int ExpiresIn { get; set; }
+  public int ExpiresIn { get; set; } = 15;
 
-  public int RefreshTokenExpiresIn { get; set; }
+  public int RefreshTokenExpiresIn { get; set; } = 180;
 
-  /// <summary>Pepper for password/2FA hashing. If not set, defaults to empty (set in appsecrets for production).</summary>
+  /// <summary>Pepper for password/2FA hashing. Set in appsecrets for production; empty until secrets load.</summary>
   public string PasswordPepper { get; set; } = "";
 }
 
@@ -37,11 +37,11 @@ public class TwoFactorSettingsConfiguration : ITwoFactorSettingsConfiguration {
 
   public string? Algorithm { get; set; }
 
-  public int? Digits { get; set; }
+  public int? Digits { get; set; } = 6;
 
-  public int? Period { get; set; }
+  public int? Period { get; set; } = 30;
 
-  public int TimeTolerance { get; set; }
+  public int TimeTolerance { get; set; } = 1;
 }
 
 public class Agent {

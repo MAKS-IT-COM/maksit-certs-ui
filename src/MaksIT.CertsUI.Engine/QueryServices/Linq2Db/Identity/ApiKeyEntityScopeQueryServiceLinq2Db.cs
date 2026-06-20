@@ -13,8 +13,6 @@ using MaksIT.CertsUI.Engine.QueryServices.Identity;
 namespace MaksIT.CertsUI.Engine.QueryServices.Linq2Db.Identity;
 
 public class ApiKeyEntityScopeQueryServiceLinq2Db(ILogger<ApiKeyEntityScopeQueryServiceLinq2Db> logger, ICertsUIDataConnectionFactory connectionFactory) : IApiKeyEntityScopeQueryService {
-  private readonly ILogger<ApiKeyEntityScopeQueryServiceLinq2Db> _logger = logger;
-  private readonly ICertsUIDataConnectionFactory _connectionFactory = connectionFactory;
 
   public Result<List<ApiKeyEntityScopeQueryResult>?> Search(
     Expression<Func<ApiKeyEntityScopeDto, bool>>? predicate,
@@ -22,7 +20,7 @@ public class ApiKeyEntityScopeQueryServiceLinq2Db(ILogger<ApiKeyEntityScopeQuery
     int? limit
   ) {
     try {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
       var query = db.GetTable<ApiKeyEntityScopeDto>().AsQueryable();
       if (predicate != null)
         query = query.Where(predicate);
@@ -51,14 +49,14 @@ public class ApiKeyEntityScopeQueryServiceLinq2Db(ILogger<ApiKeyEntityScopeQuery
       return Result<List<ApiKeyEntityScopeQueryResult>?>.Ok(results);
     }
     catch (Exception ex) {
-      _logger.LogError(ex, "Error occurred while searching API key entity scopes.");
+      logger.LogError(ex, "Error occurred while searching API key entity scopes.");
       return Result<List<ApiKeyEntityScopeQueryResult>?>.InternalServerError(null, [.. ex.ExtractMessages()]);
     }
   }
 
   public Result<int?> Count(Expression<Func<ApiKeyEntityScopeDto, bool>>? predicate) {
     try {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
 
       var query = db.GetTable<ApiKeyEntityScopeDto>().AsQueryable();
 
@@ -70,7 +68,7 @@ public class ApiKeyEntityScopeQueryServiceLinq2Db(ILogger<ApiKeyEntityScopeQuery
       return Result<int?>.Ok(count);
     }
     catch (Exception ex) {
-      _logger.LogError(ex, "Error occurred while counting API key entity scopes.");
+      logger.LogError(ex, "Error occurred while counting API key entity scopes.");
       return Result<int?>.InternalServerError(null, [.. ex.ExtractMessages()]);
     }
   }

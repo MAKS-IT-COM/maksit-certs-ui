@@ -12,16 +12,11 @@ public interface ICertsUIDataConnectionFactory {
   DataConnection Create();
 }
 
-public class CertsUIDataConnectionFactory : ICertsUIDataConnectionFactory {
-  private readonly ICertsEngineConfiguration _config;
-
-  public CertsUIDataConnectionFactory(ICertsEngineConfiguration config) {
-    _config = config;
-  }
+public class CertsUIDataConnectionFactory(ICertsEngineConfiguration config) : ICertsUIDataConnectionFactory {
 
   public DataConnection Create() {
     var options = new DataOptions()
-      .UseConnectionString(ProviderName.PostgreSQL, _config.ConnectionString)
+      .UseConnectionString(ProviderName.PostgreSQL, config.ConnectionString)
       .UseMappingSchema(CertsUILinq2DbMapping.Schema);
     return new DataConnection(options);
   }

@@ -11,8 +11,6 @@ using Microsoft.Extensions.Logging;
 namespace MaksIT.CertsUI.Engine.QueryServices.Linq2Db.Identity;
 
 public class ApiKeyQueryServiceLinq2Db(ILogger<ApiKeyQueryServiceLinq2Db> logger, ICertsUIDataConnectionFactory connectionFactory) : IApiKeyQueryService {
-  private readonly ILogger<ApiKeyQueryServiceLinq2Db> _logger = logger;
-  private readonly ICertsUIDataConnectionFactory _connectionFactory = connectionFactory;
 
   public Result<List<ApiKeyQueryResult>?> Search(
     Expression<Func<ApiKeyDto, bool>>? apiKeysPredicate,
@@ -20,7 +18,7 @@ public class ApiKeyQueryServiceLinq2Db(ILogger<ApiKeyQueryServiceLinq2Db> logger
     int? limit
   ) {
     try {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
 
       var query = db.GetTable<ApiKeyDto>().AsQueryable();
 
@@ -42,14 +40,14 @@ public class ApiKeyQueryServiceLinq2Db(ILogger<ApiKeyQueryServiceLinq2Db> logger
       return Result<List<ApiKeyQueryResult>?>.Ok(results);
     }
     catch (Exception ex) {
-      _logger.LogError(ex, "Error occurred while searching API keys.");
+      logger.LogError(ex, "Error occurred while searching API keys.");
       return Result<List<ApiKeyQueryResult>?>.InternalServerError(null, [.. ex.ExtractMessages()]);
     }
   }
 
   public Result<int?> Count(Expression<Func<ApiKeyDto, bool>>? apiKeysPredicate) {
     try {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
 
       var query = db.GetTable<ApiKeyDto>()
         .AsQueryable();
@@ -61,7 +59,7 @@ public class ApiKeyQueryServiceLinq2Db(ILogger<ApiKeyQueryServiceLinq2Db> logger
       return Result<int?>.Ok(count);
     }
     catch (Exception ex) {
-      _logger.LogError(ex, "Error occurred while counting API keys.");
+      logger.LogError(ex, "Error occurred while counting API keys.");
       return Result<int?>.InternalServerError(null, [.. ex.ExtractMessages()]);
     }
   }

@@ -10,9 +10,8 @@ namespace MaksIT.CertsUI.Controllers;
 public class CacheController(
   ICacheService cacheService
 ) : ControllerBase {
-  private readonly ICacheService _cacheService = cacheService;
 
-  #region Read
+  #region Zip import/export
   [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpGet("download")]
   [ProducesResponseType(typeof(FileResult), StatusCodes.Status200OK)]
@@ -23,7 +22,7 @@ public class CacheController(
 
     var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
 
-    var result = await _cacheService.DownloadCacheZipAsync(certsUIAuthorizationData);
+    var result = await cacheService.DownloadCacheZipAsync(certsUIAuthorizationData);
     if (!result.IsSuccess || result.Value == null) {
       return result.ToActionResult();
     }
@@ -43,7 +42,7 @@ public class CacheController(
 
     var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
 
-    var result = await _cacheService.DownloadAccountCacheZipAsync(certsUIAuthorizationData, accountId);
+    var result = await cacheService.DownloadAccountCacheZipAsync(certsUIAuthorizationData, accountId);
     if (!result.IsSuccess || result.Value == null) {
       return result.ToActionResult();
     }
@@ -52,14 +51,12 @@ public class CacheController(
 
     return File(bytes, "application/zip", $"cache-{accountId}.zip");
   }
-  #endregion
 
-  #region Create
   [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpPost("upload")]
-  //[RequestSizeLimit(200_000_000)]
   public async Task<IActionResult> PostCache(IFormFile file) {
-    if (file is null || file.Length == 0) return BadRequest("No file.");
+    if (file is null || file.Length == 0)
+      return BadRequest("No file.");
 
     var certsUIAuthorizationDataResult = HttpContext.GetCertsUIAuthorizationData();
     if (!certsUIAuthorizationDataResult.IsSuccess || certsUIAuthorizationDataResult.Value == null)
@@ -69,7 +66,7 @@ public class CacheController(
 
     using var ms = new MemoryStream();
     await file.CopyToAsync(ms);
-    var result = await _cacheService.UploadCacheZipAsync(certsUIAuthorizationData, ms.ToArray());
+    var result = await cacheService.UploadCacheZipAsync(certsUIAuthorizationData, ms.ToArray());
     return result.ToActionResult();
   }
 
@@ -82,7 +79,7 @@ public class CacheController(
 
     var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
 
-    var result = await _cacheService.UploadAccountCacheZipAsync(certsUIAuthorizationData, accountId, zipBytes);
+    var result = await cacheService.UploadAccountCacheZipAsync(certsUIAuthorizationData, accountId, zipBytes);
     return result.ToActionResult();
   }
   #endregion
@@ -98,7 +95,7 @@ public class CacheController(
 
     var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
 
-    var result = await _cacheService.DeleteCacheAsync(certsUIAuthorizationData);
+    var result = await cacheService.DeleteCacheAsync(certsUIAuthorizationData);
     return result.ToActionResult();
   }
   #endregion

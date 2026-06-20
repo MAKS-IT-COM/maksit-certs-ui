@@ -12,9 +12,15 @@ using System.Text.Json;
 namespace MaksIT.CertsUI.Services;
 
 public interface IAgentService {
+
+  #region Read
   Task<Result<HelloWorldResponse?>> GetHelloWorld(CertsUIAuthorizationData certsAuthorizationData);
+  #endregion
+
+  #region Deployment
   Task<Result> UploadCerts(Dictionary<string, string> certs);
   Task<Result> ReloadService(string serviceName);
+  #endregion
 }
 
 public class AgentService(
@@ -26,6 +32,8 @@ public class AgentService(
   appSettings
 ), IAgentService, IAgentDeploymentService {
 
+  #region Read
+
   public async Task<Result<HelloWorldResponse?>> GetHelloWorld(CertsUIAuthorizationData certsAuthorizationData) {
     var rbac = RBACWrapper(certsAuthorizationData, _ => Result.Ok(), _ => Result.Ok());
     if (!rbac.IsSuccess)
@@ -34,12 +42,12 @@ public class AgentService(
     try {
       var endpoint = $"/HelloWorld";
 
-      var fullAddress = $"{_appSettings.CertsEngineConfiguration.Agent.AgentHostname}:{_appSettings.CertsEngineConfiguration.Agent.AgentPort}{endpoint}";
+      var fullAddress = $"{AppSettings.CertsEngineConfiguration.Agent.AgentHostname}:{AppSettings.CertsEngineConfiguration.Agent.AgentPort}{endpoint}";
 
       var request = new HttpRequestMessage(HttpMethod.Get, fullAddress);
-      request.Headers.Add("x-api-key", _appSettings.CertsEngineConfiguration.Agent.AgentKey);
+      request.Headers.Add("x-api-key", AppSettings.CertsEngineConfiguration.Agent.AgentKey);
 
-      _logger.LogInformation($"Sending GET request to {fullAddress}");
+      Logger.LogInformation($"Sending GET request to {fullAddress}");
 
       var response = await httpClient.SendAsync(request);
 
@@ -51,21 +59,25 @@ public class AgentService(
         });
       }
       else {
-        _logger.LogError($"Request to {endpoint} failed with status code: {response.StatusCode}");
+        Logger.LogError($"Request to {endpoint} failed with status code: {response.StatusCode}");
         return Result<HelloWorldResponse?>.InternalServerError(null, $"Request to {endpoint} failed with status code: {response.StatusCode}");
       }
 
     }
     catch (Exception ex) {
-      List<string> messages = new() { "Something went wrong" };
+      List<string> messages = ["Something went wrong"];
 
-      _logger.LogError(ex, messages.FirstOrDefault());
+      Logger.LogError(ex, messages.FirstOrDefault());
 
       messages.Add(ex.Message);
 
       return Result<HelloWorldResponse?>.InternalServerError(null, [.. messages]);
     }
   }
+
+  #endregion
+
+  #region Deployment
 
   public async Task<Result> ReloadService(string serviceName) {
     var requestBody = new ServiceReloadRequest { ServiceName = serviceName };
@@ -79,13 +91,17 @@ public class AgentService(
     return await SendHttpRequest(requestBody, endpoint);
   }
 
+  #endregion
+
+  #region Internal helpers
+
   private async Task<Result> SendHttpRequest<T>(T requestBody, string endpoint) {
     try {
-      var request = new HttpRequestMessage(HttpMethod.Post, $"{_appSettings.CertsEngineConfiguration.Agent.AgentHostname}:{_appSettings.CertsEngineConfiguration.Agent.AgentPort}{endpoint}") {
+      var request = new HttpRequestMessage(HttpMethod.Post, $"{AppSettings.CertsEngineConfiguration.Agent.AgentHostname}:{AppSettings.CertsEngineConfiguration.Agent.AgentPort}{endpoint}") {
         Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json")
       };
 
-      request.Headers.Add("x-api-key", _appSettings.CertsEngineConfiguration.Agent.AgentKey);
+      request.Headers.Add("x-api-key", AppSettings.CertsEngineConfiguration.Agent.AgentKey);
       request.Headers.Add("accept", "application/json");
 
       var response = await httpClient.SendAsync(request);
@@ -94,18 +110,20 @@ public class AgentService(
         return Result.Ok();
       }
       else {
-        _logger.LogError($"Request to {endpoint} failed with status code: {response.StatusCode}");
+        Logger.LogError($"Request to {endpoint} failed with status code: {response.StatusCode}");
         return Result.InternalServerError($"Request to {endpoint} failed with status code: {response.StatusCode}");
       }
     }
     catch (Exception ex) {
-      List<string> messages = new() { "Something went wrong" };
+      List<string> messages = ["Something went wrong"];
 
-      _logger.LogError(ex, messages.FirstOrDefault());
+      Logger.LogError(ex, messages.FirstOrDefault());
 
       messages.Add(ex.Message);
 
       return Result.InternalServerError([.. messages]);
     }
   }
+
+  #endregion
 }

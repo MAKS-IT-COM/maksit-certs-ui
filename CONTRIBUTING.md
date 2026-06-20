@@ -16,7 +16,7 @@ Large or architectural changes are best discussed first (see [Contact](#contact)
 
 **Canonical (contributors / AI agents):** [AGENTS.md](AGENTS.md) — homelab shared skills via `.cursor/maksit-skills.json`.
 
-**Summary:** `MaksIT.CertsUI.Engine` holds domain, PostgreSQL persistence (Linq2Db), migrations, and ACME engine code; it returns `MaksIT.Results` types, not HTTP responses. `MaksIT.CertsUI` is the web host (controllers, app services, ProblemDetails). Before changing filters or identity/API-key services, read **maksit-auth-rbac** and **maksit-layering** (listed in AGENTS.md).
+**Summary:** `MaksIT.CertsUI.Engine` holds domain, PostgreSQL persistence (Linq2Db), migrations, and ACME engine code; it returns `MaksIT.Results` types, not HTTP responses. Multi-replica runtime leases and instance id come from **MaksIT.HAMode** (registered in `AddCertsEngine`); product lease names are in `RuntimeCoordination/RuntimeLeaseNames.cs`. `MaksIT.CertsUI` is the web host (controllers, app services, ProblemDetails). Before changing filters or identity/API-key services, read **maksit-auth-rbac** and **maksit-layering** (listed in AGENTS.md).
 
 ## Development setup
 

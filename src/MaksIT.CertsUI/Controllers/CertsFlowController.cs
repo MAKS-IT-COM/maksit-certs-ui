@@ -14,24 +14,8 @@ namespace MaksIT.CertsUI.Controllers;
 public class CertsFlowController(
   ICertsFlowService certsFlowService
 ) : ControllerBase {
-  private readonly ICertsFlowService _certsFlowService = certsFlowService;
 
-  #region Create
-  [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
-  [HttpPost("configure-client")]
-  public async Task<IActionResult> ConfigureClient([FromBody] ConfigureClientRequest requestData) {
-    var certsUIAuthorizationDataResult = HttpContext.GetCertsUIAuthorizationData();
-    if (!certsUIAuthorizationDataResult.IsSuccess || certsUIAuthorizationDataResult.Value == null)
-      return certsUIAuthorizationDataResult.ToActionResult();
-
-    var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
-
-    var result = await _certsFlowService.ConfigureClientAsync(certsUIAuthorizationData, requestData.IsStaging);
-    return result.ToActionResult();
-  }
-  #endregion
-
-  #region Read
+  #region Terms of service
   [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpGet("{sessionId}/terms-of-service")]
   public async Task<IActionResult> TermsOfService(Guid sessionId) {
@@ -41,7 +25,35 @@ public class CertsFlowController(
 
     var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
 
-    var result = await _certsFlowService.GetTermsOfServiceAsync(certsUIAuthorizationData, sessionId);
+    var result = await certsFlowService.GetTermsOfServiceAsync(certsUIAuthorizationData, sessionId);
+    return result.ToActionResult();
+  }
+  #endregion
+
+  #region Session, orders, and certificates
+  [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
+  [HttpPost("configure-client")]
+  public async Task<IActionResult> ConfigureClient([FromBody] ConfigureClientRequest requestData) {
+    var certsUIAuthorizationDataResult = HttpContext.GetCertsUIAuthorizationData();
+    if (!certsUIAuthorizationDataResult.IsSuccess || certsUIAuthorizationDataResult.Value == null)
+      return certsUIAuthorizationDataResult.ToActionResult();
+
+    var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
+
+    var result = await certsFlowService.ConfigureClientAsync(certsUIAuthorizationData, requestData.IsStaging);
+    return result.ToActionResult();
+  }
+
+  [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
+  [HttpPost("{sessionId}/init/{accountId?}")]
+  public async Task<IActionResult> Init(Guid sessionId, Guid? accountId, [FromBody] InitRequest requestData) {
+    var certsUIAuthorizationDataResult = HttpContext.GetCertsUIAuthorizationData();
+    if (!certsUIAuthorizationDataResult.IsSuccess || certsUIAuthorizationDataResult.Value == null)
+      return certsUIAuthorizationDataResult.ToActionResult();
+
+    var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
+
+    var result = await certsFlowService.InitAsync(certsUIAuthorizationData, sessionId, accountId, requestData.Description, requestData.Contacts);
     return result.ToActionResult();
   }
 
@@ -54,7 +66,7 @@ public class CertsFlowController(
 
     var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
 
-    var result = await _certsFlowService.NewOrderAsync(certsUIAuthorizationData, sessionId, requestData.Hostnames, requestData.ChallengeType);
+    var result = await certsFlowService.NewOrderAsync(certsUIAuthorizationData, sessionId, requestData.Hostnames, requestData.ChallengeType);
     return result.ToActionResult();
   }
 
@@ -67,7 +79,7 @@ public class CertsFlowController(
 
     var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
 
-    var result = await _certsFlowService.GetOrderAsync(certsUIAuthorizationData, sessionId, requestData.Hostnames);
+    var result = await certsFlowService.GetOrderAsync(certsUIAuthorizationData, sessionId, requestData.Hostnames);
     return result.ToActionResult();
   }
 
@@ -80,27 +92,10 @@ public class CertsFlowController(
 
     var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
 
-    var result = await _certsFlowService.GetCertificatesAsync(certsUIAuthorizationData, sessionId, requestData.Hostnames);
+    var result = await certsFlowService.GetCertificatesAsync(certsUIAuthorizationData, sessionId, requestData.Hostnames);
     return result.ToActionResult();
   }
-  #endregion
 
-  #region Init
-  [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
-  [HttpPost("{sessionId}/init/{accountId?}")]
-  public async Task<IActionResult> Init(Guid sessionId, Guid? accountId, [FromBody] InitRequest requestData) {
-    var certsUIAuthorizationDataResult = HttpContext.GetCertsUIAuthorizationData();
-    if (!certsUIAuthorizationDataResult.IsSuccess || certsUIAuthorizationDataResult.Value == null)
-      return certsUIAuthorizationDataResult.ToActionResult();
-
-    var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
-
-    var result = await _certsFlowService.InitAsync(certsUIAuthorizationData, sessionId, accountId, requestData.Description, requestData.Contacts);
-    return result.ToActionResult();
-  }
-  #endregion
-
-  #region Complete
   [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpPost("{sessionId}/complete-challenges")]
   public async Task<IActionResult> CompleteChallenges(Guid sessionId) {
@@ -110,12 +105,12 @@ public class CertsFlowController(
 
     var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
 
-    var result = await _certsFlowService.CompleteChallengesAsync(certsUIAuthorizationData, sessionId);
+    var result = await certsFlowService.CompleteChallengesAsync(certsUIAuthorizationData, sessionId);
     return result.ToActionResult();
   }
   #endregion
 
-  #region Apply
+  #region Deploy and revoke
   [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpPost("{accountId}/certificates/apply")]
   public async Task<IActionResult> ApplyCertificates(Guid accountId) {
@@ -125,12 +120,10 @@ public class CertsFlowController(
 
     var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
 
-    var result = await _certsFlowService.ApplyCertificatesAsync(certsUIAuthorizationData, accountId);
+    var result = await certsFlowService.ApplyCertificatesAsync(certsUIAuthorizationData, accountId);
     return result.ToActionResult();
   }
-  #endregion
 
-  #region Revoke
   [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpPost("{sessionId}/certificates/revoke")]
   public async Task<IActionResult> RevokeCertificates(Guid sessionId, [FromBody] RevokeCertificatesRequest requestData) {
@@ -140,7 +133,7 @@ public class CertsFlowController(
 
     var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
 
-    var result = await _certsFlowService.RevokeCertificatesAsync(certsUIAuthorizationData, sessionId, requestData.Hostnames);
+    var result = await certsFlowService.RevokeCertificatesAsync(certsUIAuthorizationData, sessionId, requestData.Hostnames);
     return result.ToActionResult();
   }
   #endregion

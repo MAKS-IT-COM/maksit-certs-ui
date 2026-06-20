@@ -13,7 +13,8 @@ public class CertsUIApiException : Exception {
 
   private static string FormatMessage(int statusCode, string? message, string? responseBody) {
     var m = message ?? $"CertsUI API returned {statusCode}.";
-    if (string.IsNullOrWhiteSpace(responseBody)) return m;
+    if (string.IsNullOrWhiteSpace(responseBody))
+      return m;
     const int maxLen = 500;
     var snippet = responseBody.Length > maxLen ? responseBody[..maxLen] + "…" : responseBody;
     return $"{m} Response: {snippet}";

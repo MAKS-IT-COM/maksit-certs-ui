@@ -16,38 +16,26 @@ namespace MaksIT.CertsUI.Engine.Domain.Identity;
 /// </list>
 /// </para>
 /// </summary>
-public class ApiKeyAuthorization {
+public class ApiKeyAuthorization(
+  Guid apiKeyId,
+  bool isGlobalAdmin = false,
+  List<ApiKeyEntityScope>? entityScopes = null
+) {
 
   /// <summary>
   /// API key this authorization belongs to.
   /// </summary>
-  public Guid ApiKeyId { get; private set; }
+  public Guid ApiKeyId { get; private set; } = apiKeyId;
 
   /// <summary>
   /// Whether the API key has global admin privileges.
   /// </summary>
-  public bool IsGlobalAdmin { get; private set; }
+  public bool IsGlobalAdmin { get; private set; } = isGlobalAdmin;
 
   /// <summary>
   /// Entity-specific scopes (e.g. organization/application permissions).
   /// </summary>
-  public List<ApiKeyEntityScope> EntityScopes { get; private set; } = [];
-
-  /// <summary>
-  /// Creates authorization for an API key (e.g. when creating a new key).
-  /// </summary>
-  public ApiKeyAuthorization(Guid apiKeyId) {
-    ApiKeyId = apiKeyId;
-  }
-
-  /// <summary>
-  /// Creates authorization with full data (e.g. when loading from persistence).
-  /// </summary>
-  public ApiKeyAuthorization(Guid apiKeyId, bool isGlobalAdmin, List<ApiKeyEntityScope> entityScopes) {
-    ApiKeyId = apiKeyId;
-    IsGlobalAdmin = isGlobalAdmin;
-    EntityScopes = entityScopes ?? [];
-  }
+  public List<ApiKeyEntityScope> EntityScopes { get; private set; } = entityScopes ?? [];
 
   public ApiKeyAuthorization SetIsGlobalAdmin(bool isGlobalAdmin) {
     IsGlobalAdmin = isGlobalAdmin;

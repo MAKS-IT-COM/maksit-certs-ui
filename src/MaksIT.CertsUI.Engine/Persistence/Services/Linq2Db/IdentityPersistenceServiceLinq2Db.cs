@@ -14,9 +14,6 @@ namespace MaksIT.CertsUI.Engine.Persistence.Services.Linq2Db;
 /// Linq2Db-based implementation of <see cref="IIdentityPersistenceService"/>.
 /// </summary>
 public class IdentityPersistenceServiceLinq2Db(ILogger<IdentityPersistenceServiceLinq2Db> logger, ICertsUIDataConnectionFactory connectionFactory, UserMapper userMapper) : IIdentityPersistenceService {
-  private readonly ILogger<IdentityPersistenceServiceLinq2Db> _logger = logger;
-  private readonly ICertsUIDataConnectionFactory _connectionFactory = connectionFactory;
-  private readonly UserMapper _userMapper = userMapper;
 
   public Result<User?> ReadById(Guid userId) =>
     GetSingleUser(db => db.GetTable<UserDto>().Where(u => u.Id == userId), $"ID {userId}", $"User with ID {userId} not found.");
@@ -37,7 +34,7 @@ public class IdentityPersistenceServiceLinq2Db(ILogger<IdentityPersistenceServic
     GetSingleUser(db => db.GetTable<UserDto>().Where(u => u.Email == email), $"email {email}", $"User with email {email} not found.");
 
   public Result<User?> ReadByToken(string token) {
-    using var db = _connectionFactory.Create();
+    using var db = connectionFactory.Create();
 
     var userId = db.GetTable<JwtTokenDto>()
       .Where(t => t.Token == token)
@@ -51,7 +48,7 @@ public class IdentityPersistenceServiceLinq2Db(ILogger<IdentityPersistenceServic
   }
 
   public Result<User?> ReadByRefreshToken(string refreshToken) {
-    using var db = _connectionFactory.Create();
+    using var db = connectionFactory.Create();
 
     var userId = db.GetTable<JwtTokenDto>()
       .Where(t => t.RefreshToken == refreshToken)
@@ -66,7 +63,7 @@ public class IdentityPersistenceServiceLinq2Db(ILogger<IdentityPersistenceServic
 
   private Result<User?> GetSingleUser(Func<LinqToDB.Data.DataConnection, IQueryable<UserDto>> queryFn, string identifier, string notFoundMessage) {
     try {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
 
       var userDto = queryFn(db).FirstOrDefault();
 
@@ -75,12 +72,12 @@ public class IdentityPersistenceServiceLinq2Db(ILogger<IdentityPersistenceServic
 
       LoadUserChildren(db, userDto);
 
-      var user = _userMapper.MapToDomain(userDto);
+      var user = userMapper.MapToDomain(userDto);
       return Result<User?>.Ok(user);
     }
     catch (Exception ex) {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error reading user with {Identifier}", identifier);
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error reading user with {Identifier}", identifier);
       return Result<User?>.InternalServerError(null, ["An error occurred while retrieving the user.", .. ex.ExtractMessages()]);
     }
   }
@@ -103,7 +100,7 @@ public class IdentityPersistenceServiceLinq2Db(ILogger<IdentityPersistenceServic
       var dto = UserMapper.MapToDto(user);
       UserMapper.ApplyAuthorizationToDto(dto, user.Id, authorization);
 
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
       var existing = db.GetTable<UserDto>().Where(u => u.Id == user.Id).FirstOrDefault();
       if (existing != null) {
         LoadUserChildren(db, existing);
@@ -121,8 +118,8 @@ public class IdentityPersistenceServiceLinq2Db(ILogger<IdentityPersistenceServic
       return Result<User?>.Ok(user);
     }
     catch (Exception ex) {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error writing user {UserId}", user.Id);
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error writing user {UserId}", user.Id);
       return Result<User?>.InternalServerError(null, ["An error occurred while saving the user.", .. ex.ExtractMessages()]);
     }
   }
@@ -232,7 +229,7 @@ public class IdentityPersistenceServiceLinq2Db(ILogger<IdentityPersistenceServic
     ArgumentNullException.ThrowIfNull(userIds);
 
     try {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
 
       foreach (var userId in userIds) {
         var exists = db.GetTable<UserDto>().Any(u => u.Id == userId);
@@ -249,8 +246,8 @@ public class IdentityPersistenceServiceLinq2Db(ILogger<IdentityPersistenceServic
       return Result.Ok();
     }
     catch (Exception ex) {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error deleting users");
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error deleting users");
 
       return Result.InternalServerError(["Error occurred while deleting users.", .. ex.ExtractMessages()]);
     }

@@ -1,13 +1,13 @@
-using FluentMigrator.Runner;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using MaksIT.CertsUI.Engine;
+using FluentMigrator.Runner;
+using MaksIT.HAMode.Extensions;
 using MaksIT.CertsUI.Engine.DomainServices;
 using MaksIT.CertsUI.Engine.FluentMigrations;
 using MaksIT.CertsUI.Engine.Infrastructure;
 using MaksIT.CertsUI.Engine.Persistence.Mappers;
 using MaksIT.CertsUI.Engine.Persistence.Services;
-using Microsoft.Extensions.Logging;
 using MaksIT.CertsUI.Engine.QueryServices.Identity;
 using MaksIT.CertsUI.Engine.QueryServices.Linq2Db.Identity;
 using MaksIT.CertsUI.Engine.Services;
@@ -63,7 +63,10 @@ public static class ServiceCollectionExtensions {
     services.AddScoped<IAcmeSessionPersistenceService, AcmeSessionPersistenceServiceLinq2Db>();
     services.AddScoped<IAcmeHttpChallengePersistenceService, AcmeHttpChallengePersistenceServiceLinq2Db>();
     services.AddScoped<ITermsOfServiceCachePersistenceService, TermsOfServiceCachePersistenceServiceLinq2Db>();
-    services.AddSingleton<IRuntimeLeaseService, RuntimeLeaseServiceNpgsql>();
+    #endregion
+
+    #region HA runtime coordination
+    services.AddHAModePostgreSql(new CertsRuntimeLeaseConnectionStringProvider(certsEngineConfiguration));
     #endregion
 
     #region Identity

@@ -16,9 +16,9 @@ public partial class LetsEncryptService {
   #region Internal helpers
 
   private async Task<State> LoadAcmeSessionStateAsync(Guid sessionId, CancellationToken cancellationToken) {
-    var result = await _acmeSessionPersistence.LoadAsync(sessionId, cancellationToken).ConfigureAwait(false);
+    var result = await acmeSessionPersistence.LoadAsync(sessionId, cancellationToken).ConfigureAwait(false);
     if (!result.IsSuccess) {
-      _logger.LogWarning(
+      logger.LogWarning(
         "ACME session load failed for {SessionId}: {Messages}",
         sessionId,
         result.Messages != null ? string.Join("; ", result.Messages) : "(no detail)");
@@ -29,9 +29,9 @@ public partial class LetsEncryptService {
   }
 
   private async Task PersistAcmeSessionStateAsync(Guid sessionId, State state, CancellationToken cancellationToken) {
-    var result = await _acmeSessionPersistence.SaveAsync(sessionId, state, cancellationToken).ConfigureAwait(false);
+    var result = await acmeSessionPersistence.SaveAsync(sessionId, state, cancellationToken).ConfigureAwait(false);
     if (!result.IsSuccess) {
-      _logger.LogError(
+      logger.LogError(
         "ACME session save failed for {SessionId}: {Messages}",
         sessionId,
         result.Messages != null ? string.Join("; ", result.Messages) : "(no detail)");
@@ -70,12 +70,12 @@ public partial class LetsEncryptService {
 
     try {
 
-      _logger.LogInformation($"Executing {nameof(GetNonceAsync)}...");
+      logger.LogInformation($"Executing {nameof(GetNonceAsync)}...");
 
       if (state.Directory is not { NewNonce: { } newNonceUri })
         return Result<string?>.InternalServerError(null, "Directory or NewNonce URL is null.");
 
-      var result = await _httpClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, newNonceUri));
+      var result = await httpClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, newNonceUri));
 
       var nonce = result.Headers.GetValues(ReplayNonceHeader).FirstOrDefault();
 
@@ -91,7 +91,7 @@ public partial class LetsEncryptService {
 
   private async Task<Result<SendResult<T>?>> SendAcmeRequest<T>(HttpRequestMessage request, State state, HttpMethod method) {
     try {
-      var response = await _httpClient.SendAsync(request);
+      var response = await httpClient.SendAsync(request);
 
       var responseText = await response.Content.ReadAsStringAsync();
 
@@ -164,7 +164,7 @@ public partial class LetsEncryptService {
 
       PrepareRequestContent(pollRequest, pollJson, HttpMethod.Post);
 
-      var pollResponse = await _httpClient.SendAsync(pollRequest);
+      var pollResponse = await httpClient.SendAsync(pollRequest);
 
       var pollResponseText = await pollResponse.Content.ReadAsStringAsync();
 
@@ -243,7 +243,7 @@ public partial class LetsEncryptService {
           state.Cache.AcmeRenewalNotBeforeUtcByHostname[key] = when;
         }
 
-        _logger.LogWarning(
+        logger.LogWarning(
             "ACME rate limited: Kind {AcmeProblemKind}, Type {AcmeProblemType}, Hostname {Hostname}, RetryNotBefore {RetryNotBeforeUtc:o}. Detail: {Detail}",
             ex.ProblemKind, ex.Problem?.Type, id, when, ex.Problem?.Detail);
 
@@ -253,7 +253,7 @@ public partial class LetsEncryptService {
         return tooManyRequests(msg);
       }
 
-      _logger.LogWarning(ex,
+      logger.LogWarning(ex,
           "Let's Encrypt ACME problem: Kind {AcmeProblemKind}, Type {AcmeProblemType}. {Detail}",
           ex.ProblemKind, ex.Problem?.Type, ex.Problem?.Detail);
       var fallback = string.IsNullOrEmpty(ex.Message) ? "Let's Encrypt request failed." : ex.Message;
@@ -265,12 +265,12 @@ public partial class LetsEncryptService {
   }
 
   private Result HandleUnhandledException(Exception ex, string defaultMessage = "Let's Encrypt client unhandled exception") {
-    _logger.LogError(ex, defaultMessage);
+    logger.LogError(ex, defaultMessage);
     return Result.InternalServerError([defaultMessage, .. ex.ExtractMessages()]);
   }
 
   private Result<T?> HandleUnhandledException<T>(Exception ex, T? defaultValue = default, string defaultMessage = "Let's Encrypt client unhandled exception") {
-    _logger.LogError(ex, defaultMessage);
+    logger.LogError(ex, defaultMessage);
     return Result<T?>.InternalServerError(defaultValue, [.. ex.ExtractMessages()]);
   }
   #endregion

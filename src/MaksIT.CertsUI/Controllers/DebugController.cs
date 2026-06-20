@@ -1,6 +1,6 @@
 using MaksIT.CertsUI.Authorization.Extensions;
 using MaksIT.CertsUI.Authorization.Filters;
-using MaksIT.CertsUI.Engine.RuntimeCoordination;
+using MaksIT.HAMode.Abstractions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MaksIT.CertsUI.Controllers;

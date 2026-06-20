@@ -14,12 +14,10 @@ namespace MaksIT.CertsUI.Engine.Persistence.Services.Linq2Db;
 /// Linq2Db-based implementation of <see cref="IUserAuthorizationPersistenceService"/>.
 /// </summary>
 public class UserAuthorizationPersistenceServiceLinq2Db(ILogger<UserAuthorizationPersistenceServiceLinq2Db> logger, ICertsUIDataConnectionFactory connectionFactory) : IUserAuthorizationPersistenceService {
-  private readonly ILogger<UserAuthorizationPersistenceServiceLinq2Db> _logger = logger;
-  private readonly ICertsUIDataConnectionFactory _connectionFactory = connectionFactory;
 
   public Result<UserAuthorization?> ReadByUserId(Guid userId) {
     try {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
 
       var userDto = db.GetTable<UserDto>()
         .Where(u => u.Id == userId)
@@ -36,17 +34,18 @@ public class UserAuthorizationPersistenceServiceLinq2Db(ILogger<UserAuthorizatio
       return Result<UserAuthorization?>.Ok(authorization);
     }
     catch (Exception ex) {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error reading authorization for user {UserId}", userId);
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error reading authorization for user {UserId}", userId);
       return Result<UserAuthorization?>.InternalServerError(null, ["An error occurred while retrieving user authorization.", .. ex.ExtractMessages()]);
     }
   }
 
   public Result Write(UserAuthorization authorization) {
-    if (authorization == null) return Result.BadRequest("Authorization is null.");
+    if (authorization == null)
+      return Result.BadRequest("Authorization is null.");
 
     try {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
 
       var userDto = db.GetTable<UserDto>()
         .Where(u => u.Id == authorization.UserId)
@@ -99,15 +98,15 @@ public class UserAuthorizationPersistenceServiceLinq2Db(ILogger<UserAuthorizatio
       return Result.Ok();
     }
     catch (Exception ex) {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error writing authorization for user {UserId}", authorization.UserId);
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error writing authorization for user {UserId}", authorization.UserId);
       return Result.InternalServerError(["An error occurred while saving user authorization.", .. ex.ExtractMessages()]);
     }
   }
 
   public Result<List<Guid>?> ReadGlobalAdminUserIds() {
     try {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
 
       var ids = db.GetTable<UserDto>()
         .Where(x => x.IsGlobalAdmin)
@@ -117,8 +116,8 @@ public class UserAuthorizationPersistenceServiceLinq2Db(ILogger<UserAuthorizatio
       return Result<List<Guid>?>.Ok(ids);
     }
     catch (Exception ex) {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error reading global admin user IDs");
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error reading global admin user IDs");
 
       return Result<List<Guid>?>.InternalServerError(null, ["An error occurred while retrieving global admins.", .. ex.ExtractMessages()]);
     }

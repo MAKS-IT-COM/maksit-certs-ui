@@ -1,6 +1,8 @@
 namespace MaksIT.CertsUI.Engine.RuntimeCoordination;
 
-/// <summary>PostgreSQL <c>app_runtime_leases.lease_name</c> values.</summary>
+/// <summary>
+/// PostgreSQL <c>app_runtime_leases.lease_name</c> values for CertsUI (see <c>MaksIT.HAMode.Abstractions.IRuntimeLeaseService</c>).
+/// </summary>
 public static class RuntimeLeaseNames {
   public const string AcmeWriter = "certs-ui-acme-writer";
 

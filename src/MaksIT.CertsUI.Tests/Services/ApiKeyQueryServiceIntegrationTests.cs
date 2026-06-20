@@ -37,7 +37,6 @@ public class ApiKeyQueryServiceIntegrationTests(PostgresCacheFixture pg) {
       NullLogger<ApiKeyAuthorizationPersistenceServiceLinq2Db>.Instance,
       pg.ConnectionFactory);
     var apiKeyDomainService = new ApiKeyDomainService(
-      NullLogger<ApiKeyDomainService>.Instance,
       apiKeyPersistence,
       apiKeyAuthzPersistence);
 
@@ -62,7 +61,6 @@ public class ApiKeyQueryServiceIntegrationTests(PostgresCacheFixture pg) {
     var apiKeyService = new ApiKeyService(
       NullLogger<ApiKeyService>.Instance,
       pg.Config.AppOptions,
-      identityDomainService,
       queryService,
       entityScopeQuery,
       apiKeyDomainService,

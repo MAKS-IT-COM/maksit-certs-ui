@@ -14,12 +14,10 @@ namespace MaksIT.CertsUI.Engine.Persistence.Services.Linq2Db;
 /// Linq2Db-based implementation of <see cref="IApiKeyAuthorizationPersistenceService"/>.
 /// </summary>
 public class ApiKeyAuthorizationPersistenceServiceLinq2Db(ILogger<ApiKeyAuthorizationPersistenceServiceLinq2Db> logger, ICertsUIDataConnectionFactory connectionFactory) : IApiKeyAuthorizationPersistenceService {
-  private readonly ILogger<ApiKeyAuthorizationPersistenceServiceLinq2Db> _logger = logger;
-  private readonly ICertsUIDataConnectionFactory _connectionFactory = connectionFactory;
 
   public Result<ApiKeyAuthorization?> ReadByApiKeyId(Guid apiKeyId) {
     try {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
 
       var dto = db.GetTable<ApiKeyDto>()
         .Where(k => k.Id == apiKeyId)
@@ -34,8 +32,8 @@ public class ApiKeyAuthorizationPersistenceServiceLinq2Db(ILogger<ApiKeyAuthoriz
       return Result<ApiKeyAuthorization?>.Ok(ApiKeyMapper.ToAuthorization(dto));
     }
     catch (Exception ex) {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error reading authorization for API key {ApiKeyId}", apiKeyId);
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error reading authorization for API key {ApiKeyId}", apiKeyId);
       return Result<ApiKeyAuthorization?>.InternalServerError(null, ["An error occurred while retrieving API key authorization.", .. ex.ExtractMessages()]);
     }
   }
@@ -47,7 +45,7 @@ public class ApiKeyAuthorizationPersistenceServiceLinq2Db(ILogger<ApiKeyAuthoriz
 
     try
     {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
 
       if (!db.GetTable<ApiKeyDto>().Any(k => k.Id == authorization.ApiKeyId))
         return Result.NotFound($"API key {authorization.ApiKeyId} not found.");
@@ -94,8 +92,8 @@ public class ApiKeyAuthorizationPersistenceServiceLinq2Db(ILogger<ApiKeyAuthoriz
       return Result.Ok();
     }
     catch (Exception ex) {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error writing authorization for API key {ApiKeyId}", authorization.ApiKeyId);
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error writing authorization for API key {ApiKeyId}", authorization.ApiKeyId);
       return Result.InternalServerError(["An error occurred while saving API key authorization.", .. ex.ExtractMessages()]);
     }
   }

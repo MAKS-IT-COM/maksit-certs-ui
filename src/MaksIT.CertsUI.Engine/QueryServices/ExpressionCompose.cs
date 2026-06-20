@@ -13,7 +13,8 @@ public static class ExpressionCompose {
   public static Expression<Func<TOuter, bool>>? ComposeNavigationPredicate<TOuter, TInner>(
     Expression<Func<TInner, bool>>? innerPredicate,
     Expression<Func<TOuter, TInner>> navigation) {
-    if (innerPredicate == null) return null;
+    if (innerPredicate == null)
+      return null;
     ArgumentNullException.ThrowIfNull(navigation);
 
     var visitor = new ReplaceParameterWithExpressionVisitor(innerPredicate.Parameters[0], navigation.Body);

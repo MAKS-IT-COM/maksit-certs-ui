@@ -14,8 +14,6 @@ namespace MaksIT.CertsUI.Engine.Persistence.Services.Linq2Db;
 /// Linq2Db-based implementation of <see cref="IApiKeyPersistenceService"/>.
 /// </summary>
 public class ApiKeyPersistenceServiceLinq2Db(ILogger<ApiKeyPersistenceServiceLinq2Db> logger, ICertsUIDataConnectionFactory connectionFactory) : IApiKeyPersistenceService {
-  private readonly ILogger<ApiKeyPersistenceServiceLinq2Db> _logger = logger;
-  private readonly ICertsUIDataConnectionFactory _connectionFactory = connectionFactory;
 
   public Result<ApiKey?> ReadById(Guid apiKeyId) =>
     GetSingle(db => db.GetTable<ApiKeyDto>()
@@ -27,7 +25,7 @@ public class ApiKeyPersistenceServiceLinq2Db(ILogger<ApiKeyPersistenceServiceLin
 
   private Result<ApiKey?> GetSingle(Func<LinqToDB.Data.DataConnection, IQueryable<ApiKeyDto>> queryFn, string identifier, string notFoundMessage) {
     try {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
 
       var dto = queryFn(db).FirstOrDefault();
 
@@ -38,8 +36,8 @@ public class ApiKeyPersistenceServiceLinq2Db(ILogger<ApiKeyPersistenceServiceLin
       return Result<ApiKey?>.Ok(ApiKeyMapper.MapToDomain(dto));
     }
     catch (Exception ex) {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error reading API key with {Identifier}", identifier);
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error reading API key with {Identifier}", identifier);
       return Result<ApiKey?>.InternalServerError(null, ["An error occurred while retrieving the API key.", .. ex.ExtractMessages()]);
     }
   }
@@ -54,7 +52,7 @@ public class ApiKeyPersistenceServiceLinq2Db(ILogger<ApiKeyPersistenceServiceLin
 
       ApiKeyMapper.ApplyAuthorizationToDto(dto, apiKey.Id, authorization);
 
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
 
       var existing = db.GetTable<ApiKeyDto>().Where(k => k.Id == apiKey.Id).FirstOrDefault();
 
@@ -81,8 +79,8 @@ public class ApiKeyPersistenceServiceLinq2Db(ILogger<ApiKeyPersistenceServiceLin
       return Result<ApiKey?>.Ok(apiKey);
     }
     catch (Exception ex) {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error writing API key {ApiKeyId}", apiKey.Id);
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error writing API key {ApiKeyId}", apiKey.Id);
       return Result<ApiKey?>.InternalServerError(null, ["An error occurred while saving the API key.", .. ex.ExtractMessages()]);
     }
   }
@@ -137,7 +135,7 @@ public class ApiKeyPersistenceServiceLinq2Db(ILogger<ApiKeyPersistenceServiceLin
     ArgumentNullException.ThrowIfNull(apiKeyIds);
 
     try {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
       foreach (var id in apiKeyIds) {
         if (!db.GetTable<ApiKeyDto>().Any(k => k.Id == id))
           return Result.NotFound($"API key with ID {id} not found.");
@@ -154,8 +152,8 @@ public class ApiKeyPersistenceServiceLinq2Db(ILogger<ApiKeyPersistenceServiceLin
       return Result.Ok();
     }
     catch (Exception ex) {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error deleting API keys");
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error deleting API keys");
       return Result.InternalServerError(["Error occurred while deleting API keys.", .. ex.ExtractMessages()]);
     }
   }

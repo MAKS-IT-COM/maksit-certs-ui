@@ -14,8 +14,6 @@ namespace MaksIT.CertsUI.Engine.QueryServices.Linq2Db.Identity;
 /// Linq2Db-based implementation of <see cref="IIdentityQueryService"/>.
 /// </summary>
 public class IdentityQueryServiceLinq2Db(ILogger<IdentityQueryServiceLinq2Db> logger, ICertsUIDataConnectionFactory connectionFactory) : IIdentityQueryService {
-  private readonly ILogger<IdentityQueryServiceLinq2Db> _logger = logger;
-  private readonly ICertsUIDataConnectionFactory _connectionFactory = connectionFactory;
 
   public Result<List<UserQueryResult>?> Search(
     Expression<Func<UserDto, bool>>? usersPredicate,
@@ -23,7 +21,7 @@ public class IdentityQueryServiceLinq2Db(ILogger<IdentityQueryServiceLinq2Db> lo
     int? limit
   ) {
     try {
-      using var db = _connectionFactory
+      using var db = connectionFactory
         .Create();
 
       var query = db.GetTable<UserDto>()
@@ -58,15 +56,15 @@ public class IdentityQueryServiceLinq2Db(ILogger<IdentityQueryServiceLinq2Db> lo
       return Result<List<UserQueryResult>?>.Ok(results);
     }
     catch (Exception ex) {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error occurred while searching users. Params: {UsersPredicate}, {Skip}, {Limit}", usersPredicate, skip, limit);
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error occurred while searching users. Params: {UsersPredicate}, {Skip}, {Limit}", usersPredicate, skip, limit);
       return Result<List<UserQueryResult>?>.InternalServerError(null, [.. ex.ExtractMessages()]);
     }
   }
 
   public Result<int?> Count(Expression<Func<UserDto, bool>>? usersPredicate) {
     try {
-      using var db = _connectionFactory.Create();
+      using var db = connectionFactory.Create();
 
       var query = db.GetTable<UserDto>().AsQueryable();
       if (usersPredicate != null)
@@ -76,8 +74,8 @@ public class IdentityQueryServiceLinq2Db(ILogger<IdentityQueryServiceLinq2Db> lo
       return Result<int?>.Ok(count);
     }
     catch (Exception ex) {
-      if (_logger.IsEnabled(LogLevel.Error))
-        _logger.LogError(ex, "Error occurred while counting users. Params: {UsersPredicate}", usersPredicate);
+      if (logger.IsEnabled(LogLevel.Error))
+        logger.LogError(ex, "Error occurred while counting users. Params: {UsersPredicate}", usersPredicate);
       return Result<int?>.InternalServerError(null, [.. ex.ExtractMessages()]);
     }
   }

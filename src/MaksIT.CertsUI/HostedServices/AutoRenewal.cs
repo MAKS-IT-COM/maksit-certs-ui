@@ -1,7 +1,7 @@
 using MaksIT.CertsUI.Engine.Domain.Certs;
 using MaksIT.CertsUI.Engine.DomainServices;
-using MaksIT.CertsUI.Engine.Infrastructure;
 using MaksIT.CertsUI.Engine.RuntimeCoordination;
+using MaksIT.HAMode.Abstractions;
 using MaksIT.CertsUI.Services;
 
 namespace MaksIT.CertsUI.HostedServices;

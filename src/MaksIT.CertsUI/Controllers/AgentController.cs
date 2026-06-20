@@ -12,8 +12,6 @@ public class AgentController(
   IAgentService agentService
 ) : ControllerBase {
 
-  private readonly IAgentService _agentService = agentService;
-
   #region Read
   [ServiceFilter(typeof(CertsUIAuthorizationFilter))]
   [HttpGet("test")]
@@ -25,7 +23,7 @@ public class AgentController(
 
     var certsUIAuthorizationData = certsUIAuthorizationDataResult.Value;
 
-    var result = await _agentService.GetHelloWorld(certsUIAuthorizationData);
+    var result = await agentService.GetHelloWorld(certsUIAuthorizationData);
     return result.ToActionResult();
   }
   #endregion

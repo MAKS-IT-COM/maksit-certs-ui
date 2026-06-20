@@ -16,38 +16,26 @@ namespace MaksIT.CertsUI.Engine.Domain.Identity;
 /// </list>
 /// </para>
 /// </summary>
-public class UserAuthorization {
+public class UserAuthorization(
+  Guid userId,
+  bool isGlobalAdmin = false,
+  List<UserEntityScope>? entityScopes = null
+) {
 
   /// <summary>
   /// User this authorization belongs to.
   /// </summary>
-  public Guid UserId { get; private set; }
+  public Guid UserId { get; private set; } = userId;
 
   /// <summary>
   /// Whether the user has global admin privileges.
   /// </summary>
-  public bool IsGlobalAdmin { get; private set; }
+  public bool IsGlobalAdmin { get; private set; } = isGlobalAdmin;
 
   /// <summary>
   /// Entity-specific scopes (e.g. organization/application permissions).
   /// </summary>
-  public List<UserEntityScope> EntityScopes { get; private set; } = [];
-
-  /// <summary>
-  /// Creates authorization for a user (e.g. when creating a new user).
-  /// </summary>
-  public UserAuthorization(Guid userId) {
-    UserId = userId;
-  }
-
-  /// <summary>
-  /// Creates authorization with full data (e.g. when loading from persistence).
-  /// </summary>
-  public UserAuthorization(Guid userId, bool isGlobalAdmin, List<UserEntityScope> entityScopes) {
-    UserId = userId;
-    IsGlobalAdmin = isGlobalAdmin;
-    EntityScopes = entityScopes ?? [];
-  }
+  public List<UserEntityScope> EntityScopes { get; private set; } = entityScopes ?? [];
 
   public UserAuthorization SetIsGlobalAdmin(bool isGlobalAdmin) {
     IsGlobalAdmin = isGlobalAdmin;
